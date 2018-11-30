@@ -35,9 +35,10 @@ BINARY = sys.argv[1]
 SEED = ''.join(sys.argv[2:])
 ENTRY = None
 PROJ = None
+SYMBOLS = None
 
 LOGGER = logging.getLogger("lg")
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.ERROR)
 
 
 class Node:
@@ -50,11 +51,14 @@ class Node:
         self.visited = 0
         # each element of constraints is a list of constraints along one path to the node
         self.constraints = [constraint] if constraint else []
+        self.solver = None
+        self.symbols = ''
         if not dummy:
             self.children['Simulation'] = Node(path, constraint=constraint, dummy=True)
 
     def get_constraint(self):
         # TODO: return the simplest constraint
+        assert not self.is_path_node()
         if self.constraints:
             return random.choice(self.constraints)
         return None
@@ -111,6 +115,14 @@ class Node:
             expansion_start = time.time()
             if child_constraint and child_constraint != parent_constraint:
                 self.children[child_addr] = Node(self.path + (child_addr,), child_constraint)
+                self.children[child_addr].children['Simulation'].solver = claripy.Solver()
+                self.children[child_addr].children['Simulation'].solver.add(child_constraint)
+                for con in child_constraint:
+                    for c in con.args:
+                        if type(c.args[1]) is claripy.ast.BV:
+                            self.children[child_addr].children['Simulation'].symbols \
+                                = c.args[1].concat(self.symbols)
+                assert self.children[child_addr].children['Simulation'].symbols is not ''
                 starts_new_path = True
             expansion_end = time.time()
             EXPANSION_TIME += expansion_end - expansion_start
@@ -121,6 +133,9 @@ class Node:
         self.distinct += starts_new_path
         self.children['Simulation'].distinct += starts_new_path
         return starts_new_path
+
+    def solve_in_str(self):
+        return self.solver.eval(self.symbols, NUM_SAMPLES)
 
     def info(self):
         node_score = "{0:4s}: {1:.4f}({2:1d}/{2:1d})".format(
@@ -203,19 +218,15 @@ def mutate(node):
 
     mutate_start = time.time()
 
-    if node.constraints:
-        constraint = node.get_constraint()
-        solver = claripy.Solver()
-        for con in constraint:
-            solver.add(con)
-        vals = solver.eval(constraint[0].args[0].args[1], NUM_SAMPLES)
+    if node.solver:
+        vals = node.solve_in_str()
         results = [chr(val) for val in vals]
         mutate_end = time.time()
         QS_TIME += mutate_end - mutate_start
         QS_COUNT += NUM_SAMPLES
         return results
 
-    assert not node.constraints
+    assert not any(node.constraints)
 
     results = [generate_random() for _ in range(NUM_SAMPLES)]
     mutate_end = time.time()

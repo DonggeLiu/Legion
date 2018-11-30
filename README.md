@@ -2,7 +2,7 @@
 
 Second version of Legion, with progresses and TODOs
 
-## TODOs
+## TODO
 
 ### Version control
 
@@ -11,8 +11,9 @@ Second version of Legion, with progresses and TODOs
 
 ### Runner Optimisation
 
-1. [x] Replace `QEMU` with `tracejump`
-2. [ ] `tracejump` optimisation
+1. [x] Test `tracejump`
+2. [ ] Replace `QEMU` with `tracejump`
+3. [ ] `tracejump` optimisation
 
 ### Tracer optimisation
 
@@ -34,6 +35,7 @@ Second version of Legion, with progresses and TODOs
 2. [ ] CGC programs
 3. [ ] LAVA-M programs
 4. [ ] Four-byte-word sample PUT
+5. [ ] Replace `QEMU` with `tracejump`
 
 ### Solver optimisation
 

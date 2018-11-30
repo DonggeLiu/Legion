@@ -1,3 +1,4 @@
+import logging
 import random
 import struct
 import sys
@@ -10,13 +11,13 @@ import subprocess32
 
 from Results.pie_maker import make_pie
 
-RHO = 1 / sqrt(2)
-
-NUM_SAMPLES = 1
 MAX_PATHS = 9
+NUM_SAMPLES = 1
 DSC_PATHS = set()
-MAX_ROUNDS = 1000
+MAX_ROUNDS = float('inf')
 CUR_ROUND = 0
+
+RHO = 1 / sqrt(2)
 
 QS_TIME = 0.
 RD_TIME = 0.
@@ -34,6 +35,9 @@ BINARY = sys.argv[1]
 SEED = ''.join(sys.argv[2:])
 ENTRY = None
 PROJ = None
+
+LOGGER = logging.getLogger("lg")
+LOGGER.setLevel(logging.INFO)
 
 
 class Node:
@@ -80,12 +84,12 @@ class Node:
             tracer_end = time.time()
             TRACER_TIME += tracer_end - tracer_start
 
-            # if path:
-            #     print("Warning!! Path : {} is not empty while Active is: {}"
-            #           .format(path, simgr.active))
-            # if simgr.active:
-            #     print("Warning!! Active : {} is not empty while Path is: {}"
-            #           .format(simgr.active, path))
+            if path:
+                LOGGER.debug("Path : {} is not empty while Active is: {}"
+                             .format(path, simgr.active))
+            if simgr.active:
+                LOGGER.debug("Active : {} is not empty while Path is: {}"
+                             .format(simgr.active, path))
             return starts_new_path
 
         child = simgr.active[0]
@@ -159,7 +163,9 @@ def compare_addr(state, addr):
     return state.addr == addr
 
 
-def cannot_terminate():
+def cannot_terminate(root):
+    LOGGER.info("=== Iter:{} === Root.distinct:{} === len(DSC_PATHS):{} === QS_COUNT:{} ==="
+                .format(CUR_ROUND, root.distinct, len(DSC_PATHS), QS_COUNT))
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
 
@@ -282,10 +288,8 @@ def run():
     root.insert_descendants(simgr, path[1:])
     CUR_ROUND += 1
 
-    while cannot_terminate():
+    while cannot_terminate(root):
         assert root.distinct == len(DSC_PATHS)
-        print("=== Iter:{} === Root.distinct:{} === len(DSC_PATHS):{} === QS_COUNT:{} ==="
-              .format(CUR_ROUND, root.distinct, len(DSC_PATHS), QS_COUNT))
         history.append([CUR_ROUND, root.distinct])
         mcts(root)
         CUR_ROUND += 1
@@ -412,34 +416,32 @@ def simulate(node):
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:
-    start = time.time()
-
     assert BINARY and SEED
-
+    start = time.time()
     iter_count = run()[-1][0]
     end = time.time()
-    assert (len(DSC_PATHS) == MAX_PATHS)
 
+    assert (len(DSC_PATHS) == MAX_PATHS)
     assert iter_count
-    print("Iter_count = {}".format(iter_count))
-    print("TOTAL_TIME = {}".format(end-start))
-    print("AVG_TTL_TIME = {}".format((end-start)/iter_count))
-    print("ANGR_TIME = {}".format(ANGR_TIME))
-    print("AVG_ANGR_TIME = {}".format(ANGR_TIME/iter_count))
-    print("TRACER_TIME = {}".format(TRACER_TIME))
-    print("AVG_TRACER_TIME = {}".format(TRACER_TIME/iter_count))
-    print("SIMLTR_TIME = {}".format(SIMLTR_TIME))
-    print("AVG_SIMLTR_TIME = {}".format(SIMLTR_TIME/iter_count))
-    print("QS_FZ_TIME = {}".format(QS_TIME))
-    print("AVG_QS_TIME = {}".format(QS_TIME / QS_COUNT))
-    print("RAN_FZ_TIME = {}".format(RD_TIME))
-    print("AVG_RN_TIME = {}".format(RD_TIME / RD_COUNT))
-    print("TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME))
-    print("AVG_TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME/iter_count))
-    print("CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME))
-    print("AVG_CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME / MAX_PATHS))
-    print("EXPANSION_TIME = {}".format(EXPANSION_TIME))
-    print("AVG_EXPANSION_TIME = {}".format(EXPANSION_TIME / MAX_PATHS))
+    LOGGER.info("Iter_count = {}".format(iter_count))
+    LOGGER.info("TOTAL_TIME = {}".format(end-start))
+    LOGGER.info("AVG_TTL_TIME = {}".format((end-start)/iter_count))
+    LOGGER.info("ANGR_TIME = {}".format(ANGR_TIME))
+    LOGGER.info("AVG_ANGR_TIME = {}".format(ANGR_TIME/iter_count))
+    LOGGER.info("TRACER_TIME = {}".format(TRACER_TIME))
+    LOGGER.info("AVG_TRACER_TIME = {}".format(TRACER_TIME/iter_count))
+    LOGGER.info("SIMLTR_TIME = {}".format(SIMLTR_TIME))
+    LOGGER.info("AVG_SIMLTR_TIME = {}".format(SIMLTR_TIME/iter_count))
+    LOGGER.info("QS_FZ_TIME = {}".format(QS_TIME))
+    LOGGER.info("AVG_QS_TIME = {}".format(QS_TIME / QS_COUNT))
+    LOGGER.info("RAN_FZ_TIME = {}".format(RD_TIME))
+    LOGGER.info("AVG_RN_TIME = {}".format(RD_TIME / RD_COUNT))
+    LOGGER.info("TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME))
+    LOGGER.info("AVG_TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME/iter_count))
+    LOGGER.info("CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME))
+    LOGGER.info("AVG_CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME / MAX_PATHS))
+    LOGGER.info("EXPANSION_TIME = {}".format(EXPANSION_TIME))
+    LOGGER.info("AVG_EXPANSION_TIME = {}".format(EXPANSION_TIME / MAX_PATHS))
 
     make_pie(
         categories=['Iteration', 'Total', 'Angr', 'TraceJump',

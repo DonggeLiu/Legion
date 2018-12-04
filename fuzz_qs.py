@@ -358,9 +358,9 @@ def mcts(root):
         mutated_in_str, path = result
         if path in DSC_PATHS:
             continue
+        DSC_PATHS.add(path)
         simgr = initialise_simgr(mutated_in_str)
         new_win = root.insert_descendants(simgr, path[1:])
-        DSC_PATHS.add(path)
         assert new_win
 
 

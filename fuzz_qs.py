@@ -14,6 +14,7 @@ from Results.pie_maker import make_pie
 MAX_PATHS = 9
 NUM_SAMPLES = 1
 DSC_PATHS = set()
+# TODO: Track past inputs as well as discovered path
 MAX_ROUNDS = float('inf')
 CUR_ROUND = 0
 
@@ -80,8 +81,19 @@ class Node:
         pos = 0
         while pos < len(path) and simgr.active \
                 and curr_cons == len(simgr.active[0].solver.constraints):
+            preconstraints = set(simgr.active[0].preconstrainer.preconstraints)
+            all_constraint = set(simgr.active[0].solver.constraints)
+            child_constraint = list(all_constraint - preconstraints)
+            pc = (hex(simgr.active[0].addr), child_constraint)
+
             simgr.explore(find=lambda s: compare_addr(s, path[pos]))
             simgr.move('found', 'active')
+
+            preconstraints = set(simgr.active[0].preconstrainer.preconstraints)
+            all_constraint = set(simgr.active[0].solver.constraints)
+            child_constraint = list(all_constraint - preconstraints)
+            cc = (hex(simgr.active[0].addr), child_constraint)
+
             pos += 1
 
         if not simgr.active or not path:
@@ -283,6 +295,10 @@ def traced_with_input(in_str):
     p = subprocess32.Popen(BINARY, stdin=subprocess32.PIPE, stderr=subprocess32.PIPE)
     (output, error) = p.communicate(in_str)
     addrs = unpack(error)
+
+    # runner = tracer.qemu_runner.QEMURunner(BINARY, in_str)
+    # addrs = runner.trace
+
     return addrs
 
 
@@ -290,12 +306,24 @@ def run():
     global CUR_ROUND, DSC_PATHS
     history = []
 
-    path = program(SEED)
-    initialise_angr(path)
-    DSC_PATHS.add(path)
+    raw_path = program(SEED)
+    initialise_angr(raw_path)
+    DSC_PATHS.add(raw_path)
 
     simgr = initialise_simgr(SEED)
     root = Node((simgr.active[0].addr,))
+
+    path = []
+    for i, addr in enumerate(raw_path):
+        if i < 3 or addr != 4197276:
+            path.append(addr)
+        else:
+            path.append(4197295)
+    # path = [addr for addr in raw_path if (addr != 4197276 or raw_path.index(addr) < 3)]
+    # while simgr.active:
+    #     print(hex(simgr.active[0].addr), simgr.active[0].solver.constraints)
+    #     simgr.step()
+
     root.insert_descendants(simgr, path[1:])
     CUR_ROUND += 1
 

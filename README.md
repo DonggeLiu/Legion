@@ -12,7 +12,7 @@ Second version of Legion, with progresses and TODOs
 ### Runner Optimisation
 
 1. [x] Test `tracejump`
-2. [ ] Replace `QEMU` with `tracejump`
+2. [x] Replace `QEMU` with `tracejump`
 3. [ ] `tracejump` optimisation
 
 ### Tracer optimisation
@@ -31,11 +31,13 @@ Second version of Legion, with progresses and TODOs
 ### Program Under Test
 
 1. [ ] Program with loops:
-    * [ ] Why constraints are missing?
+    * [x] Why constraints are missing?:
+        * Cause repeated bytes recorded by `tracejump` are not recorded by SIMGR
+    * [ ] match the bytes recorded by `tracejump` with the ones in SIMGR
 2. [ ] CGC programs
 3. [ ] LAVA-M programs
 4. [ ] Four-byte-word sample PUT
-5. [ ] Replace `QEMU` with `tracejump`
+5. [x] Replace `QEMU` with `tracejump`
 
 ### Solver optimisation
 
@@ -44,16 +46,20 @@ Second version of Legion, with progresses and TODOs
 
 ### Experiments
 
-1. [ ] Compare time: Legion - `tracejump` ?= random - `tracejump`
+1. [ ] Compare time: Legion - `tracejump` ?= random - `tracejump`:
+    * [x] Legion is way more slower on one-byte-input
+    * [ ] Test on inputs with more bytes (choke-point)
 2. [ ] simpler loop:
-    * [ ] check assembly, make sure loops are not simplified away
+    * [x] `simple_while.c`:
+    * [x] check assembly, make sure loops are not simplified away
 
 ## Progress
 
 1. [x] study `tracejump`
 2. [x] fix bugs in `tracejump`
 3. [x] sample PUT triggers the difference between `tracejump` & SIMGR:
-    * [ ] If any
+    * [x] If any:
+        * caused by repeated bytes that are not recorded by SIMGR
     * [ ] load the assembly or the binary in GDB, scan step through it.
 
 ## Next

@@ -13,7 +13,8 @@ Second version of Legion, with progresses and TODOs
 
 1. [x] Test `tracejump`
 2. [x] Replace `QEMU` with `tracejump`
-3. [ ] `tracejump` optimisation
+3. [ ] `tracejump` optimisation:
+    * [ ] Investigate the difference between `tracejump` instrumentation and SIMGR
 
 ### Tracer optimisation
 
@@ -27,6 +28,7 @@ Second version of Legion, with progresses and TODOs
         * Runs into a dead-end state
         * Uses `step()` internally
     * [ ] Alternatives?
+3. [ ] Run on pre-instrumentation binary
 
 ### Program Under Test
 
@@ -52,6 +54,7 @@ Second version of Legion, with progresses and TODOs
 2. [ ] simpler loop:
     * [x] `simple_while.c`:
     * [x] check assembly, make sure loops are not simplified away
+    * [ ] `for` loops
 
 ## Progress
 
@@ -60,6 +63,13 @@ Second version of Legion, with progresses and TODOs
 3. [x] sample PUT triggers the difference between `tracejump` & SIMGR:
     * [x] If any:
         * caused by repeated bytes that are not recorded by SIMGR
-    * [ ] load the assembly or the binary in GDB, scan step through it.
+    * [x] load the assembly or the binary in GDB, scan step through it.
+    * [ ] Fixing the mismatch
 
 ## Next
+1. [ ] Correct the names in Pie Chart
+2. [ ] Correct the counters in the algorithm
+3. [ ] Test on inputs with more bytes
+4. [ ] Test on inputs with `for` loops
+5. [ ] Optimisation: avoid executing the binary on inputs that showed up before
+6. [ ] Fixing the mismatch between instrumentation and tracer

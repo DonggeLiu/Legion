@@ -73,3 +73,7 @@ Second version of Legion, with progresses and TODOs
 4. [ ] Test on inputs with `for` loops
 5. [ ] Optimisation: avoid executing the binary on inputs that showed up before
 6. [ ] Fixing the mismatch between instrumentation and tracer
+
+
+## Important notes:
+1. Cannot keep symbolic execution states with preconstraints in the MCTS tree node, otherwise, future symbolic execution will be limited to this input.

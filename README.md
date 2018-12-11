@@ -67,9 +67,13 @@ Second version of Legion, with progresses and TODOs
     * [ ] Fixing the mismatch
 
 ## Next
-1. [ ] Correct the names in Pie Chart
-2. [ ] Correct the counters in the algorithm
+1. [x] Correct the names in Pie Chart
+2. [x] Correct the counters in the algorithm
 3. [ ] Test on inputs with more bytes
 4. [ ] Test on inputs with `for` loops
 5. [ ] Optimisation: avoid executing the binary on inputs that showed up before
-6. [ ] Fixing the mismatch between instrumentation and tracer
+6. [x] Fixing the mismatch between instrumentation and tracer
+7. [ ] Mark a node as exhausted if quick sampler cannot find any new in_str from it
+8. [ ] A automatic program to compare the performance between legion and given benchmark
+9. [ ] Fix back-propagation: assign rewards according to the in_str generated
+10. [ ] Version-control Angr

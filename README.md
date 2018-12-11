@@ -77,3 +77,7 @@ Second version of Legion, with progresses and TODOs
 8. [ ] A automatic program to compare the performance between legion and given benchmark
 9. [ ] Fix back-propagation: assign rewards according to the in_str generated
 10. [ ] Version-control Angr
+
+
+## Important notes:
+1. Cannot keep symbolic execution states with preconstraints in the MCTS tree node, otherwise, future symbolic execution will be limited to this input.

@@ -1,0 +1,3 @@
+[submodule "ANGR/claripy"]
+	path = ANGR/claripy
+	url = https://github.com/angr/claripy.git

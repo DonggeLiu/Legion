@@ -324,7 +324,7 @@ def unpack(output):
     assert(len(output) % 8 == 0)
 
     addrs = []
-    for i in xrange(len(output) / 8):
+    for i in range(int(len(output) / 8)):
         addr = struct.unpack_from('q', output, i * 8)  # returns a tuple
         addrs.append(addr[0])
     return addrs

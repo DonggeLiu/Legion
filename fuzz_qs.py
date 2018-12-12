@@ -47,7 +47,7 @@ LOGGER.setLevel(logging.ERROR)
 class TreeNode:
     def __init__(self, path, parent=None, constraint=None, dummy=False):
         assert path
-
+        self.exhausted = False
         self.path = path
         self.parent = parent
         self.children = {}  # {addr: Node}
@@ -288,8 +288,11 @@ def mutate(node):
 
 
 def uct(node):
-    if node.is_path_node():
-        return uct(node.children['Simulation'])
+    # if node.is_path_node():
+    #     return uct(node.children['Simulation'])
+
+    if node.exhausted or (node.is_path_node() and node.children['Simulation'].exhausted):
+        return -float('inf')
 
     if not node.visited:
         return float('inf')
@@ -311,7 +314,8 @@ def playout_full(node):
     SIMLTR_TIME += simul_end - simul_start
     SIMLTR_COUNT += NUM_SAMPLES
 
-    assert len(results) == len(paths) == NUM_SAMPLES
+    # if not (len(results) == len(paths) == NUM_SAMPLES or node.exhausted):
+    #     pdb.set_trace()
 
     return [[results[i], paths[i]] for i in range(len(results))]
 

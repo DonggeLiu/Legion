@@ -34,7 +34,7 @@ EXPANSION_TIME = 0.
 CONSTRAINT_PARSING_TIME = 0.
 
 BINARY = sys.argv[1]
-SEED = ''.join(sys.argv[2:])
+SEED = str.encode(''.join(sys.argv[2:]))
 ENTRY = None
 PROJ = None
 SYMBOLS = None
@@ -233,7 +233,21 @@ def mutate(node):
 
     if node.solver:
         vals = node.solve_in_str()
-        results = [chr(val) for val in vals]
+
+        # for val in vals:
+        #     # assert repeating in_str
+        #     # if val in PST_INSTRS:
+        #     #     pdb.set_trace()
+        #
+        #     PST_INSTRS.add(val)
+
+        # results = []
+        # for val in vals:
+        #     if type(val) is not int:
+        #         pdb.set_trace()
+        #     results.append(chr(val))
+        results = [str.encode(chr(val)) for val in vals if val is not None]
+
         mutate_end = time.time()
         QS_TIME += mutate_end - mutate_start
         QS_COUNT += NUM_SAMPLES
@@ -241,7 +255,15 @@ def mutate(node):
 
     assert not any(node.constraints)
 
-    results = [generate_random() for _ in range(NUM_SAMPLES)]
+    results = []
+    for _ in range(NUM_SAMPLES):
+        # assuming random generator will never be exhausted
+        result = generate_random()
+        while result in PST_INSTRS:
+            result = generate_random()
+        PST_INSTRS.add(result)
+        results.append((str.encode(chr(result))))
+
     mutate_end = time.time()
     RD_TIME += mutate_end - mutate_start
     RD_COUNT += NUM_SAMPLES

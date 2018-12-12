@@ -49,6 +49,7 @@ class TreeNode:
         assert path
 
         self.path = path
+        self.parent = parent
         self.children = {}  # {addr: Node}
         self.distinct = 0
         self.visited = 0

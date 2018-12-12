@@ -15,9 +15,10 @@ from Results.pie_maker import make_pie
 MAX_PATHS = 9
 NUM_SAMPLES = 1
 DSC_PATHS = set()
-# TODO: Track past inputs as well as discovered path
-MAX_ROUNDS = float('inf')
+PST_INSTRS = set()
+MAX_ROUNDS = 100
 CUR_ROUND = 0
+SAMPLES_COUNT = 0
 
 RHO = 1 / sqrt(2)
 
@@ -148,7 +149,15 @@ class Node:
         return starts_new_path
 
     def solve_in_str(self):
-        return self.solver.eval(self.symbols, NUM_SAMPLES)
+        global SAMPLES_COUNT, PST_INSTRS
+        # TODO: A better way to handle unpreserving inputs from QS
+        # vals = self.solver.eval(self.symbols, NUM_SAMPLES, PST_INSTRS)
+        vals = self.solver.eval(self.symbols, NUM_SAMPLES)
+        # if NUM_SAMPLES > len(vals):
+        #     self.exhausted = True
+        #     pdb.set_trace()
+        print("Solve_in_str collects: {}".format(vals))
+        return vals
 
     def info(self):
         node_score = "{0:4s}: {1:.4f}({2:1d}/{2:1d})".format(
@@ -227,7 +236,7 @@ def initialise_simgr(in_str):
 
 
 def mutate(node):
-    global QS_TIME, QS_COUNT, RD_TIME, RD_COUNT
+    global QS_TIME, QS_COUNT, RD_TIME, RD_COUNT, PST_INSTRS
 
     mutate_start = time.time()
 

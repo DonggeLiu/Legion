@@ -337,9 +337,6 @@ def traced_with_input(in_str):
     (output, error) = p.communicate(in_str)
     addrs = unpack(error)
 
-    # runner = tracer.qemu_runner.QEMURunner(BINARY, in_str)
-    # addrs = runner.trace
-
     return addrs
 
 

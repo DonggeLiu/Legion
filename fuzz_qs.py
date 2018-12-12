@@ -1,13 +1,14 @@
 import logging
+import pdb
 import random
 import struct
+import subprocess
 import sys
 import time
 from math import sqrt, log
 
 import angr
 import claripy
-import subprocess32
 
 from Results.pie_maker import make_pie
 
@@ -292,7 +293,9 @@ def unpack(output):
 
 
 def traced_with_input(in_str):
-    p = subprocess32.Popen(BINARY, stdin=subprocess32.PIPE, stderr=subprocess32.PIPE)
+    p = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    if type(in_str) is not bytes:
+        pdb.set_trace()
     (output, error) = p.communicate(in_str)
     addrs = unpack(error)
 

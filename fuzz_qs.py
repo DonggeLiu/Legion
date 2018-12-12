@@ -493,6 +493,11 @@ def simulate(node):
     return num_win, num_sim
 
 
+def logging_results():
+    for i in range(len(categories)):
+        LOGGER.info("{}: {} ~ {}".format(categories[i], values[i], averages[i]))
+
+
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEED
     start = time.time()

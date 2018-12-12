@@ -44,8 +44,8 @@ LOGGER = logging.getLogger("lg")
 LOGGER.setLevel(logging.ERROR)
 
 
-class Node:
-    def __init__(self, path, constraint=None, dummy=False):
+class TreeNode:
+    def __init__(self, path, parent=None, constraint=None, dummy=False):
         assert path
 
         self.path = path
@@ -57,7 +57,8 @@ class Node:
         self.solver = None
         self.symbols = ''
         if not dummy:
-            self.children['Simulation'] = Node(path, constraint=constraint, dummy=True)
+            self.children['Simulation'] = \
+                TreeNode(path, parent=self, constraint=constraint, dummy=True)
 
     def get_constraint(self):
         # TODO: return the simplest constraint
@@ -128,8 +129,13 @@ class Node:
 
             expansion_start = time.time()
             if child_constraint and child_constraint != parent_constraint:
-                self.children[child_addr] = Node(self.path + (child_addr,), child_constraint)
-                self.children[child_addr].children['Simulation'].solver = claripy.Solver()
+                self.children[child_addr] \
+                    = TreeNode(path=self.path + (child_addr,),
+                               parent=self,
+                               constraint=child_constraint)
+                pdb.set_trace()
+                self.children[child_addr].children['Simulation'].solver \
+                    = claripy.Solver(backend=claripy.backends._all_backends[2])
                 self.children[child_addr].children['Simulation'].solver.add(child_constraint)
                 for con in child_constraint:
                     for c in con.args:
@@ -345,18 +351,7 @@ def run():
     DSC_PATHS.add(raw_path)
 
     simgr = initialise_simgr(SEED)
-    root = Node((simgr.active[0].addr,))
-
-    path = []
-    for i, addr in enumerate(raw_path):
-        if i < 3 or addr != 4197276:
-            path.append(addr)
-        else:
-            path.append(4197295)
-    # path = [addr for addr in raw_path if (addr != 4197276 or raw_path.index(addr) < 3)]
-    # while simgr.active:
-    #     print(hex(simgr.active[0].addr), simgr.active[0].solver.constraints)
-    #     simgr.step()
+    root = TreeNode((simgr.active[0].addr,))
 
     root.insert_descendants(simgr, path[1:])
     CUR_ROUND += 1

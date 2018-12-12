@@ -182,8 +182,7 @@ class TreeNode:
             children=children_score)
 
     def pp(self, indent=0):
-        i = "  " * indent
-        s = i
+        s = "  " * indent
         s += 'Path node: ' if self.is_path_node() else 'Simulation Child: '
         s += hex(self.path[-1]) if self.path[-1] else 'Root'
         s += " "
@@ -209,8 +208,8 @@ def cannot_terminate(root):
 
 
 def generate_random():
-    in_str = "".join(map(chr, [random.randint(0, 255) for _ in SEED]))
-    return in_str
+    # in_str = "".join(map(chr, [random.randint(0, 255) for _ in SEED]))
+    return random.randint(0, 255)
 
 
 def initialise_angr(path):
@@ -230,7 +229,7 @@ def initialise_simgr(in_str):
 
     tracer_start = time.time()
     entry.preconstrainer.preconstrain_file(in_str, entry.posix.stdin, True)
-    simgr = PROJ.factory.simulation_manager(entry, save_unsat=False)
+    simgr = PROJ.factory.simulation_manager(entry, save_unsat=True)
     tracer_end = time.time()
     TRACER_TIME += tracer_end - tracer_start
 
@@ -261,10 +260,12 @@ def mutate(node):
 
         mutate_end = time.time()
         QS_TIME += mutate_end - mutate_start
-        QS_COUNT += NUM_SAMPLES
+        QS_COUNT += len(results)
         return results
 
-    assert not any(node.constraints)
+    # Call in the random generator
+    if any(node.constraints):
+        pdb.set_trace()
 
     results = []
     for _ in range(NUM_SAMPLES):
@@ -346,9 +347,9 @@ def run():
     global CUR_ROUND, DSC_PATHS
     history = []
 
-    raw_path = program(SEED)
-    initialise_angr(raw_path)
-    DSC_PATHS.add(raw_path)
+    path = program(SEED)
+    initialise_angr(path)
+    DSC_PATHS.add(path)
 
     simgr = initialise_simgr(SEED)
     root = TreeNode((simgr.active[0].addr,))
@@ -357,7 +358,8 @@ def run():
     CUR_ROUND += 1
 
     while cannot_terminate(root):
-        assert root.distinct == len(DSC_PATHS)
+        if not root.distinct == len(DSC_PATHS):
+            pdb.set_trace()
         history.append([CUR_ROUND, root.distinct])
         mcts(root)
         CUR_ROUND += 1
@@ -370,27 +372,38 @@ def mcts(root):
 
     node = root
 
+    # Selection
     tree_policy_start = time.time()
-
+    # pdb.set_trace()
     while node.children:
+        LOGGER.info(node.info())
         node = best_child(node)
 
     tree_policy_end = time.time()
     TREE_POLICY_TIME += tree_policy_end - tree_policy_start
 
+    # Simulation
     results = playout_full(node)
-    num_win, num_sim = 0, len(results)
+    # num_win, num_sim = 0, len(results)
+
+    pdb.set_trace()
 
     for result in results:
-        node.visited += num_sim
-
+        node.visited += 1
         mutated_in_str, path = result
         if path in DSC_PATHS:
+            while node.parent:
+                node.parent.visited += 1
+                node = node.parent
             continue
         DSC_PATHS.add(path)
+        # if node.path[-1] not in path:
+        #     pdb.set_trace()
+
+        # Expansion
         simgr = initialise_simgr(mutated_in_str)
-        new_win = root.insert_descendants(simgr, path[1:])
-        assert new_win
+        root.insert_descendants(simgr, path[1:])
+    # Back-propagation
 
 
 def best_child(node):
@@ -489,37 +502,48 @@ if __name__ == "__main__" and len(sys.argv) > 1:
     iter_count = run()[-1][0]
     end = time.time()
 
-    assert (len(DSC_PATHS) == MAX_PATHS)
     assert iter_count
-    LOGGER.info("Iter_count = {}".format(iter_count))
-    LOGGER.info("TOTAL_TIME = {}".format(end-start))
-    LOGGER.info("AVG_TTL_TIME = {}".format((end-start)/iter_count))
-    LOGGER.info("ANGR_TIME = {}".format(ANGR_TIME))
-    LOGGER.info("AVG_ANGR_TIME = {}".format(ANGR_TIME/iter_count))
-    LOGGER.info("TRACER_TIME = {}".format(TRACER_TIME))
-    LOGGER.info("AVG_TRACER_TIME = {}".format(TRACER_TIME/iter_count))
-    LOGGER.info("SIMLTR_TIME = {}".format(SIMLTR_TIME))
-    LOGGER.info("AVG_SIMLTR_TIME = {}".format(SIMLTR_TIME/iter_count))
-    LOGGER.info("QS_FZ_TIME = {}".format(QS_TIME))
-    LOGGER.info("AVG_QS_TIME = {}".format(QS_TIME / QS_COUNT))
-    LOGGER.info("RAN_FZ_TIME = {}".format(RD_TIME))
-    LOGGER.info("AVG_RN_TIME = {}".format(RD_TIME / RD_COUNT))
-    LOGGER.info("TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME))
-    LOGGER.info("AVG_TREE_POLICY_TIME = {}".format(TREE_POLICY_TIME/iter_count))
-    LOGGER.info("CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME))
-    LOGGER.info("AVG_CONSTRAINT_PARSING_TIME = {}".format(CONSTRAINT_PARSING_TIME / MAX_PATHS))
-    LOGGER.info("EXPANSION_TIME = {}".format(EXPANSION_TIME))
-    LOGGER.info("AVG_EXPANSION_TIME = {}".format(EXPANSION_TIME / MAX_PATHS))
+    categories = ['Iteration',
+                  'Samples Num',
+                  'Total Time',
+                  'Initialisation',
+                  'Binary Execution',
+                  'Symbolic Execution',
+                  'Path Preserve Fuzzing',
+                  'Random Fuzzing',
+                  'TreePolicy',
+                  'TreeExpansion',
+                  'Constraint Reading']
 
-    make_pie(
-        categories=['Iteration', 'Total', 'Angr', 'TraceJump',
-                    'Tracer', 'ConstraintParsing', 'QuickSampler', 'RandomFuzzing',
-                    'TreePolicy', 'TreeExpansion'],
-        values=[iter_count, end - start, ANGR_TIME, SIMLTR_TIME,
-                TRACER_TIME, CONSTRAINT_PARSING_TIME, QS_TIME, RD_TIME,
-                TREE_POLICY_TIME, EXPANSION_TIME],
-        averages=['/', (end-start) / iter_count, ANGR_TIME / iter_count, SIMLTR_TIME / iter_count,
-                  TRACER_TIME / iter_count, CONSTRAINT_PARSING_TIME / MAX_PATHS,
-                  QS_TIME / QS_COUNT, RD_TIME / RD_COUNT,
-                  TREE_POLICY_TIME / iter_count, EXPANSION_TIME / iter_count]
-    )
+    values = [iter_count,
+              NUM_SAMPLES * iter_count,
+              end - start,
+              ANGR_TIME,
+              SIMLTR_TIME,
+              TRACER_TIME,
+              QS_TIME,
+              RD_TIME,
+              TREE_POLICY_TIME,
+              EXPANSION_TIME,
+              CONSTRAINT_PARSING_TIME]
+
+    averages = ['/',
+                '/',
+                (end - start) / (iter_count * NUM_SAMPLES),
+                ANGR_TIME / (iter_count * NUM_SAMPLES),
+                SIMLTR_TIME / (iter_count * NUM_SAMPLES),
+                TRACER_TIME / (iter_count * NUM_SAMPLES),
+                QS_TIME / QS_COUNT,
+                RD_TIME / RD_COUNT,
+                TREE_POLICY_TIME / iter_count,
+                EXPANSION_TIME / (iter_count * NUM_SAMPLES),
+                CONSTRAINT_PARSING_TIME / MAX_PATHS]
+
+    if not len(categories) == len(values) == len(averages):
+        pdb.set_trace()
+
+    logging_results()
+
+    make_pie(categories=categories, values=values, averages=averages)
+
+    assert (len(DSC_PATHS) == MAX_PATHS)

@@ -85,31 +85,26 @@ class TreeNode:
         pos = 0
         while pos < len(path) and simgr.active \
                 and curr_cons == len(simgr.active[0].solver.constraints):
-            preconstraints = set(simgr.active[0].preconstrainer.preconstraints)
-            all_constraint = set(simgr.active[0].solver.constraints)
-            child_constraint = list(all_constraint - preconstraints)
-            pc = (hex(simgr.active[0].addr), child_constraint)
-
-            simgr.explore(find=lambda s: compare_addr(s, path[pos]))
+            # simgr.explore(find=lambda s: compare_addr(s, path[pos]))
+            # pos += 1
+            simgr.explore(find=lambda s: s.addr in path[pos:])
             simgr.move('found', 'active')
-
-            preconstraints = set(simgr.active[0].preconstrainer.preconstraints)
-            all_constraint = set(simgr.active[0].solver.constraints)
-            child_constraint = list(all_constraint - preconstraints)
-            cc = (hex(simgr.active[0].addr), child_constraint)
-
-            pos += 1
-
-        if not simgr.active or not path:
+            assert len(simgr.active) <= 1
+            if not simgr.active:
+                break
+            pos = path.index(simgr.active[0].addr, pos) + 1
+        if not simgr.active or pos >= len(path):
             tracer_end = time.time()
             TRACER_TIME += tracer_end - tracer_start
 
             if path:
                 LOGGER.debug("Path : {} is not empty while Active is: {}"
                              .format(path, simgr.active))
+                assert simgr.active
             if simgr.active:
                 LOGGER.debug("Active : {} is not empty while Path is: {}"
                              .format(simgr.active, path))
+                return True
             return starts_new_path
 
         child = simgr.active[0]

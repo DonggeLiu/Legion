@@ -12,7 +12,7 @@ all: test.instr test.instr.s test.out.s
 	python tracejump.py $^ $@
 
 %.instr: %.instr.o __trace_jump.o
-	$(CC) -static -o $@ $^
+	$(CC) -o $@ $^ -no-pie
 
 %.out.s: %
 	objdump -d $^ > $@

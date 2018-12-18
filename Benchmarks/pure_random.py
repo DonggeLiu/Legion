@@ -1,7 +1,7 @@
 import logging
-import sys
-import struct
 import random
+import struct
+import sys
 import time
 
 import subprocess32
@@ -9,6 +9,7 @@ import subprocess32
 MAX_PATHS = 9
 NUM_SAMPLES = 1
 DSC_PATHS = set()
+PST_INSTRS = set()
 MAX_ROUNDS = float('inf')
 CUR_ROUND = 0
 SIMUL_TIME = 0.
@@ -63,6 +64,8 @@ def run():
     while cannot_terminate():
         CUR_ROUND += 1
         new_in = generate_random(SEED)
+        while new_in in PST_INSTRS:
+            new_in = generate_random(SEED)
         simul_start = time.time()
         path = program(new_in)
         simul_end = time.time()

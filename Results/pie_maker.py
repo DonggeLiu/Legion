@@ -10,8 +10,10 @@
 #
 # Copyright 2013-2018, John McNamara, jmcnamara@cpan.org
 #
-import xlsxwriter
 import time
+
+import xlsxwriter
+
 
 def make_pie(categories, values, averages):
     workbook = xlsxwriter.Workbook('chart_pie{}.xlsx'.format(
@@ -42,8 +44,8 @@ def make_pie(categories, values, averages):
     # Configure the series. Note the use of the list syntax to define ranges:
     chart1.add_series({
         'name':       'Time Consumption',
-        'categories': ['Sheet1', 3, 0, len(categories), 0],
-        'values':     ['Sheet1', 3, 1, len(categories), 1],
+        'categories': ['Sheet1', 4, 0, len(categories), 0],
+        'values': ['Sheet1', 4, 1, len(categories), 1],
     })
 
     # Add a title.
@@ -56,15 +58,13 @@ def make_pie(categories, values, averages):
     worksheet.insert_chart('D1', chart1, {'x_offset': 25, 'y_offset': 10})
     # worksheet.insert_chart('D1', chart1)
 
-
-
     chart2 = workbook.add_chart({'type': 'pie'})
 
     # Configure the series. Note the use of the list syntax to define ranges:
     chart2.add_series({
         'name':       'Average Time Consumption',
-        'categories': ['Sheet1', 3, 0, len(categories), 0],
-        'values':     ['Sheet1', 3, 2, len(categories), 2],
+        'categories': ['Sheet1', 4, 0, len(categories), 0],
+        'values': ['Sheet1', 4, 2, len(categories), 2],
     })
 
     # Add a title.

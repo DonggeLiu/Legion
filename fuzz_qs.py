@@ -331,7 +331,7 @@ def unpack(output):
 
 
 def traced_with_input(in_str):
-    p = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if type(in_str) is not bytes:
         pdb.set_trace()
     (output, error) = p.communicate(in_str)

@@ -1,10 +1,9 @@
 import logging
 import random
 import struct
+import subprocess
 import sys
 import time
-
-import subprocess32
 
 MAX_PATHS = 9
 NUM_SAMPLES = 1
@@ -35,15 +34,14 @@ def unpack(output):
     assert(len(output) % 8 == 0)
 
     addrs = []
-    for i in xrange(len(output) / 8):
+    for i in range(int(len(output) / 8)):
         addr = struct.unpack_from('q', output, i * 8)
         addrs.append(addr[0])
     return addrs
 
 
 def traced_with_input(in_str):
-
-    p = subprocess32.Popen(BINARY, stdin=subprocess32.PIPE, stderr=subprocess32.PIPE)
+    p = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     (output, error) = p.communicate(in_str)
     addrs = unpack(error)
 

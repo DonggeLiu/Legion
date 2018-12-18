@@ -83,6 +83,6 @@ if __name__ == "__main__" and len(sys.argv) > 1:
     start = time.time()
     results = run()
     end = time.time()
-    print end - start
-    print SIMUL_TIME
-    print CUR_ROUND
+    print(end - start)
+    print(SIMUL_TIME)
+    print(CUR_ROUND)

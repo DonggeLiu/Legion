@@ -13,7 +13,7 @@ import claripy
 from Results.pie_maker import make_pie
 
 MAX_PATHS = 9
-NUM_SAMPLES = 1
+NUM_SAMPLES = 5
 DSC_PATHS = set()
 PST_INSTRS = set()
 MAX_ROUNDS = 100
@@ -41,14 +41,15 @@ PROJ = None
 SYMBOLS = None
 
 LOGGER = logging.getLogger("lg")
-LOGGER.setLevel(logging.ERROR)
+LOGGER.setLevel(logging.DEBUG)
 
 
 class TreeNode:
-    def __init__(self, path, parent=None, constraint=None, dummy=False):
+    def __init__(self, path, state, parent=None, constraint=None, dummy=False):
         assert path
         self.exhausted = False
         self.path = path
+        self.state = state
         self.parent = parent
         self.children = {}  # {addr: Node}
         self.distinct = 0
@@ -59,7 +60,7 @@ class TreeNode:
         self.symbols = ''
         if not dummy:
             self.children['Simulation'] = \
-                TreeNode(path, parent=self, constraint=constraint, dummy=True)
+                TreeNode(path, parent=self, state=state, constraint=constraint, dummy=True)
 
     def get_constraint(self):
         # TODO: return the simplest constraint
@@ -80,44 +81,57 @@ class TreeNode:
         self.visited += 1
         starts_new_path = False
 
+        child_state = None
         tracer_start = time.time()
-        curr_cons = len(simgr.active[0].solver.constraints)
-        pos = 0
-        while pos < len(path) and simgr.active \
-                and curr_cons == len(simgr.active[0].solver.constraints):
-            # simgr.explore(find=lambda s: compare_addr(s, path[pos]))
-            # pos += 1
-            simgr.explore(find=lambda s: s.addr in path[pos:])
-            simgr.move('found', 'active')
-            assert len(simgr.active) <= 1
-            if not simgr.active:
-                break
-            pos = path.index(simgr.active[0].addr, pos) + 1
-        if not simgr.active or pos >= len(path):
-            tracer_end = time.time()
-            TRACER_TIME += tracer_end - tracer_start
+        while simgr.active:
+            keep = [state for state in simgr.active if state.addr in path]
+            keep.sort(key=lambda state: path.index(state.addr))
+            if keep:
+                state = keep[0]
+                pos = path.index(state.addr)
+                if len(simgr.active) > 1:
+                    child_state = state
+                    simgr.drop(lambda s: s != state)
+                path = path[pos + 1:]
 
-            if path:
-                LOGGER.debug("Path : {} is not empty while Active is: {}"
-                             .format(path, simgr.active))
-                assert simgr.active
-            if simgr.active:
-                LOGGER.debug("Active : {} is not empty while Path is: {}"
-                             .format(simgr.active, path))
-                return True
+            assert len(simgr.active) == 1
+            simgr.step()
+        # curr_cons = len(simgr.active[0].solver.constraints)
+        # pos = 0
+        # while pos < len(path) and simgr.active \
+        #         and curr_cons == len(simgr.active[0].solver.constraints):
+        #     # simgr.explore(find=lambda s: compare_addr(s, path[pos]))
+        #     # pos += 1
+        #     simgr.explore(find=lambda s: s.addr in path[pos:])
+        #     simgr.move('found', 'active')
+        #     assert len(simgr.active) <= 1
+        #     if not simgr.active:
+        #         break
+        #     pos = path.index(simgr.active[0].addr, pos) + 1
+        # if not simgr.active or pos >= len(path):
+        #     tracer_end = time.time()
+        #     TRACER_TIME += tracer_end - tracer_start
+        #
+        #     if path:
+        #         LOGGER.debug("Path : {} is not empty while Active is: {}"
+        #                      .format(path, simgr.active))
+        #         assert simgr.active
+        #     if simgr.active:
+        #         LOGGER.debug("Active : {} is not empty while Path is: {}"
+        #                      .format(simgr.active, path))
+        #         return True
+        if not child_state:
             return starts_new_path
 
-        child = simgr.active[0]
+        child_addr = child_state.addr
         tracer_end = time.time()
         TRACER_TIME += tracer_end - tracer_start
 
-        child_addr = child.addr
-
-        if child_addr not in self.children.keys():  # new child
+        if child_state.addr not in self.children.keys():  # new child
             constraint_parsing_start = time.time()
 
-            preconstraints = set(simgr.active[0].preconstrainer.preconstraints)
-            all_constraint = set(simgr.active[0].solver.constraints)
+            preconstraints = set(child_state.preconstrainer.preconstraints)
+            all_constraint = set(child_state.solver.constraints)
             child_constraint = list(all_constraint-preconstraints)
 
             constraint_parsing_end = time.time()
@@ -127,9 +141,10 @@ class TreeNode:
             if child_constraint and child_constraint != parent_constraint:
                 self.children[child_addr] \
                     = TreeNode(path=self.path + (child_addr,),
+                               state=child_state,
                                parent=self,
                                constraint=child_constraint)
-                pdb.set_trace()
+                # pdb.set_trace()
                 self.children[child_addr].children['Simulation'].solver \
                     = claripy.Solver(backend=claripy.backends._all_backends[2])
                 self.children[child_addr].children['Simulation'].solver.add(child_constraint)
@@ -144,7 +159,7 @@ class TreeNode:
             EXPANSION_TIME += expansion_end - expansion_start
 
         starts_new_path = self.children[child_addr].insert_descendants(
-            simgr, path[pos:], self.constraints) or starts_new_path
+            simgr, path, self.constraints) or starts_new_path
 
         self.distinct += starts_new_path
         self.children['Simulation'].distinct += starts_new_path
@@ -222,13 +237,12 @@ def initialise_angr(path):
     ANGR_TIME += angr_end - angr_start
 
 
-def initialise_simgr(in_str):
+def initialise_simgr():
     global TRACER_TIME
-
+    # TODO: change entry
     entry = ENTRY.copy()
 
     tracer_start = time.time()
-    entry.preconstrainer.preconstrain_file(in_str, entry.posix.stdin, True)
     simgr = PROJ.factory.simulation_manager(entry, save_unsat=True)
     tracer_end = time.time()
     TRACER_TIME += tracer_end - tracer_start
@@ -348,8 +362,9 @@ def run():
     initialise_angr(path)
     DSC_PATHS.add(path)
 
-    simgr = initialise_simgr(SEED)
-    root = TreeNode((simgr.active[0].addr,))
+    simgr = initialise_simgr()
+    assert simgr.active[0].addr == path[0]
+    root = TreeNode((simgr.active[0].addr,), simgr.active[0])
 
     root.insert_descendants(simgr, path[1:])
     CUR_ROUND += 1
@@ -361,6 +376,9 @@ def run():
         mcts(root)
         CUR_ROUND += 1
 
+    root.pp()
+    for key in root.children.keys():
+        print("{}: {}".format(key, root.children[key].state.solver.constraints))
     return history
 
 
@@ -383,7 +401,7 @@ def mcts(root):
     results = playout_full(node)
     # num_win, num_sim = 0, len(results)
 
-    pdb.set_trace()
+    # pdb.set_trace()
 
     for result in results:
         node.visited += 1
@@ -398,7 +416,7 @@ def mcts(root):
         #     pdb.set_trace()
 
         # Expansion
-        simgr = initialise_simgr(mutated_in_str)
+        simgr = initialise_simgr()
         root.insert_descendants(simgr, path[1:])
     # Back-propagation
 

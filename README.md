@@ -13,8 +13,8 @@ Second version of Legion, with progresses and TODOs
 
 1. [x] Test `tracejump`
 2. [x] Replace `QEMU` with `tracejump`
-3. [ ] `tracejump` optimisation:
-    * [ ] Investigate the difference between `tracejump` instrumentation and SIMGR
+3. [x] `tracejump` optimisation:
+    * [x] Investigate the difference between `tracejump` instrumentation and SIMGR
 
 ### Tracer optimisation
 
@@ -64,7 +64,7 @@ Second version of Legion, with progresses and TODOs
     * [x] If any:
         * caused by repeated bytes that are not recorded by SIMGR
     * [x] load the assembly or the binary in GDB, scan step through it.
-    * [ ] Fixing the mismatch
+    * [x] Fixing the mismatch
 
 ## Next
 1. [x] Correct the names in Pie Chart
@@ -73,10 +73,15 @@ Second version of Legion, with progresses and TODOs
 4. [ ] Test on inputs with `for` loops
 5. [ ] Optimisation: avoid executing the binary on inputs that showed up before
 6. [x] Fixing the mismatch between instrumentation and tracer
-7. [ ] Mark a node as exhausted if quick sampler cannot find any new in_str from it
+7. [x] Mark a node as exhausted if quick sampler cannot find any new in_str from it
 8. [ ] A automatic program to compare the performance between legion and given benchmark
-9. [ ] Fix back-propagation: assign rewards according to the in_str generated
+9. [x] Fix back-propagation: assign rewards according to the in_str generated
 10. [x] Version-control Angr
 
 ## Important notes:
 1. Cannot keep symbolic execution states with preconstraints in the MCTS tree node, otherwise, future symbolic execution will be limited to this input.
+2. Four kinds of nodes:
+    1. White:  In TraceJump     + Not sure if in Angr   + check Symbolic state later    + may have simulation child
+    2. Red:    In TraceJump     + Confirmed in Angr     + has Symbolic state            + has Simulation child
+    3. Black:  In TraceJump     + Confirmed not in Angr + No Symbolic state             + No Simulation child
+    4. Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child

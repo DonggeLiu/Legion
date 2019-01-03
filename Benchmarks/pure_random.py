@@ -23,7 +23,7 @@ LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 
 def generate_random(seed):
     in_str = "".join(map(chr, [random.randint(0, 255) for _ in seed]))
-    return in_str
+    return str.encode(in_str)
 
 
 def program(in_str):

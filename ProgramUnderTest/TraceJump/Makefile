@@ -9,7 +9,7 @@ all: test.instr test.instr.s test.out.s
 	$(CC) -S -o $@ $^
 
 %.instr.s: %.s
-	python tracejump.py $^ $@
+	python3 tracejump.py $^ $@
 
 %.instr: %.instr.o __trace_jump.o
 	$(CC) -o $@ $^ -no-pie

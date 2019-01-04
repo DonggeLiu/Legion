@@ -60,7 +60,6 @@ def timeit(method):
 
 
 def generate_random():
-    # in_str = "".join(map(chr, [random.randint(0, 255) for _ in SEED]))
     return random.randint(0, 255)
 
 
@@ -80,7 +79,6 @@ class TreeNode:
         self.parent = parent
         self.state = state
         self.colour = colour
-        self.constraint = []
 
         self.children = {}  # {addr: Node}
         self.distinct = 0
@@ -129,7 +127,6 @@ class TreeNode:
         # dye the way down along the path
         assert PROJ
         simgr = prepare_simgr(entry=parent.state)
-        # simgr = PROJ.factory.simulation_manager(parent.state, save_unsat=True)
         found_red_child = False
         while not found_red_child:
             if not parent.children:  # leaf
@@ -148,17 +145,10 @@ class TreeNode:
         node, path = self, []
         while node.parent and (not node.state):
             path.append(node.addr)
-            # if not node.parent:  # Root
-            #     break
             node = node.parent
         path.append(node.addr)
 
         assert node.state
-        # if not node.state:
-        #     assert not node.parent  # Root before SEED
-        #     node.state = PROJ.factory.entry_state(addr=node.addr, stdin=angr.storage.file.SimFileStream)
-        #     node.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=self.state, colour='G')
-        #     node.colour = 'R'
         assert node and (node.colour is 'R') and node.state and (node.addr is path.pop())
         # pop out path[-1], which should be the addr of node and will not be needed
         return node, path
@@ -168,7 +158,6 @@ class TreeNode:
         if self.state:
             self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=self.state, colour='G',
                                                    symbols=self.symbols)
-            self.children['Simulation'].constraint = self.constraint
 
     def attach_state(self, simgr):
         identified = False
@@ -179,40 +168,22 @@ class TreeNode:
                     continue
                 identified = True
                 self.state, self.colour = (state, 'R') if len(simgr.active) > 1 else (None, 'B')
-                if self.state:
-                    self.compute_constraints()
-            simgr.step()
-        # assert identified
-        if not identified:
-            # pdb.set_trace()
-            self.state, self.colour = None, 'B'
 
-    def compute_constraints(self):
-        if not self.state:
-            pdb.set_trace()
-        preconstraints = set(self.state.preconstrainer.preconstraints)
-        all_constraint = set(self.state.solver.constraints)
-        self.constraint = list(all_constraint - preconstraints)
-        # for con in self.constraint:
-        #     for c in con.args:
-        #         if type(c.args[1]) is claripy.ast.BV:
-        #             self.symbols = c.args[1].concat(self.symbols)
+            simgr.step()
+        if not identified:
+            self.state, self.colour = None, 'B'
 
     def is_exhausted(self):
         return self.exhausted or ('Simulation' in self.children and self.children['Simulation'].exhausted)
 
     def mutate(self):
         global QS_COUNT, RD_COUNT
-        if self.state and self.constraint:
+        if self.state.solver.constraints:
             # TODO: Pass PST_INSTRS to solver
-            # pdb.set_trace()
-            # solver = claripy.Solver(backend=claripy.backends._all_backends[2])
-            print("{}'s constraint: {}".format(hex(self.addr), make_constraint_readable(self.constraint)))
+            print("{}'s constraint: {}".format(
+                hex(self.addr), make_constraint_readable(self.state.solver.constraints)))
             QS_COUNT += NUM_SAMPLES
-            # solver.add(self.constraint)
-            # assert solver.constraints == self.constraint
             vals = self.state.solver.eval_upto(e=self.state.posix.stdin.load(0, self.state.posix.stdin.size), n=3)
-            # pdb.set_trace()
             if None in vals:
                 self.exhausted = True
 
@@ -301,7 +272,7 @@ def initialisation():
     root = TreeNode(addr=None, parent=None, state=None, colour='R')
     root.state = prepare_simgr(entry=root.addr)
     root.state = PROJ.factory.entry_state(addr=root.addr, stdin=angr.storage.file.SimFileStream)
-    root.compute_constraints()
+    # root.compute_constraints()
     root.children['Simulation'] = TreeNode(addr=root.addr, parent=root, state=root.state, colour='G',
                                            symbols=root.symbols)
     seed_paths = simulation_stage(node=root.children['Simulation'], input_str=SEEDS)

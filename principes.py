@@ -9,7 +9,6 @@ import time
 from math import sqrt, log
 
 import angr
-import claripy
 
 from Results.pie_maker import make_pie
 
@@ -19,7 +18,7 @@ DSC_PATHS = set()
 PST_INSTRS = set()
 MAX_ROUNDS = 100
 CUR_ROUND = 0
-SAMPLES_COUNT = 0
+BINARY_EXECUTION_COUNT = 0
 
 RHO = 1 / sqrt(2)
 
@@ -41,6 +40,20 @@ PROJ = None
 
 LOGGER = logging.getLogger("lg")
 LOGGER.setLevel(logging.DEBUG)
+
+
+def timeit(method):
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        if 'log_time' in kw:
+            name = kw.get('log_name', method.__name__.upper())
+            kw['log_time'][name] = int((te - ts) * 1000)
+        else:
+            print('%r  %2.2f ms' % (method.__name__, (te - ts) * 1000))
+        return result
+    return timed
 
 
 def generate_random():
@@ -186,20 +199,23 @@ class TreeNode:
         return self.exhausted or ('Simulation' in self.children and self.children['Simulation'].exhausted)
 
     def mutate(self):
+        global QS_COUNT, RD_COUNT
         if self.state and self.constraint:
             # TODO: Pass PST_INSTRS to solver
-            solver = claripy.Solver(backend=claripy.backends._all_backends[2])
-            print("{}'s constraint: {}".format(hex(self.addr), self.constraint))
             # pdb.set_trace()
-            solver.add(self.constraint)
-            assert solver.constraints == self.constraint
-            vals = solver.eval(e=self.state.posix.stdin.load(0, self.state.posix.stdin.size), n=NUM_SAMPLES)
-
+            # solver = claripy.Solver(backend=claripy.backends._all_backends[2])
+            print("{}'s constraint: {}".format(hex(self.addr), make_constraint_readable(self.constraint)))
+            QS_COUNT += NUM_SAMPLES
+            # solver.add(self.constraint)
+            # assert solver.constraints == self.constraint
+            vals = self.state.solver.eval_upto(e=self.state.posix.stdin.load(0, self.state.posix.stdin.size), n=3)
+            # pdb.set_trace()
             if None in vals:
                 self.exhausted = True
 
             return vals
 
+        RD_COUNT += NUM_SAMPLES
         # Must be root in the first round before executing seed:
         assert not self.parent.parent
         return [generate_random() for _ in range(NUM_SAMPLES)]
@@ -266,13 +282,15 @@ def uct(node):
 
 def run():
     global CUR_ROUND
-
+    history = []
     root = initialisation()
     CUR_ROUND += 1
     root.pp()
     while keep_fuzzing(root):
+        history.append([CUR_ROUND, root.distinct])
         mcts(root)
         CUR_ROUND += 1
+    return history
 
 
 def initialisation():
@@ -295,8 +313,8 @@ def initialise_angr():
 
 
 def keep_fuzzing(root):
-    LOGGER.info("=== Iter:{} === Root.distinct:{} === len(DSC_PATHS):{} === QS_COUNT:{} ==="
-                .format(CUR_ROUND, root.distinct, len(DSC_PATHS), QS_COUNT))
+    LOGGER.info("== Iter:{} == Tree path:{} == Set path:{} == SAMPLE_COUNT:{} == QS: {} == RD: {} =="
+                .format(CUR_ROUND, root.distinct, len(DSC_PATHS), BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
     assert root.distinct == len(DSC_PATHS)
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
@@ -350,6 +368,9 @@ def simulation_stage(node, input_str=None):
 
 
 def program(input_str):
+    global BINARY_EXECUTION_COUNT
+    BINARY_EXECUTION_COUNT += 1
+
     def unpack(output):
         assert (len(output) % 8 == 0)
         # print([addr for i in range(int(len(output)/8)) for addr in struct.unpack_from('q', output, i * 8)])
@@ -423,9 +444,11 @@ def prepare_simgr(entry):
 def make_constraint_readable(constraint):
     con_str = "["
     for con in constraint:
-        con_ops = re.search(pattern='<Bool (.*?) [<=>]*? (0x[a-f0-9][a-f0-9])>', string=str(con))
-        op_str1 = "INPUT_STR" if 'stdin' in con_ops[1] else str(int(con_ops[1], 16))
-        op_str2 = "INPUT_STR" if 'stdin' in con_ops[2] else str(int(con_ops[2], 16))
+        con_ops = re.search(pattern='<Bool (.*?) [<=>]*? (.*)>', string=str(con))
+        op_str1 = "INPUT_STR" if 'stdin' in con_ops[1] \
+            else str(int(con_ops[1], 16) if '0x' in con_ops[1] else con_ops[1])
+        op_str2 = "INPUT_STR" if 'stdin' in con_ops[2] \
+            else str(int(con_ops[2], 16) if '0x' in con_ops[2] else con_ops[2])
         con_str += con_ops[0].replace(con_ops[1], op_str1).replace(con_ops[2], op_str2)
         con_str += ", "
 
@@ -437,10 +460,10 @@ if __name__ == "__main__" and len(sys.argv) > 1:
     start = time.time()
     iter_count = run()[-1][0]
     end = time.time()
-
+    print(end-start)
     assert iter_count
     categories = ['Iteration',
-                  'Samples Num',
+                  'Sample/iter',
                   'Total Time',
                   'Initialisation',
                   'Binary Execution',
@@ -452,7 +475,7 @@ if __name__ == "__main__" and len(sys.argv) > 1:
                   'Constraint Reading']
 
     values = [iter_count,
-              NUM_SAMPLES * iter_count,
+              NUM_SAMPLES,
               end - start,
               ANGR_TIME,
               SIMLTR_TIME,

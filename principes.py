@@ -10,29 +10,32 @@ from math import sqrt, log
 
 import angr
 
-from Results.pie_maker import make_pie
-
 MAX_PATHS = 9
+MAX_ROUNDS = 100
 NUM_SAMPLES = 5
+
 DSC_PATHS = set()
 PST_INSTRS = set()
-MAX_ROUNDS = 100
 CUR_ROUND = 0
-BINARY_EXECUTION_COUNT = 0
 
 RHO = 1 / sqrt(2)
 
 QS_TIME = 0.
-RD_TIME = 0.
 QS_COUNT = 0
+
+RD_TIME = 0.
 RD_COUNT = 0
-ANGR_TIME = 0.
-TRACER_TIME = 0.
-SIMLTR_TIME = 0.
-SIMLTR_COUNT = 0.
+
+INITIAL_TIME = 0.
+
+SYMBOLIC_EXECUTION_TIME = 0.
+
+BINARY_EXECUTION_TIME = 0.
+BINARY_EXECUTION_COUNT = 0
+
 TREE_POLICY_TIME = 0.
+
 EXPANSION_TIME = 0.
-CONSTRAINT_PARSING_TIME = 0.
 
 BINARY = sys.argv[1]
 SEEDS = [str.encode(''.join(sys.argv[2:]))]
@@ -234,7 +237,7 @@ class TreeNode:
             s += "|-- "
         s += str(self)
         if self == mark_node:
-            s += "\033[1;32m <= found {}\033[0;m".format(found)
+            s += "\033[1;32m <=< found {}\033[0;m".format(found)
         print(s)
         if self.children:
             indent += 1
@@ -462,43 +465,45 @@ if __name__ == "__main__" and len(sys.argv) > 1:
     end = time.time()
     print(end-start)
     assert iter_count
-    categories = ['Iteration',
-                  'Sample/iter',
-                  'Total Time',
+    categories = ['Iteration Number',
+                  'Samples Number / iter',
+                  'Total',
                   'Initialisation',
                   'Binary Execution',
                   'Symbolic Execution',
                   'Path Preserve Fuzzing',
                   'Random Fuzzing',
-                  'TreePolicy',
-                  'TreeExpansion',
-                  'Constraint Reading']
+                  'Tree Policy',
+                  'Tree Expansion'
+                  ]
 
     values = [iter_count,
               NUM_SAMPLES,
               end - start,
-              ANGR_TIME,
-              SIMLTR_TIME,
-              TRACER_TIME,
+              INITIAL_TIME,
+              BINARY_EXECUTION_TIME,
+              SYMBOLIC_EXECUTION_TIME,
               QS_TIME,
               RD_TIME,
               TREE_POLICY_TIME,
-              EXPANSION_TIME,
-              CONSTRAINT_PARSING_TIME]
+              EXPANSION_TIME
+              ]
 
-    averages = ['/',
-                '/',
-                (end - start) / (iter_count * NUM_SAMPLES),
-                ANGR_TIME / (iter_count * NUM_SAMPLES),
-                SIMLTR_TIME / (iter_count * NUM_SAMPLES),
-                TRACER_TIME / (iter_count * NUM_SAMPLES),
-                QS_TIME / QS_COUNT,
-                RD_TIME / RD_COUNT,
-                TREE_POLICY_TIME / iter_count,
-                EXPANSION_TIME / (iter_count * NUM_SAMPLES),
-                CONSTRAINT_PARSING_TIME / MAX_PATHS]
+    units = [1,
+             1,
+             iter_count * NUM_SAMPLES,  # Time
+             iter_count * NUM_SAMPLES,  # Initialisation
+             BINARY_EXECUTION_COUNT,  # Binary execution
+             MAX_PATHS,  # Symbolic execution
+             QS_COUNT,  # Quick sampler
+             RD_COUNT,  # Random sampler
+             iter_count,  # Tree Policy
+             MAX_PATHS  # Expansion time
+             ]
 
-    if not len(categories) == len(values) == len(averages):
+    averages = [values[i] / units[i] for i in range(len(values))]
+
+    if not len(categories) == len(values) == len(units) == len(averages):
         pdb.set_trace()
 
     # logging_results()

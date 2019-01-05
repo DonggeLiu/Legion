@@ -37,6 +37,8 @@ TREE_POLICY_TIME = 0.
 
 EXPANSION_TIME = 0.
 
+TIME_LOG = {}
+
 BINARY = sys.argv[1]
 SEEDS = [str.encode(''.join(sys.argv[2:]))]
 PROJ = None
@@ -45,18 +47,20 @@ LOGGER = logging.getLogger("lg")
 LOGGER.setLevel(logging.DEBUG)
 
 
-def timeit(method):
-    def timed(*args, **kw):
+def timer(method):
+    global TIME_LOG
+
+    def timeit(*args, **kw):
         ts = time.time()
         result = method(*args, **kw)
         te = time.time()
-        if 'log_time' in kw:
-            name = kw.get('log_name', method.__name__.upper())
-            kw['log_time'][name] = int((te - ts) * 1000)
+        if method.__name__ in TIME_LOG:
+            TIME_LOG[method.__name__] += te - ts
         else:
-            print('%r  %2.2f ms' % (method.__name__, (te - ts) * 1000))
+            TIME_LOG[method.__name__] = te - ts
         return result
-    return timed
+
+    return timeit
 
 
 def generate_random():
@@ -156,8 +160,8 @@ class TreeNode:
     def dye(self, simgr):
         self.attach_state(simgr=simgr)
         if self.state:
-            self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=self.state, colour='G',
-                                                   symbols=self.symbols)
+            self.children['Simulation'] = TreeNode(
+                addr=self.addr, parent=self, state=self.state, colour='G', symbols=self.symbols)
 
     def attach_state(self, simgr):
         identified = False
@@ -254,6 +258,7 @@ def uct(node):
     return exploit + RHO * explore
 
 
+@timer
 def run():
     global CUR_ROUND
     history = []
@@ -267,14 +272,14 @@ def run():
     return history
 
 
+@timer
 def initialisation():
     initialise_angr()
     root = TreeNode(addr=None, parent=None, state=None, colour='R')
     root.state = prepare_simgr(entry=root.addr)
     root.state = PROJ.factory.entry_state(addr=root.addr, stdin=angr.storage.file.SimFileStream)
-    # root.compute_constraints()
-    root.children['Simulation'] = TreeNode(addr=root.addr, parent=root, state=root.state, colour='G',
-                                           symbols=root.symbols)
+    root.children['Simulation'] = TreeNode(
+        addr=root.addr, parent=root, state=root.state, colour='G', symbols=root.symbols)
     seed_paths = simulation_stage(node=root.children['Simulation'], input_str=SEEDS)
     are_new = expansion_stage(root, seed_paths)
     propagation_stage(root, seed_paths, are_new, [root, root.children['Simulation']])
@@ -305,6 +310,7 @@ def mcts(root):
     root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
+@timer
 def selection_stage(node):
     nodes, prev_red_index = [], 0
 
@@ -331,6 +337,7 @@ def selection_stage(node):
     return nodes
 
 
+@timer
 def simulation_stage(node, input_str=None):
     mutants = node.mutate()
 
@@ -347,7 +354,6 @@ def program(input_str):
 
     def unpack(output):
         assert (len(output) % 8 == 0)
-        # print([addr for i in range(int(len(output)/8)) for addr in struct.unpack_from('q', output, i * 8)])
         # NOTE: changed addr[0] to addr
         return [addr for i in range(int(len(output) / 8)) for addr in struct.unpack_from('q', output, i * 8)]
 
@@ -356,6 +362,7 @@ def program(input_str):
     return unpack(error_msg)
 
 
+@timer
 def expansion_stage(root, paths):
     return [expand_path(root, path) for path in paths]
 
@@ -378,6 +385,7 @@ def expand_path(root, path):
     return is_new
 
 
+@timer
 def propagation_stage(root, paths, are_new, nodes, short=0):
     assert len(paths) == len(are_new)
 
@@ -431,54 +439,53 @@ def make_constraint_readable(constraint):
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
-    start = time.time()
     iter_count = run()[-1][0]
-    end = time.time()
-    print(end-start)
+
+    print(TIME_LOG)
     assert iter_count
-    categories = ['Iteration Number',
-                  'Samples Number / iter',
-                  'Total',
-                  'Initialisation',
-                  'Binary Execution',
-                  'Symbolic Execution',
-                  'Path Preserve Fuzzing',
-                  'Random Fuzzing',
-                  'Tree Policy',
-                  'Tree Expansion'
-                  ]
-
-    values = [iter_count,
-              NUM_SAMPLES,
-              end - start,
-              INITIAL_TIME,
-              BINARY_EXECUTION_TIME,
-              SYMBOLIC_EXECUTION_TIME,
-              QS_TIME,
-              RD_TIME,
-              TREE_POLICY_TIME,
-              EXPANSION_TIME
-              ]
-
-    units = [1,
-             1,
-             iter_count * NUM_SAMPLES,  # Time
-             iter_count * NUM_SAMPLES,  # Initialisation
-             BINARY_EXECUTION_COUNT,  # Binary execution
-             MAX_PATHS,  # Symbolic execution
-             QS_COUNT,  # Quick sampler
-             RD_COUNT,  # Random sampler
-             iter_count,  # Tree Policy
-             MAX_PATHS  # Expansion time
-             ]
-
-    averages = [values[i] / units[i] for i in range(len(values))]
-
-    if not len(categories) == len(values) == len(units) == len(averages):
-        pdb.set_trace()
-
-    # logging_results()
-
-    make_pie(categories=categories, values=values, averages=averages)
-
-    assert (len(DSC_PATHS) == MAX_PATHS)
+    # categories = ['Iteration Number',
+    #               'Samples Number / iter',
+    #               'Total',
+    #               'Initialisation',
+    #               'Binary Execution',
+    #               'Symbolic Execution',
+    #               'Path Preserve Fuzzing',
+    #               'Random Fuzzing',
+    #               'Tree Policy',
+    #               'Tree Expansion'
+    #               ]
+    #
+    # values = [iter_count,
+    #           NUM_SAMPLES,
+    #           end - start,
+    #           INITIAL_TIME,
+    #           BINARY_EXECUTION_TIME,
+    #           SYMBOLIC_EXECUTION_TIME,
+    #           QS_TIME,
+    #           RD_TIME,
+    #           TREE_POLICY_TIME,
+    #           EXPANSION_TIME
+    #           ]
+    #
+    # units = [1,
+    #          1,
+    #          iter_count * NUM_SAMPLES,  # Time
+    #          iter_count * NUM_SAMPLES,  # Initialisation
+    #          BINARY_EXECUTION_COUNT,  # Binary execution
+    #          MAX_PATHS,  # Symbolic execution
+    #          QS_COUNT,  # Quick sampler
+    #          RD_COUNT,  # Random sampler
+    #          iter_count,  # Tree Policy
+    #          MAX_PATHS  # Expansion time
+    #          ]
+    #
+    # averages = [values[i] / units[i] for i in range(len(values))]
+    #
+    # if not len(categories) == len(values) == len(units) == len(averages):
+    #     pdb.set_trace()
+    #
+    # # logging_results()
+    #
+    # # make_pie(categories=categories, values=values, averages=averages)
+    #
+    # assert (len(DSC_PATHS) == MAX_PATHS)

@@ -15,7 +15,7 @@ import time
 import xlsxwriter
 
 
-def make_pie(categories, values, averages):
+def make_pie(categories, values, units, averages):
     workbook = xlsxwriter.Workbook('chart_pie{}.xlsx'.format(
         time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
@@ -23,17 +23,12 @@ def make_pie(categories, values, averages):
     bold = workbook.add_format({'bold': 1})
 
     # Add the worksheet data that the charts will refer to.
-    headings = ['Category', 'Values', 'Average']
-    data = [
-        categories,
-        values,
-        averages
-    ]
-
+    headings = ['Category', 'Value', 'unit', 'Average']
     worksheet.write_row('A1', headings, bold)
-    worksheet.write_column('A2', data[0])
-    worksheet.write_column('B2', data[1])
-    worksheet.write_column('C2', data[2])
+    worksheet.write_column('A2', categories)
+    worksheet.write_column('B2', values)
+    worksheet.write_column('C2', units)
+    worksheet.write_column('D2', averages)
 
     #######################################################################
     #
@@ -55,7 +50,7 @@ def make_pie(categories, values, averages):
     chart1.set_style(10)
 
     # Insert the chart into the worksheet (with an offset).
-    worksheet.insert_chart('D1', chart1, {'x_offset': 25, 'y_offset': 10})
+    worksheet.insert_chart('E1', chart1, {'x_offset': 25, 'y_offset': 10})
     # worksheet.insert_chart('D1', chart1)
 
     chart2 = workbook.add_chart({'type': 'pie'})
@@ -64,7 +59,7 @@ def make_pie(categories, values, averages):
     chart2.add_series({
         'name':       'Average Time Consumption',
         'categories': ['Sheet1', 4, 0, len(categories), 0],
-        'values': ['Sheet1', 4, 2, len(categories), 2],
+        'values': ['Sheet1', 4, 3, len(categories), 3],
     })
 
     # Add a title.
@@ -75,7 +70,7 @@ def make_pie(categories, values, averages):
 
     # Insert the chart into the worksheet (with an offset).
     # worksheet.insert_chart('D16')
-    worksheet.insert_chart('D16', chart2, {'x_offset': 25, 'y_offset': 10})
+    worksheet.insert_chart('E16', chart2, {'x_offset': 25, 'y_offset': 10})
     # #######################################################################
     # #
     # # Create a Pie chart with user defined segment colors.

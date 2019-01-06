@@ -86,3 +86,8 @@ Second version of Legion, with progresses and TODOs
     3. Black:  In TraceJump     + Confirmed not in Angr + No Symbolic state             + No Simulation child
     4. Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child
 3. Installation order: `Angr` -> `Cle` -> `Claripy`
+
+
+## Changes to dependencies
+1. Angr: Fixed the loggers of angr, so that it will not affect importers
+2. Claripy: Added a new approximate constraint solver backend: Quick Sampler

@@ -33,8 +33,11 @@ BINARY = sys.argv[1]
 SEEDS = [str.encode(''.join(sys.argv[2:]))]
 PROJ = None
 
-LOGGER = logging.getLogger("lg")
-LOGGER.setLevel(logging.DEBUG)
+LOGGER = logging.getLogger("Principes")
+LOGGER.setLevel(logging.ERROR)
+sthl = logging.StreamHandler()
+sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
+LOGGER.addHandler(sthl)
 
 
 def timer(method):
@@ -86,7 +89,7 @@ class TreeNode:
         for child in self.children.values():
             child = child.next_non_black_child()
             child_score = uct(child)
-            print(child, child_score)
+            LOGGER.info("\033[0mCandidate: {}\033[0m".format(child))
             if child_score == max_score:
                 candidates.append(child)
             if child_score > max_score:
@@ -222,7 +225,7 @@ class TreeNode:
         s += str(self)
         if self == mark_node:
             s += "\033[1;32m <=< found {}\033[0;m".format(found)
-        print(s)
+        LOGGER.info(s)
         if self.children:
             indent += 1
         for addr, child in self.children.items():
@@ -305,14 +308,11 @@ def initialise_seeds(root):
     return root
 
 
-def initialise_angr():
-    global PROJ
-    PROJ = angr.Project(BINARY)
-
-
 def keep_fuzzing(root):
-    LOGGER.info("== Iter:{} == Tree path:{} == Set path:{} == SAMPLE_COUNT:{} == QS: {} == RD: {} =="
-                .format(CUR_ROUND, root.distinct, len(DSC_PATHS), BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
+    LOGGER.info("\033[1;35m== Iter:{} == Tree path:{} == Set path:{} "
+                "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
+                .format(CUR_ROUND, root.distinct, len(DSC_PATHS),
+                        BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
     assert root.distinct == len(DSC_PATHS)
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
@@ -344,9 +344,7 @@ def tree_policy(node):
     nodes, prev_red_index = [], 0
 
     while node.children:
-        print("Select: {}".format(node))
-        if node.colour is 'R':
-            prev_red_node = node
+        LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         if node.colour is 'W':
             node.dye_to_nearest_red_child()
         assert not (node.colour is 'W' or node.colour is 'G')
@@ -354,6 +352,8 @@ def tree_policy(node):
         node = node.best_child()
         prev_red_index = len(nodes) if node.colour is 'R' else prev_red_index
         nodes.append(node)
+    LOGGER.info("Select: {}".format(nodes[-1]))
+    return nodes, prev_red_index
 
 
 @timer
@@ -368,10 +368,10 @@ def tree_policy_for_leaf(nodes, red_index):
 def simulation_stage(node, input_str=None):
     mutants = node.mutate()
 
-    print("INPUT_val: {}".format([mutant for mutant in mutants]))
+    LOGGER.info("INPUT_val: {}".format(mutants))
     mutants = input_str if input_str else [str.encode(chr(mutant), 'utf-8', 'surrogatepass')
                                            for mutant in mutants if mutant is not None]
-    print("INPUT_STR: {}".format(mutants))
+    LOGGER.info("INPUT_STR: {}".format(mutants))
     return [program(mutant) for mutant in mutants]
 
 
@@ -400,7 +400,7 @@ def expansion_stage(root, paths):
 def expand_path(root, path):
     global DSC_PATHS
     DSC_PATHS.add(tuple(path))
-    print("INPUT_PATH: {}".format([hex(addr) for addr in path]))
+    LOGGER.info("INPUT_PATH: {}".format([hex(addr) for addr in path]))
 
     assert (not root.addr or root.addr == path[0])  # Either Root before SEED or it must have an addr
 

@@ -135,7 +135,7 @@ class TreeNode:
             assert child
             child.dye(simgr=simgr)
             if child.colour is 'R':
-                return
+                found_red_child = True
             parent = child
         assert self.colour is not 'W'
         assert self.colour is 'B' or self.state
@@ -222,6 +222,9 @@ class TreeNode:
         s = ""
         for _ in range(indent - 1):
             s += "|   "
+        if indent > 32:
+            LOGGER.info("...")
+            return
         if indent:
             s += "|-- "
         s += str(self)
@@ -347,13 +350,15 @@ def tree_policy(node):
 
     while node.children:
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
+        nodes.append(node)
+        assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
         if node.colour is 'W':
             node.dye_to_nearest_red_child()
         assert not (node.colour is 'W' or node.colour is 'G')
         # NOTE: No need to differentiate red or black here
         node = node.best_child()
         prev_red_index = len(nodes) if node.colour is 'R' else prev_red_index
-        nodes.append(node)
+    nodes.append(node)
     LOGGER.info("Select: {}".format(nodes[-1]))
     return nodes, prev_red_index
 
@@ -363,6 +368,9 @@ def tree_policy_for_leaf(nodes, red_index):
     # NOTE: Roll back to the immediate red ancestor
     #  and only keep the path from root the that ancestor's simulation child
     LOGGER.info("Select: {} as {} is a leaf".format(nodes[red_index], nodes[-1]))
+
+    # assert node is red and has simulation child
+    assert nodes[red_index].colour is 'R' and 'Simulation' in nodes[red_index].children
     return nodes[:red_index + 1] + [nodes[red_index].children['Simulation']]
 
 
@@ -438,7 +446,7 @@ def propagate_path(root, path, is_new, node):
     for addr in path[1:]:
         node.visited += 1
         node.distinct += is_new
-        assert node.distinct < 10
+        assert node.distinct <= MAX_PATHS
         if addr not in node.children:
             pdb.set_trace()
         node = node.children.get(addr)

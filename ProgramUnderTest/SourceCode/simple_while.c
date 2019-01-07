@@ -3,7 +3,7 @@
 
 
 int test(unsigned int x) {
-	while (x>110) {
+	while (x>32 && x < 64) {
 	    x--;
 	}
 	return x;
@@ -11,12 +11,14 @@ int test(unsigned int x) {
 
 
 int main(int argc, char * argv[]) {
-	unsigned char x;
+	unsigned char x, y;
 
-	// int n;
-	// n = read(0, &x, 1);
-	// printf("read %d bytes, x = %c\n", n, x);
 	read(0, &x, 1);
-	unsigned int r = test(x);
-	return x;
+	read(0, &y, 1);
+
+	if(y > 256-32) {
+	    test(x);
+	}
+
+	return 0;
 }

@@ -477,12 +477,16 @@ def make_constraint_readable(constraint):
 
 def display_results():
     for i in range(len(categories)):
-        print("{:25s}: {:20f} / {} = {:20f}"
+        print("{:25s}: {:-9.6f} / {:-3d} = {:3.6f}"
               .format(categories[i], values[i], units[i], averages[i]))
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
+
+    LOGGER.info(BINARY)
+    LOGGER.info(SEEDS)
+
     ITER_COUNT = run()[-1][0]
     for key, val in TIME_LOG.items():
         LOGGER.info("{:25s}: {}".format(key, val))

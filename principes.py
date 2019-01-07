@@ -57,7 +57,7 @@ def timer(method):
 
 
 def generate_random():
-    return random.randint(0, 255)
+    return [random.randint(0, 255) for _ in SEEDS[0]]
 
 
 class TreeNode:
@@ -193,13 +193,15 @@ class TreeNode:
         LOGGER.info("{}'s constraint: {}".format(
             hex(self.addr), make_constraint_readable(self.state.solver.constraints)))
 
-        # TODO: Pass PST_INSTRS to solver
-        vals = self.state.solver.eval_upto(
-            e=self.state.posix.stdin.load(0, self.state.posix.stdin.size), n=NUM_SAMPLES)
-        if None in vals:
-            self.exhausted = True
+        target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
+        vals = self.state.solver.eval_upto(e=target, n=NUM_SAMPLES)
 
-        return vals
+        if len(vals) < NUM_SAMPLES:
+            self.exhausted = True
+        n = (target.size() + 7) // 8  # Round up to the next full byte
+        result = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
+
+        return result
 
     @timer
     def random_sampler(self):
@@ -366,12 +368,11 @@ def tree_policy_for_leaf(nodes, red_index):
 
 @timer
 def simulation_stage(node, input_str=None):
-    mutants = node.mutate()
+    mutants = input_str if input_str else node.mutate()
 
     LOGGER.info("INPUT_val: {}".format(mutants))
-    mutants = input_str if input_str else [str.encode(chr(mutant), 'utf-8', 'surrogatepass')
-                                           for mutant in mutants if mutant is not None]
-    LOGGER.info("INPUT_STR: {}".format(mutants))
+    mutants = [bytes(mutant) for mutant in mutants if mutant is not None]
+    LOGGER.info("INPUT_bytes: {}".format(mutants))
     return [program(mutant) for mutant in mutants]
 
 

@@ -1,18 +1,10 @@
-.PHONY: all
 
-all: test.instr test.instr.s test.out.s
-
-# test: test.c
-# 	gcc -o $@ $^
-
-%.s: %.c
-	$(CC) -S -o $@ $^
+%.s: ../SourceCode/%.c
+	$(CC) -S -o $@ ../SourceCode/$^
 
 %.instr.s: %.s
 	python3 tracejump.py $^ $@
 
 %.instr: %.instr.o __trace_jump.o
-	$(CC) -o $@ $^ -no-pie
-
-%.out.s: %
-	objdump -d $^ > $@
+	$(CC) -o ../Instrumented/$@ $^ -no-pie
+	objdump -d ../Instrumented/$@ > ../Assembly/$@.s

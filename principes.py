@@ -325,12 +325,9 @@ def tree_policy(node):
 
 
 def dye_to_the_next_red(start_node, last_state):
-
     succs = compute_line_children_states(state=last_state)
-    while True:
-        dye_red_black_node(start_node, target_states=succs)
-        if start_node.is_diverging() or not start_node.children:
-            break
+    while not dye_red_black_node(start_node, target_states=succs) and not \
+            start_node.is_diverging() and start_node.children:
         start_node = next(v for v in start_node.children.values())
 
 
@@ -353,10 +350,9 @@ def dye_red_black_node(candidate_node, target_states):
     for state in target_states:
         if candidate_node.addr == state.addr:
             candidate_node.dye(colour='R', state=state)
-            break
-    if candidate_node.colour is 'R':
-        return
+            return True
     candidate_node.dye(colour='B')
+    return False
 
 
 @timer

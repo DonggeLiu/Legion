@@ -27,9 +27,9 @@ is64 = True
 # registers used by write
 # rcx, r11
 
+
 def trace_jump(output):
-    global is64
-    assert(is64)
+    assert is64
 
     # output.write('.align 4\n')
     output.write('\tsub $128,%rsp\n')
@@ -50,8 +50,8 @@ def trace_jump(output):
 
 
 # see afl-as.c add_instrumentation
-def instrument(input, output):
-    global code_sections, data_sections, is64
+def instrument():
+    global data_sections, is64
     
     ins_lines = 0
     instr_ok = False
@@ -60,16 +60,16 @@ def instrument(input, output):
     skip_intel = False
     skip_app = False
     instrument_next = False
-    
-    for line in input:
+
+    for line in asm_file:
         if not skip_intel and not skip_app and not skip_csect and instr_ok and instrument_next and line[0] == '\t' and str.isalpha(line[1]):
-            trace_jump(output)
+            trace_jump(ins_file)
             ins_lines += 1
             instrument_next = False
 
-        output.write(line)
-        
-        if(line[0] == '\t' and line[1] == '.'):
+        ins_file.write(line)
+
+        if line[0] == '\t' and line[1] == '.':
             if line == '\t.text\n' or line.startswith('\t.section\t.text') or line.startswith('\t.section\t__TEXT,__text') or line.startswith('\t.section __TEXT,__text'):
                 instr_ok = True
                 continue
@@ -100,7 +100,7 @@ def instrument(input, output):
         
         if line[0] == '\t':
             if line[1] == 'j' and line[2] != 'm':
-                trace_jump(output)
+                trace_jump(ins_file)
                 ins_lines += 1
             continue
         
@@ -117,7 +117,6 @@ def instrument(input, output):
 
 
 if __name__ == "__main__" and len(sys.argv) > 2:
-    input = open(sys.argv[1], 'r')
-    output = open(sys.argv[2], 'w')
-    ins_lines = instrument(input, output)
-    print('instrumented ' + str(ins_lines) + ' lines')
+    asm_file = open(sys.argv[1], 'r')
+    ins_file = open(sys.argv[2], 'w')
+    print('instrumented {} lines'.format(instrument()))

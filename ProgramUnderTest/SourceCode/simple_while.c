@@ -2,23 +2,20 @@
 #include <stdio.h>
 
 
-int test(unsigned int x) {
-	while (x>32 && x < 64) {
-	    x--;
+int test(unsigned int y) {
+	while (y>32 && y < 40) {
+	    y--;
 	}
-	return x;
+	return y;
 }
 
 
 int main(int argc, char * argv[]) {
-	unsigned char x, y;
 
-	read(0, &x, 1);
-	read(0, &y, 1);
-
-	if(y > 256-32) {
-	    test(x);
+	unsigned char buff[2];
+	int bytes = read(0, buff, sizeof buff);
+	if (buff[0] > 200) {
+	    test(buff[1]);
 	}
-
 	return 0;
 }

@@ -137,7 +137,7 @@ class TreeNode:
 
     @timer
     def mutate(self):
-        if self.state.solver.constraints:
+        if self.state.solver.constraints and not self.exhausted:
             return self.quick_sampler()
         return self.random_sampler()
 
@@ -162,8 +162,6 @@ class TreeNode:
     def random_sampler(self):
         global RD_COUNT
         RD_COUNT += NUM_SAMPLES
-        # Must be root in the first round before executing seed:
-        assert not self.parent.parent
         return [generate_random() for _ in range(NUM_SAMPLES)]
 
     def add_child(self, addr):
@@ -219,8 +217,8 @@ class TreeNode:
 
 
 def uct(node):
-    if node.is_exhausted():
-        return -float('inf')
+    # if node.is_exhausted():
+    #     return -float('inf')
     if not node.visited:
         return float('inf')
     if 'Simulation' in node.children:

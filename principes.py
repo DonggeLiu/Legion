@@ -149,7 +149,7 @@ class TreeNode:
             hex(self.addr), make_constraint_readable(self.state.solver.constraints)))
 
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
-        vals = self.state.solver.eval_upto(e=target, n=NUM_SAMPLES)
+        vals = [val for val in self.state.solver.eval_upto(e=target, n=NUM_SAMPLES) if val is not None]
 
         if len(vals) < NUM_SAMPLES:
             self.exhausted = True

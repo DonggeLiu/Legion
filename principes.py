@@ -145,8 +145,7 @@ class TreeNode:
     def quick_sampler(self):
         global QS_COUNT
         QS_COUNT += NUM_SAMPLES
-        LOGGER.info("{}'s constraint: {}".format(
-            hex(self.addr), make_constraint_readable(self.state.solver.constraints)))
+        LOGGER.info("{}'s constraint: {}".format(hex(self.addr), self.state.solver.constraints))
 
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
         vals = [val for val in self.state.solver.eval_upto(e=target, n=NUM_SAMPLES) if val is not None]
@@ -154,9 +153,8 @@ class TreeNode:
         if len(vals) < NUM_SAMPLES:
             self.exhausted = True
         n = (target.size() + 7) // 8  # Round up to the next full byte
-        result = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
-
-        return result
+        results = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
+        return results
 
     @timer
     def random_sampler(self):
@@ -277,7 +275,6 @@ def keep_fuzzing(root):
 
 def mcts(root):
     nodes = selection_stage(root)
-    # pdb.set_trace()
     paths = simulation_stage(nodes[-1])
     # NOTE: What if len(paths) < NUM_SAMPLES? i.e. fuzzer finds less mutant than asked
     #  Without handling this, we will be trapped in the infeasible node, whose num_visited is always 0
@@ -373,8 +370,9 @@ def tree_policy_for_leaf(nodes, red_index):
 @timer
 def simulation_stage(node, input_str=None):
     mutants = input_str if input_str else node.mutate()
-
-    LOGGER.info("INPUT_val: {}".format(mutants))
+    vals = [[b for b in m] for m in mutants]
+    assert not vals or type(vals[0][0]) is int
+    LOGGER.info("INPUT_val: {}".format(vals))
     mutants = [bytes(mutant) for mutant in mutants if mutant is not None]
     LOGGER.info("INPUT_bytes: {}".format(mutants))
     return [program(mutant) for mutant in mutants]

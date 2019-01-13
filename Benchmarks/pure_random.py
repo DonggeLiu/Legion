@@ -49,8 +49,7 @@ def traced_with_input(in_str):
 
 
 def cannot_terminate():
-    LOGGER.debug("=== Iter:{} === len(DSC_PATHS):{}"
-                 .format(CUR_ROUND, len(DSC_PATHS)))
+    LOGGER.debug("=== Iter:{} === len(DSC_PATHS):{}".format(CUR_ROUND, len(DSC_PATHS)))
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
 
@@ -66,6 +65,7 @@ def run():
             new_in = generate_random(SEED)
         simul_start = time.time()
         path = program(new_in)
+        PST_INSTRS.add(new_in)
         simul_end = time.time()
         SIMUL_TIME += simul_end - simul_start
         # prev_num = len(DSC_PATHS)

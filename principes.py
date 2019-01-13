@@ -109,73 +109,28 @@ class TreeNode:
         return self.best_child()
 
     @timer
-    def dye_to_nearest_red_child(self):
-        """
-        First find the nearest red parent as starting point of simulation manager
-        Then use it to compute the symbolic state of self and self's decedents
-        return if the first red node is found
-        """
+    def dye(self, colour, state=None):
         assert self.colour is 'W'
+        assert (colour is 'B' and not state) or (colour is 'R' and state)
 
-        # First find red parent
-        parent, path = self.track_nearest_red_parent()
-        if parent is self:
-            assert self.parent is None  # meaning self has already been dyed as red (Root?)
-            return
+        self.colour = colour
+        if colour is 'R':
+            self.state = state
+            self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=self.state, colour='G')
+        LOGGER.info("Dye {}".format(self))
 
-        # dye the way down along the path
-        assert PROJ
-        simgr = prepare_simgr(entry=parent.state)
-        found_red_child = False
-        while not found_red_child:
-            if not parent.children:  # leaf
-                break
-            addr = path.pop() if path else random.choice(list(parent.children.keys()))
-            child = parent.children.get(addr)
-            assert child
-            child.dye(simgr=simgr)
-            if child.colour is 'R':
-                found_red_child = True
-            parent = child
-        assert self.colour is not 'W'
-        assert self.colour is 'B' or self.state
+    def is_diverging(self):
+        # Return if self is a diverging node in the current incomplete tree
+        return (len(self.children) - ('Simulation' in self.children)) > 1
 
-    @timer
-    def track_nearest_red_parent(self):
-        node, path = self, []
-        while node.parent and (not node.state):
-            path.append(node.addr)
-            node = node.parent
-        path.append(node.addr)
-
-        assert node.state
-        assert node and (node.colour is 'R') and node.state and (node.addr is path.pop())
-        # pop out path[-1], which should be the addr of node and will not be needed
-        return node, path
-
-    @timer
-    def dye(self, simgr):
-        self.attach_state(simgr=simgr)
-        if self.state:
-            self.children['Simulation'] = TreeNode(
-                addr=self.addr, parent=self, state=self.state, colour='G', symbols=self.symbols)
-
-    def attach_state(self, simgr):
-        global SYMBOLIC_EXECUTION_COUNT
-
-        identified = False
-        assert not self.state
-        while simgr.active and not identified:
-            for state in simgr.active:
-                if self.addr != state.addr:
-                    continue
-                identified = True
-                self.state, self.colour = (state, 'R') if len(simgr.active) > 1 else (None, 'B')
-
-            simgr.step()
-            SYMBOLIC_EXECUTION_COUNT += 1
-        if not identified:
-            self.state, self.colour = None, 'B'
+    def mark_exhausted(self):
+        assert not self.exhausted
+        self.exhausted = True
+        if self.colour is 'R':
+            self.children['Simulation'].exhausted = True
+        else:
+            assert self.colour is 'G'
+            self.parent.exhausted = True
 
     def is_exhausted(self):
         return self.exhausted or ('Simulation' in self.children and self.children['Simulation'].exhausted)
@@ -346,21 +301,64 @@ def selection_stage(node):
 
 @timer
 def tree_policy(node):
-    nodes, prev_red_index = [], 0
+    nodes, prev_red_index, last_state = [], 0, PROJ.factory.entry_state(stdin=angr.storage.file.SimFileStream)
 
     while node.children:
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         nodes.append(node)
         assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
         if node.colour is 'W':
-            node.dye_to_nearest_red_child()
-        assert not (node.colour is 'W' or node.colour is 'G')
-        # NOTE: No need to differentiate red or black here
+            dye_to_the_next_red(start_node=node, last_state=last_state)
+        if node.colour is 'R':
+            last_state = node.state
+        # NOTE: No need to distinguish red or black here
         node = node.best_child()
         prev_red_index = len(nodes) if node.colour is 'R' else prev_red_index
     nodes.append(node)
     LOGGER.info("Select: {}".format(nodes[-1]))
     return nodes, prev_red_index
+
+
+def dye_to_the_next_red(start_node, last_state):
+
+    succs = compute_line_children_states(state=last_state)
+    while True:
+        dye_red_black_node(start_node, target_states=succs)
+        if start_node.is_diverging() or not start_node.children:
+            break
+        start_node = next(v for v in start_node.children.values())
+
+
+def compute_line_children_states(state):
+    """
+    Symbolically execute to the end of the line of the state
+    :param state: the state which is in the line to execute through
+    :return: a list of the immediate children states of the line,
+        could be empty if the line is a leaf
+    """
+    children = symbolic_execute(state=state)
+    ls = []
+    while len(children) == 1:
+        ls.append(children[0])
+        children = symbolic_execute(state=children[0])
+    return children
+
+
+def dye_red_black_node(candidate_node, target_states):
+    for state in target_states:
+        if candidate_node.addr == state.addr:
+            candidate_node.dye(colour='R', state=state)
+            break
+    if candidate_node.colour is 'R':
+        return
+    candidate_node.dye(colour='B')
+
+
+@timer
+def symbolic_execute(state):
+    global SYMBOLIC_EXECUTION_COUNT
+    SYMBOLIC_EXECUTION_COUNT += 1
+    return state.step().successors
 
 
 @timer
@@ -453,12 +451,6 @@ def propagate_path(root, path, is_new, node):
         assert node
     node.visited += 1
     node.distinct += is_new
-
-
-def prepare_simgr(entry):
-    # TODO: modify the code in line 117 of sim_manager.py to avoid duplicated initialisation of simgr
-    assert PROJ
-    return PROJ.factory.simulation_manager(entry, save_unsat=True)
 
 
 def make_constraint_readable(constraint):

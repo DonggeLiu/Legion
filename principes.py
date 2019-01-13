@@ -184,7 +184,8 @@ class TreeNode:
         LOGGER.info(s)
         if self.children:
             indent += 1
-        for addr, child in self.children.items():
+
+        for _, child in sorted(list(self.children.items()), key=lambda k: str(k)):
             child.pp(indent=indent, mark_node=mark_node, found=found)
 
     def repr_node_name(self):
@@ -243,7 +244,7 @@ def run():
 @timer
 def initialisation():
     initialise_angr()
-    return initialise_seeds(TreeNode(addr=None, parent=None, state=None, colour='R'))
+    return initialise_seeds(TreeNode(addr=None, parent=None, state=None, colour='W'))
 
 
 @timer
@@ -254,13 +255,22 @@ def initialise_angr():
 
 @timer
 def initialise_seeds(root):
-    root.state = prepare_simgr(entry=root.addr)
-    root.state = PROJ.factory.entry_state(addr=root.addr, stdin=angr.storage.file.SimFileStream)
-    root.children['Simulation'] = TreeNode(
-        addr=root.addr, parent=root, state=root.state, colour='G', symbols=root.symbols)
+    # NOTE: prepare the root (dye red, add simulation child) otherwise the data in simulation stage of SEEDs
+    #   cannot be recorded without building another special case
+    #   recorded in the simulation child of it.
+    #   Cannot dye root with dye_to_the_next_red() as usual, as:
+    #       1. The addr of root will not be known before simulation
+    #       2. The function requires a red node in the previous line of the node to dye,
+    #       which does not exist for root
+    root.dye(colour='R', state=PROJ.factory.entry_state(stdin=angr.storage.file.SimFileStream))
     seed_paths = simulation_stage(node=root.children['Simulation'], input_str=SEEDS)
     are_new = expansion_stage(root, seed_paths)
     propagation_stage(root, seed_paths, are_new, [root, root.children['Simulation']])
+    assert len(set([path[0] for path in seed_paths])) == 1  # Make sure all paths are starting from the same addr
+    while root.state.addr != root.addr:
+        succs = symbolic_execute(state=root.state)
+        assert len(succs) == 1  # Make sure no divergence before root
+        root.state = succs[0]
     return root
 
 
@@ -476,8 +486,8 @@ if __name__ == "__main__" and len(sys.argv) > 1:
     LOGGER.info(SEEDS)
 
     ITER_COUNT = run()[-1][0]
-    for key, val in TIME_LOG.items():
-        LOGGER.info("{:25s}: {}".format(key, val))
+    for method_name, method_time in TIME_LOG.items():
+        LOGGER.info("{:25s}: {}".format(method_name, method_time))
 
     assert ITER_COUNT
     categories = ['Iteration Number',

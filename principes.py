@@ -324,6 +324,7 @@ def tree_policy(node):
     return nodes, prev_red_index
 
 
+@timer
 def dye_to_the_next_red(start_node, last_state):
     succs = compute_line_children_states(state=last_state)
     while not dye_red_black_node(start_node, target_states=succs) and not \
@@ -331,6 +332,7 @@ def dye_to_the_next_red(start_node, last_state):
         start_node = next(v for v in start_node.children.values())
 
 
+@timer
 def compute_line_children_states(state):
     """
     Symbolically execute to the end of the line of the state
@@ -346,6 +348,7 @@ def compute_line_children_states(state):
     return children
 
 
+@timer
 def dye_red_black_node(candidate_node, target_states):
     for state in target_states:
         if candidate_node.addr == state.addr:

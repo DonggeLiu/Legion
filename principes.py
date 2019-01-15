@@ -70,7 +70,7 @@ class TreeNode:
             Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child
     """
 
-    def __init__(self, addr, parent=None, state=None, colour='W', symbols=''):
+    def __init__(self, addr, parent=None, state=None, colour='W'):
         self.exhausted = False
         self.addr = addr
         self.parent = parent
@@ -80,7 +80,6 @@ class TreeNode:
         self.children = {}  # {addr: Node}
         self.distinct = 0
         self.visited = 0
-        self.symbols = symbols
 
     def best_child(self):
 

@@ -283,7 +283,7 @@ def initialise_seeds(root):
     propagation_stage(root, seed_paths, are_new, [root, root.children['Simulation']])
     assert len(set([path[0] for path in seed_paths])) == 1  # Make sure all paths are starting from the same addr
     while root.state.addr != root.addr:
-        succs = symbolic_execute(state=root.state)
+        succs = execute_symbolically(state=root.state)
         assert len(succs) == 1  # Make sure no divergence before root
         root.state = succs[0]
     return root
@@ -325,17 +325,17 @@ def tree_policy(node):
 
     while node.children:
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
-        nodes.append(node)
         assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
         if node.colour is 'W':
             dye_to_the_next_red(start_node=node, last_state=last_state)
         if node.colour is 'R':
             last_state = node.state
+            prev_red_index = len(nodes)
         # NOTE: No need to distinguish red or black here
+        nodes.append(node)
         node = node.best_child()
-        prev_red_index = len(nodes) if node.colour is 'R' else prev_red_index
     nodes.append(node)
-    LOGGER.info("Select: {}".format(nodes[-1]))
+    LOGGER.info("Final: {}".format(nodes[-1]))
     return nodes, prev_red_index
 
 
@@ -355,11 +355,11 @@ def compute_line_children_states(state):
     :return: a list of the immediate children states of the line,
         could be empty if the line is a leaf
     """
-    children = symbolic_execute(state=state)
+    children = execute_symbolically(state=state)
     ls = []
     while len(children) == 1:
         ls.append(children[0])
-        children = symbolic_execute(state=children[0])
+        children = execute_symbolically(state=children[0])
     return children
 
 
@@ -374,7 +374,7 @@ def dye_red_black_node(candidate_node, target_states):
 
 
 @timer
-def symbolic_execute(state):
+def execute_symbolically(state):
     global SYMBOLIC_EXECUTION_COUNT
     SYMBOLIC_EXECUTION_COUNT += 1
     return state.step().successors
@@ -579,10 +579,10 @@ if __name__ == "__main__" and len(sys.argv) > 1:
               TIME_LOG['run'],  # Time
               TIME_LOG['initialisation'],  # Initialisation
               TIME_LOG['program'],  # Binary execution
-              TIME_LOG['dye'],  # Symbolic execution
+              TIME_LOG['execute_symbolically'],  # Symbolic execution
               TIME_LOG['quick_sampler'],  # Quick sampler
               TIME_LOG['random_sampler'],  # Random sampler
-              TIME_LOG['selection_stage'] - TIME_LOG['dye_to_nearest_red_child'],  # Tree policy
+              TIME_LOG['selection_stage'] - TIME_LOG['dye_to_the_next_red'],  # Tree policy
               TIME_LOG['expansion_stage']  # Expansion
               ]
 

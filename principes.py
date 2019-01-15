@@ -172,24 +172,26 @@ class TreeNode:
         return True
 
     @timer
-    def pp(self, indent=0, mark_node=None, found=0):
+    def pp(self, indent=0, mark_node=None, found=0, forced=False):
+        if LOGGER.level != logging.DEBUG and not forced:
+            return
         s = ""
         for _ in range(indent - 1):
             s += "|   "
         if indent > 32:
-            LOGGER.info("...")
+            print("...")
             return
         if indent:
             s += "|-- "
         s += str(self)
         if self == mark_node:
             s += "\033[1;32m <=< found {}\033[0;m".format(found)
-        LOGGER.info(s)
+        print(s)
         if self.children:
             indent += 1
 
         for _, child in sorted(list(self.children.items()), key=lambda k: str(k)):
-            child.pp(indent=indent, mark_node=mark_node, found=found)
+            child.pp(indent=indent, mark_node=mark_node, found=found, forced=forced)
 
     def repr_node_name(self):
         return ("Simul Node: " if self.colour is 'G' else "Block Node: ") \
@@ -250,6 +252,7 @@ def run():
         history.append([CUR_ROUND, root.distinct])
         mcts(root)
         CUR_ROUND += 1
+    root.pp(forced=True)
     return history
 
 
@@ -303,7 +306,7 @@ def mcts(root):
     #  I saved all nodes along the path of selection stage and used them here
     are_new = expansion_stage(root, paths)
     propagation_stage(root, paths, are_new, nodes, NUM_SAMPLES - len(paths))
-    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
 @timer

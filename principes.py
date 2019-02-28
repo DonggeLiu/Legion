@@ -133,8 +133,7 @@ class TreeNode:
 
         self.colour = colour
         if colour is 'R':
-            self.state = state
-            self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=self.state, colour='G')
+            self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=state, colour='G')
         LOGGER.info("Dye {}".format(self))
 
     def is_diverging(self):
@@ -309,10 +308,10 @@ def initialise_seeds(root):
     are_new = expansion_stage(root, seed_paths)
     propagation_stage(root, seed_paths, are_new, [root, root.children['Simulation']])
     assert len(set([path[0] for path in seed_paths])) == 1  # Make sure all paths are starting from the same addr
-    while root.state.addr != root.addr:
-        succs = execute_symbolically(state=root.state)
+    while root.children['Simulation'].state.addr != root.addr:
+        succs = execute_symbolically(state=root.children['Simulation'].state)
         assert len(succs) == 1  # Make sure no divergence before root
-        root.state = succs[0]
+        root.children['Simulation'].state = succs[0]
     return root
 
 
@@ -351,15 +350,14 @@ def selection_stage(node):
 
 @timer
 def tree_policy(node):
-    nodes, prev_red_index, last_state = [], 0, PROJ.factory.entry_state(stdin=angr.storage.file.SimFileStream)
+    nodes, prev_red_index = [], 0
 
     while node.children:
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
         if node.colour is 'W':
-            dye_to_the_next_red(start_node=node, last_state=last_state)
+            dye_to_the_next_red(start_node=node, last_red=nodes[prev_red_index])
         if node.colour is 'R':
-            last_state = node.state
             prev_red_index = len(nodes)
         # NOTE: No need to distinguish red or black here
         nodes.append(node)
@@ -370,7 +368,8 @@ def tree_policy(node):
 
 
 @timer
-def dye_to_the_next_red(start_node, last_state):
+def dye_to_the_next_red(start_node, last_red):
+    last_state = last_red.children['Simulation'].state
     succs = compute_line_children_states(state=last_state)
     while not dye_red_black_node(
             candidate_node=start_node, target_states=succs, phantom_parent=last_red) and \

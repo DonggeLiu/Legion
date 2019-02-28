@@ -333,6 +333,9 @@ def mcts(root):
     # NOTE: What if len(paths) < NUM_SAMPLES? i.e. fuzzer finds less mutant than asked
     #  Without handling this, we will be trapped in the infeasible node, whose num_visited is always 0
     #  I saved all nodes along the path of selection stage and used them here
+    if nodes[-1].colour is 'P':
+        del nodes[-1].parent.children[nodes[-1].addr]
+        nodes.pop()
     are_new = expansion_stage(root, paths)
     propagation_stage(root, paths, are_new, nodes, NUM_SAMPLES - len(paths))
     # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))

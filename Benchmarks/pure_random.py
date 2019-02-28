@@ -5,25 +5,43 @@ import subprocess
 import sys
 import time
 
-MAX_PATHS = 9
+MAX_PATHS = 18
 NUM_SAMPLES = 1
 DSC_PATHS = set()
 PST_INSTRS = set()
 MAX_ROUNDS = float('inf')
 CUR_ROUND = 0
 SIMUL_TIME = 0.
+TIME_LOG = {}
 
 BINARY = sys.argv[1]
 SEED = ''.join(sys.argv[2:])
-
+print(SEED)
 LOGGER = logging.getLogger('rd')
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.ERROR)
 LOGGER.addHandler(logging.StreamHandler(sys.stdout))
 
 
+def timer(method):
+    global TIME_LOG
+
+    def timeit(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        if method.__name__ in TIME_LOG:
+            TIME_LOG[method.__name__] += te - ts
+        else:
+            TIME_LOG[method.__name__] = te - ts
+        return result
+
+    return timeit
+
+
 def generate_random(seed):
-    in_str = "".join(map(chr, [random.randint(0, 255) for _ in seed]))
-    return str.encode(in_str)
+
+    new_bytes = bytes([random.randint(0, 255) for _ in seed])
+    return new_bytes
 
 
 def program(in_str):
@@ -49,10 +67,12 @@ def traced_with_input(in_str):
 
 
 def cannot_terminate():
-    LOGGER.debug("=== Iter:{} === len(DSC_PATHS):{}".format(CUR_ROUND, len(DSC_PATHS)))
+    # LOGGER.debug("=== Iter:{} === len(DSC_PATHS):{}".format(CUR_ROUND, len(DSC_PATHS)))
+    print('{},{}'.format(CUR_ROUND, len(DSC_PATHS)))
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
 
+@timer
 def run():
     global CUR_ROUND, SIMUL_TIME
 
@@ -61,17 +81,14 @@ def run():
     while cannot_terminate():
         CUR_ROUND += 1
         new_in = generate_random(SEED)
-        while new_in in PST_INSTRS:
-            new_in = generate_random(SEED)
+        # while new_in in PST_INSTRS:
+        #     new_in = generate_random(SEED)
         simul_start = time.time()
         path = program(new_in)
         PST_INSTRS.add(new_in)
         simul_end = time.time()
         SIMUL_TIME += simul_end - simul_start
-        # prev_num = len(DSC_PATHS)
         DSC_PATHS.add(path)
-        # if len(DSC_PATHS) > prev_num:
-        #     LOGGER.info(map(hex, path))
         history.append([CUR_ROUND, len(DSC_PATHS)])
         if CUR_ROUND >= MAX_ROUNDS:
             break
@@ -80,9 +97,7 @@ def run():
 
 if __name__ == "__main__" and len(sys.argv) > 1:
 
-    start = time.time()
     results = run()
-    end = time.time()
-    print(end - start)
+    print(TIME_LOG)
     print(SIMUL_TIME)
     print(CUR_ROUND)

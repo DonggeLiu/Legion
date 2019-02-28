@@ -19,6 +19,7 @@ NUM_SAMPLES = 5
 DSC_PATHS = set()
 PST_INSTRS = set()
 CUR_ROUND = 0
+TTL_SEL = 0
 
 RHO = 1 / sqrt(2)
 
@@ -488,6 +489,7 @@ def propagate_path(root, path, is_new, node):
 
 
 def neo_propagate_path(root, path, is_new, nodes):
+    global TTL_SEL
     # print("---------- sel ----------")
     # print(nodes)
     # print(is_new, [hex(addr) for addr in path])
@@ -498,12 +500,14 @@ def neo_propagate_path(root, path, is_new, nodes):
         preserved = preserved and len(path) > i and path[i] == nodes[i].addr
         nodes[i].sel_win += preserved
         nodes[i].sel_try += 1
+        TTL_SEL += 1
         # print(nodes[i], hex(path[i]) if len(path) > i else "")
 
     # print(nodes[-1], hex(path[-1]) if preserved else "")
     # print("Preserved" if preserved else "Deviated")
     nodes[-1].sel_win += preserved
     nodes[-1].sel_try += 1
+    TTL_SEL += 1
     # print(nodes[-1], hex(path[-1]) if preserved else "")
 
     # print("---------- sim ----------")

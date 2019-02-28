@@ -82,12 +82,13 @@ class TreeNode:
             Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child
     """
 
-    def __init__(self, addr, parent=None, state=None, colour='W'):
+    def __init__(self, addr, parent=None, state=None, colour='W', phantom=False):
         self.exhausted = False
         self.addr = addr
         self.parent = parent
         self.state = state
         self.colour = colour
+        self.phantom = phantom
 
         self.children = {}  # {addr: Node}
         self.sel_try = 0
@@ -225,15 +226,18 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
-        return '\033[1;{colour}m{name}: {state}, {data}\033[0m'.format(
+        return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'.format(
             colour=30 if self.colour is 'B' else
             31 if self.colour is 'R' else
             33 if self.colour is 'G' else
-            37 if self.colour is 'W' else 32,
+            37 if self.colour is 'W' else
+            35 if self.colour is 'P' else 32,
             name=self.repr_node_name(),
             state=self.repr_node_state(),
             data=self.repr_node_data(),
-            children=self.repr_node_child())
+            children=self.repr_node_child(),
+            phantom=self.phantom
+        )
 
 
 @timer
@@ -357,8 +361,10 @@ def tree_policy(node):
 @timer
 def dye_to_the_next_red(start_node, last_state):
     succs = compute_line_children_states(state=last_state)
-    while not dye_red_black_node(start_node, target_states=succs) and not \
-            start_node.is_diverging() and start_node.children:
+    while not dye_red_black_node(
+            candidate_node=start_node, target_states=succs, phantom_parent=last_red) and \
+        not start_node.is_diverging() and \
+            start_node.children:
         start_node = next(v for v in start_node.children.values())
 
 
@@ -379,11 +385,19 @@ def compute_line_children_states(state):
 
 
 @timer
-def dye_red_black_node(candidate_node, target_states):
+def dye_red_black_node(candidate_node, target_states, phantom_parent):
     for state in target_states:
-        if candidate_node.addr == state.addr:
+        if candidate_node.addr == state.addr and not candidate_node.phantom:
             candidate_node.dye(colour='R', state=state)
-            return True
+            target_states.remove(state)
+            break
+    if candidate_node.colour is 'R':
+        for state in target_states:
+            if state.addr in phantom_parent.children:
+                continue
+            phantom_parent.children[state.addr] = TreeNode(
+                addr=state.addr, parent=phantom_parent, state=state, colour='P')
+        return True
     candidate_node.dye(colour='B')
     return False
 

@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from math import sqrt, log
-
+import os
 import angr
 
 from Results.pie_maker import make_pie
@@ -33,7 +33,13 @@ FOUND_BUG = False
 TIME_LOG = {}
 
 BINARY = sys.argv[1]
-SEEDS = [str.encode(''.join(sys.argv[2:]))]
+PRE_SEEDS = sys.argv[2:]
+SEEDS = []
+for seed in PRE_SEEDS:
+    SEEDS.append(seed)
+    SEEDS.append('\n')
+SEEDS = [SEEDS]
+
 PROJ = None
 
 LOGGER = logging.getLogger("Principes")
@@ -60,7 +66,10 @@ def timer(method):
 
 
 def generate_random():
-    return [random.randint(0, 255) for _ in SEEDS[0]]
+    random_bytes = b''
+    for _ in SEEDS[0]:
+        random_bytes += os.urandom(1)
+    return random_bytes
 
 
 class TreeNode:
@@ -399,12 +408,16 @@ def tree_policy_for_leaf(nodes, red_index):
 
 @timer
 def simulation_stage(node, input_str=None):
-    mutants = input_str if input_str else node.mutate()
-    vals = [[b for b in m] for m in mutants]
-    assert not vals or type(vals[0][0]) is int
-    LOGGER.info("INPUT_val: {}".format(vals))
-    mutants = [bytes(mutant) for mutant in mutants if mutant is not None]
-    LOGGER.info("INPUT_bytes: {}".format(mutants))
+    # pdb.set_trace()
+    mutants = [bytes("".join(mutant), 'utf-8') for mutant in input_str] if input_str else node.mutate()
+    # pdb.set_trace()
+    # vals = [[b for b in m] for m in mutants]
+    # assert not vals or type(vals[0][0]) is int
+    # # pdb.set_trace()
+    # LOGGER.error("INPUT_val: {}".format(vals))
+    # mutants = [bytes(mutant) for mutant in mutants if mutant is not None]
+    # LOGGER.error("INPUT_bytes: {}".format(mutants))
+    # print(mutants)
     return [program(mutant) for mutant in mutants]
 
 

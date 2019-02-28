@@ -97,6 +97,8 @@ class TreeNode:
         self.sim_win = 0
         self.distinct = 0
         self.visited = 0
+        if self.colour in ['G', 'P']:
+            self.samples = None
 
     def best_child(self):
 
@@ -164,10 +166,18 @@ class TreeNode:
         LOGGER.info("{}'s constraint: {}".format(hex(self.addr), self.state.solver.constraints))
 
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
-        vals = [val for val in self.state.solver.eval_upto(e=target, n=NUM_SAMPLES) if val is not None]
 
-        if len(vals) < NUM_SAMPLES:
-            self.exhausted = True
+        if not self.samples:
+            assert not self.sel_try
+            self.samples = self.state.solver.iterate(e=target)
+        vals = []
+        for _ in range(NUM_SAMPLES):
+            try:
+                val = next(self.samples)
+            except StopIteration:
+                self.exhausted = True
+                break
+            vals.append(val)
         n = (target.size() + 7) // 8  # Round up to the next full byte
         results = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
         return results
@@ -500,8 +510,9 @@ def propagation_stage(root, paths, are_new, nodes, short=0):
 
 
 def propagate_path(root, path, is_new, node):
-    node.visited += 1
-    node.distinct += is_new
+    if node is not root:
+        node.visited += 1
+        node.distinct += is_new
     node = root
     assert node.addr == path[0]
     for addr in path[1:]:

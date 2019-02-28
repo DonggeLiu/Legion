@@ -163,8 +163,8 @@ class TreeNode:
     def quick_sampler(self):
         global QS_COUNT
         QS_COUNT += NUM_SAMPLES
-        LOGGER.info("{}'s constraint: {}".format(hex(self.addr), self.state.solver.constraints))
-
+        LOGGER.info("Using quick sampler")
+        LOGGER.debug("{}'s constraint: {}".format(hex(self.addr), self.state.solver.constraints))
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
@@ -196,7 +196,7 @@ class TreeNode:
 
     @timer
     def pp(self, indent=0, mark_node=None, found=0, forced=False):
-        if LOGGER.level != logging.DEBUG and not forced:
+        if LOGGER.level > logging.INFO and not forced:
             return
         s = ""
         for _ in range(indent - 1):
@@ -217,7 +217,8 @@ class TreeNode:
             child.pp(indent=indent, mark_node=mark_node, found=found, forced=forced)
 
     def repr_node_name(self):
-        return ("Simul Node: " if self.colour is 'G' else "Block Node: ") \
+        return ("Simul Node: " if self.colour is 'G' else
+                "Phant Node: " if self.colour is 'P' else "Block Node: ") \
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
@@ -416,6 +417,7 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
 def execute_symbolically(state):
     global SYMBOLIC_EXECUTION_COUNT
     SYMBOLIC_EXECUTION_COUNT += 1
+    LOGGER.debug("Step: {}".format(hex(state.addr)))
     return state.step().successors
 
 

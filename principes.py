@@ -28,6 +28,8 @@ RD_COUNT = 0
 BINARY_EXECUTION_COUNT = 0
 SYMBOLIC_EXECUTION_COUNT = 0
 
+FOUND_BUG = False
+
 TIME_LOG = {}
 
 BINARY = sys.argv[1]
@@ -295,8 +297,11 @@ def keep_fuzzing(root):
                 "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
                 .format(CUR_ROUND, root.distinct, len(DSC_PATHS),
                         BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
-    assert root.distinct == len(DSC_PATHS)
-    return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
+    if not root.distinct == len(DSC_PATHS):
+        # for path in DSC_PATHS:
+        #     print([hex(addr) for addr in path])
+        pdb.set_trace()
+    return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS and not FOUND_BUG
 
 
 def mcts(root):
@@ -405,7 +410,7 @@ def simulation_stage(node, input_str=None):
 
 @timer
 def program(input_str):
-    global BINARY_EXECUTION_COUNT
+    global BINARY_EXECUTION_COUNT, FOUND_BUG
     BINARY_EXECUTION_COUNT += 1
 
     def unpack(output):
@@ -414,8 +419,12 @@ def program(input_str):
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
 
-    error_msg = subprocess.Popen(
-        BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE).communicate(input_str)[1]
+    sp = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    msg = sp.communicate(input_str)
+    error_msg = msg[1]
+    FOUND_BUG = sp.returncode == 100
+    if FOUND_BUG:
+        print("\n*******************\n***** EUREKA! *****\n*******************\n")
     return unpack(error_msg)
 
 

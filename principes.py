@@ -622,7 +622,7 @@ if __name__ == "__main__" and len(sys.argv) > 1:
 
     ITER_COUNT = run()[-1][0]
     for method_name, method_time in TIME_LOG.items():
-        print("{:25s}: {}".format(method_name, method_time))
+        print("{:28s}: {}".format(method_name, method_time))
 
     assert ITER_COUNT
     categories = ['Iteration Number',
@@ -633,7 +633,6 @@ if __name__ == "__main__" and len(sys.argv) > 1:
                   'Symbolic Execution',
                   'Path Preserve Fuzzing',
                   'Random Fuzzing',
-                  'Tree Policy',
                   'Tree Expansion'
                   ]
 
@@ -645,7 +644,6 @@ if __name__ == "__main__" and len(sys.argv) > 1:
               TIME_LOG['execute_symbolically'],  # Symbolic execution
               TIME_LOG['quick_sampler'],  # Quick sampler
               TIME_LOG['random_sampler'],  # Random sampler
-              TIME_LOG['selection_stage'] - TIME_LOG['dye_to_the_next_red'],  # Tree policy
               TIME_LOG['expansion_stage']  # Expansion
               ]
 
@@ -657,7 +655,6 @@ if __name__ == "__main__" and len(sys.argv) > 1:
              SYMBOLIC_EXECUTION_COUNT,  # Symbolic execution
              QS_COUNT,  # Quick sampler
              RD_COUNT,  # Random sampler
-             ITER_COUNT,  # Tree Policy
              MAX_PATHS  # Expansion time
              ]
 

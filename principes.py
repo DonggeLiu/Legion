@@ -240,7 +240,7 @@ def uct(node):
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
-    explore = sqrt(log(RD_COUNT+QS_COUNT + 1) / node.sel_try)
+    explore = sqrt(log(TTL_SEL + 1) / node.sel_try)
     return exploit + RHO * explore
 
 

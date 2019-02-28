@@ -1,4 +1,5 @@
 import logging
+import os
 import pdb
 import random
 import re
@@ -7,13 +8,13 @@ import subprocess
 import sys
 import time
 from math import sqrt, log
-import os
+
 import angr
 
 from Results.pie_maker import make_pie
 
-MAX_PATHS = 9
-MAX_ROUNDS = 100
+MAX_PATHS = 30
+MAX_ROUNDS = float('inf')
 NUM_SAMPLES = 5
 
 DSC_PATHS = set()
@@ -43,7 +44,7 @@ SEEDS = [SEEDS]
 PROJ = None
 
 LOGGER = logging.getLogger("Principes")
-LOGGER.setLevel(logging.ERROR)
+LOGGER.setLevel(logging.INFO)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
@@ -530,7 +531,7 @@ def propagate_path(root, path, is_new, node):
     for addr in path[1:]:
         node.visited += 1
         node.distinct += is_new
-        assert node.distinct <= MAX_PATHS
+        # assert node.distinct <= MAX_PATHS
         if addr not in node.children:
             pdb.set_trace()
         node = node.children.get(addr)

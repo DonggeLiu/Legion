@@ -468,7 +468,15 @@ def program(input_str):
 
 @timer
 def expansion_stage(root, paths):
-    return [expand_path(root, path) for path in paths]
+    are_new = []
+    for path in paths:
+        if tuple(path) in DSC_PATHS:
+            are_new.append(expand_path(root, path))
+            if are_new[-1]:
+                pdb.set_trace()
+        else:
+            are_new.append(expand_path(root, path))
+    return are_new
 
 
 @timer

@@ -10,13 +10,13 @@ from math import sqrt, log
 import angr
 import claripy
 
-from Results.pie_maker import make_pie
+# from Results.pie_maker import make_pie
 
 MAX_PATHS = 9
 NUM_SAMPLES = 5
 DSC_PATHS = set()
-PST_INSTRS = set()
-MAX_ROUNDS = 100
+# PST_INSTRS = set()
+MAX_ROUNDS = 500
 CUR_ROUND = 0
 SAMPLES_COUNT = 0
 
@@ -57,6 +57,7 @@ class TreeNode:
         # each element of constraints is a list of constraints along one path to the node
         self.constraints = [constraint] if constraint else []
         self.solver = None
+        self.samples = None
         self.symbols = ''
         if not dummy:
             self.children['Simulation'] = \
@@ -166,15 +167,32 @@ class TreeNode:
         return starts_new_path
 
     def solve_in_str(self):
-        global SAMPLES_COUNT, PST_INSTRS
-        # TODO: A better way to handle unpreserving inputs from QS
-        # vals = self.solver.eval(self.symbols, NUM_SAMPLES, PST_INSTRS)
-        vals = self.solver.eval(self.symbols, NUM_SAMPLES)
-        # if NUM_SAMPLES > len(vals):
-        #     self.exhausted = True
-        #     pdb.set_trace()
-        print("Solve_in_str collects: {}".format(vals))
-        return vals
+        # global SAMPLES_COUNT, PST_INSTRS
+        # # TODO: A better way to handle unpreserving inputs from QS
+        # # vals = self.solver.eval(self.symbols, NUM_SAMPLES, PST_INSTRS)
+        # vals = self.solver.eval(self.symbols, NUM_SAMPLES)
+        # # if NUM_SAMPLES > len(vals):
+        # #     self.exhausted = True
+        # #     pdb.set_trace()
+        # # print("Solve_in_str collects: {}".format(vals))
+        # return vals
+
+        target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
+
+        if not self.samples:
+            assert not self.visited
+            self.samples = self.state.solver.iterate(e=target)
+        vals = []
+        for _ in range(NUM_SAMPLES):
+            try:
+                val = next(self.samples)
+            except StopIteration:
+                self.exhausted = True
+                break
+            vals.append(val)
+        n = (target.size() + 7) // 8  # Round up to the next full byte
+        results = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
+        return results
 
     def info(self):
         node_score = "{0:4s}: {1:.4f}({2:1d}/{2:1d})".format(
@@ -219,12 +237,17 @@ def compare_addr(state, addr):
 def cannot_terminate(root):
     LOGGER.info("=== Iter:{} === Root.distinct:{} === len(DSC_PATHS):{} === QS_COUNT:{} ==="
                 .format(CUR_ROUND, root.distinct, len(DSC_PATHS), QS_COUNT))
+    print("{},{}".format(RD_COUNT + QS_COUNT, len(DSC_PATHS)))
     return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS
 
 
-def generate_random():
-    # in_str = "".join(map(chr, [random.randint(0, 255) for _ in SEED]))
-    return random.randint(0, 255)
+# def generate_random():
+#     # in_str = "".join(map(chr, [random.randint(0, 255) for _ in SEED]))
+#     return random.randint(0, 255)
+
+def generate_random(seed):
+    new_bytes = bytes([random.randint(0, 255) for _ in seed])
+    return new_bytes
 
 
 def initialise_angr(path):
@@ -251,7 +274,7 @@ def initialise_simgr():
 
 
 def mutate(node):
-    global QS_TIME, QS_COUNT, RD_TIME, RD_COUNT, PST_INSTRS
+    global QS_TIME, QS_COUNT, RD_TIME, RD_COUNT
 
     mutate_start = time.time()
 
@@ -270,8 +293,8 @@ def mutate(node):
         #     if type(val) is not int:
         #         pdb.set_trace()
         #     results.append(chr(val))
-        results = [str.encode(chr(val)) for val in vals if val is not None]
-
+        results = [bytes([val[0]]) for val in vals if val[0] is not None]
+        # pdb.set_trace()
         mutate_end = time.time()
         QS_TIME += mutate_end - mutate_start
         QS_COUNT += len(results)
@@ -284,11 +307,11 @@ def mutate(node):
     results = []
     for _ in range(NUM_SAMPLES):
         # assuming random generator will never be exhausted
-        result = generate_random()
-        while result in PST_INSTRS:
-            result = generate_random()
-        PST_INSTRS.add(result)
-        results.append((str.encode(chr(result))))
+        result = generate_random(SEED)
+        # while result in PST_INSTRS:
+        #     result = generate_random(SEED)
+        # PST_INSTRS.add(result)
+        results.append(result)
 
     mutate_end = time.time()
     RD_TIME += mutate_end - mutate_start
@@ -376,9 +399,9 @@ def run():
         mcts(root)
         CUR_ROUND += 1
 
-    root.pp()
-    for key in root.children.keys():
-        print("{}: {}".format(key, root.children[key].state.solver.constraints))
+    # root.pp()
+    # for key in root.children.keys():
+    #     print("{}: {}".format(key, root.children[key].state.solver.constraints))
     return history
 
 
@@ -396,11 +419,14 @@ def mcts(root):
 
     tree_policy_end = time.time()
     TREE_POLICY_TIME += tree_policy_end - tree_policy_start
-
+    # print(hex(node.path[-1]))
     # Simulation
     results = playout_full(node)
+    # for result in results:
+    #     print(result[0], [hex(r) for r in result[1]])
     # num_win, num_sim = 0, len(results)
-
+    # root.pp()
+    # pdb.set_trace()
     # pdb.set_trace()
 
     for result in results:
@@ -564,6 +590,6 @@ if __name__ == "__main__" and len(sys.argv) > 1:
 
     logging_results()
 
-    make_pie(categories=categories, values=values, averages=averages)
+    # make_pie(categories=categories, values=values, averages=averages)
 
-    assert (len(DSC_PATHS) == MAX_PATHS)
+    # assert (len(DSC_PATHS) == MAX_PATHS)

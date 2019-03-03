@@ -9,11 +9,12 @@ import sys
 import time
 from math import sqrt, log
 
+import gc
 import angr
 
 from Results.pie_maker import make_pie
 
-MAX_PATHS = 30
+MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
 NUM_SAMPLES = 5
 
@@ -22,7 +23,7 @@ PST_INSTRS = set()
 CUR_ROUND = 0
 TTL_SEL = 0
 
-RHO = 1 / sqrt(2)
+RHO = sqrt(2)
 
 QS_COUNT = 0
 RD_COUNT = 0
@@ -90,6 +91,7 @@ class TreeNode:
         self.state = state
         self.colour = colour
         self.phantom = phantom
+        self.fully_explored = False
 
         self.children = {}  # {addr: Node}
         self.sel_try = 0
@@ -124,7 +126,8 @@ class TreeNode:
         if not self.children:
             return self
         if len(self.children) == 1:
-            return self.children[list(self.children.keys())[0]].next_non_black_child()
+            return self.children[
+                list(self.children.keys())[0]].next_non_black_child()
         return self.best_child()
 
     @timer
@@ -134,7 +137,8 @@ class TreeNode:
 
         self.colour = colour
         if colour is 'R':
-            self.children['Simulation'] = TreeNode(addr=self.addr, parent=self, state=state, colour='G')
+            self.children['Simulation'] \
+                = TreeNode(addr=self.addr, parent=self, state=state, colour='G')
         LOGGER.info("Dye {}".format(self))
 
     def is_diverging(self):
@@ -151,7 +155,8 @@ class TreeNode:
             self.parent.exhausted = True
 
     def is_exhausted(self):
-        return self.exhausted or ('Simulation' in self.children and self.children['Simulation'].exhausted)
+        return self.exhausted or ('Simulation' in self.children
+                                  and self.children['Simulation'].exhausted)
 
     @timer
     def mutate(self):
@@ -164,7 +169,8 @@ class TreeNode:
         global QS_COUNT
         QS_COUNT += NUM_SAMPLES
         LOGGER.info("Using quick sampler")
-        LOGGER.debug("{}'s constraint: {}".format(hex(self.addr), self.state.solver.constraints))
+        LOGGER.debug("{}'s constraint: {}"
+                     .format(hex(self.addr), self.state.solver.constraints))
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
@@ -179,7 +185,8 @@ class TreeNode:
                 break
             vals.append(val)
         n = (target.size() + 7) // 8  # Round up to the next full byte
-        results = [x.to_bytes(n, 'big') for x in vals]  # 'Big' is default order of z3 BitVecVal
+        # 'Big' is default order of z3 BitVecVal
+        results = [x.to_bytes(n, 'big') for x in vals]
         return results
 
     @timer
@@ -194,6 +201,15 @@ class TreeNode:
         self.children[addr] = TreeNode(addr=addr, parent=self)
         return True
 
+    def mark_fully_explored(self):
+        self.fully_explored = True
+        self.remove_redundant_state()
+        LOGGER.info("Mark {} as FULLY EXPLORED".format(self))
+
+    def remove_redundant_state(self):
+        if 'Simulation' in self.children:
+            del self.children['Simulation']
+
     @timer
     def pp(self, indent=0, mark_node=None, found=0, forced=False):
         if LOGGER.level > logging.INFO and not forced:
@@ -201,7 +217,7 @@ class TreeNode:
         s = ""
         for _ in range(indent - 1):
             s += "|   "
-        if indent > 32:
+        if indent > 15 and self.parent and self.parent.colour is 'W':
             print("...")
             return
         if indent:
@@ -213,21 +229,22 @@ class TreeNode:
         if self.children:
             indent += 1
 
-        for _, child in sorted(list(self.children.items()), key=lambda k: str(k)):
-            child.pp(indent=indent, mark_node=mark_node, found=found, forced=forced)
+        for _, child in sorted(list(self.children.items()),
+                               key=lambda k: str(k)):
+            child.pp(indent=indent, mark_node=mark_node,
+                     found=found, forced=forced)
 
     def repr_node_name(self):
         return ("Simul Node: " if self.colour is 'G' else
-                "Phant Node: " if self.colour is 'P' else "Block Node: ") \
+                "Phant Node: " if self.colour is 'P' else
+                "@Root Node: " if self.colour is 'R' and not self.parent else
+                "Block Node: ") \
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
-        # return "{uct:.4f}({distinct:1d}/{visited:1d})".format(
-        #     uct=uct(self), distinct=self.distinct, visited=self.visited) \
-        #        + ", sel: {}/{}, sim: {}/{}".format(self.sel_win, self.sel_try, self.sim_win, self.sim_try)
-        return "{uct:.4f}".format(
-            uct=uct(self), distinct=self.distinct, visited=self.visited) \
-               + ", sel: {}/{}, sim: {}/{}".format(self.sel_win, self.sel_try, self.sim_win, self.sim_try)
+        return "{uct:.4f}: {simw} / {simt} + {r} * sqrt({t_sel}/{sel_t})"\
+            .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
+                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try)
 
     def repr_node_state(self):
         return "State: {}".format(self.state if self.state else "None")
@@ -237,18 +254,17 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
-        return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'.format(
-            colour=30 if self.colour is 'B' else
-            31 if self.colour is 'R' else
-            33 if self.colour is 'G' else
-            37 if self.colour is 'W' else
-            35 if self.colour is 'P' else 32,
-            name=self.repr_node_name(),
-            state=self.repr_node_state(),
-            data=self.repr_node_data(),
-            children=self.repr_node_child(),
-            phantom=self.phantom
-        )
+        return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
+            .format(colour=30 if self.colour is 'B' else
+                    31 if self.colour is 'R' else
+                    33 if self.colour is 'G' else
+                    37 if self.colour is 'W' else
+                    35 if self.colour is 'P' else 32,
+                    name=self.repr_node_name(),
+                    state=self.repr_node_state(),
+                    data=self.repr_node_data(),
+                    children=self.repr_node_child(),
+                    phantom=self.phantom)
 
 
 @timer
@@ -261,6 +277,8 @@ def uct(node):
     #     return uct(node.children['Simulation'])
     # exploit = node.distinct / node.visited
     # explore = sqrt(log(CUR_ROUND + 1) / node.visited)
+    if node.fully_explored:
+        return 0
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
@@ -286,7 +304,8 @@ def run():
 @timer
 def initialisation():
     initialise_angr()
-    return initialise_seeds(TreeNode(addr=None, parent=None, state=None, colour='W'))
+    return initialise_seeds(
+        TreeNode(addr=None, parent=None, state=None, colour='W'))
 
 
 @timer
@@ -297,18 +316,24 @@ def initialise_angr():
 
 @timer
 def initialise_seeds(root):
-    # NOTE: prepare the root (dye red, add simulation child) otherwise the data in simulation stage of SEEDs
+    # NOTE: prepare the root (dye red, add simulation child)
+    #  otherwise the data in simulation stage of SEEDs
     #   cannot be recorded without building another special case
     #   recorded in the simulation child of it.
     #   Cannot dye root with dye_to_the_next_red() as usual, as:
     #       1. The addr of root will not be known before simulation
-    #       2. The function requires a red node in the previous line of the node to dye,
+    #       2. The function requires a red node
+    #       in the previous line of the node to dye,
     #       which does not exist for root
-    root.dye(colour='R', state=PROJ.factory.entry_state(stdin=angr.storage.file.SimFileStream))
-    seed_paths = simulation_stage(node=root.children['Simulation'], input_str=SEEDS)
+    root.dye(colour='R', state=PROJ.factory.entry_state(
+        stdin=angr.storage.file.SimFileStream))
+    seed_paths = simulation_stage(node=root.children['Simulation'],
+                                  input_str=SEEDS)
     are_new = expansion_stage(root, seed_paths)
-    propagation_stage(root, seed_paths, are_new, [root, root.children['Simulation']])
-    assert len(set([path[0] for path in seed_paths])) == 1  # Make sure all paths are starting from the same addr
+    propagation_stage(root, seed_paths, are_new,
+                      [root, root.children['Simulation']])
+    # Make sure all paths are starting from the same addr
+    assert len(set([path[0] for path in seed_paths])) == 1
     while root.children['Simulation'].state.addr != root.addr:
         succs = execute_symbolically(state=root.children['Simulation'].state)
         assert len(succs) == 1  # Make sure no divergence before root
@@ -317,28 +342,36 @@ def initialise_seeds(root):
 
 
 def keep_fuzzing(root):
-    LOGGER.info("\033[1;35m== Iter:{} == Tree path:{} == Set path:{} "
-                "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
-                .format(CUR_ROUND, root.distinct, len(DSC_PATHS),
-                        BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
+    LOGGER.error("\033[1;35m== Iter:{} == Tree path:{} == Set path:{} "
+                 "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
+                 .format(CUR_ROUND, root.distinct, len(DSC_PATHS),
+                         BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
     if not root.distinct == len(DSC_PATHS):
         # for path in DSC_PATHS:
         #     print([hex(addr) for addr in path])
         pdb.set_trace()
-    return len(DSC_PATHS) < MAX_PATHS and CUR_ROUND < MAX_ROUNDS and not FOUND_BUG
+    return len(DSC_PATHS) < MAX_PATHS \
+        and CUR_ROUND < MAX_ROUNDS \
+        and not FOUND_BUG
 
 
 def mcts(root):
     nodes = selection_stage(root)
+    while not nodes:
+        nodes = selection_stage(root)
     paths = simulation_stage(nodes[-1])
-    # NOTE: What if len(paths) < NUM_SAMPLES? i.e. fuzzer finds less mutant than asked
-    #  Without handling this, we will be trapped in the infeasible node, whose num_visited is always 0
+    simul_phantom = nodes[-1].colour is 'P'
+    # NOTE: What if len(paths) < NUM_SAMPLES?
+    #  i.e. fuzzer finds less mutant than asked
+    #  Without handling this, we will be trapped in the infeasible node,
+    #  whose num_visited is always 0
     #  I saved all nodes along the path of selection stage and used them here
-    if nodes[-1].colour is 'P':
+    if simul_phantom:
         del nodes[-1].parent.children[nodes[-1].addr]
         nodes.pop()
     are_new = expansion_stage(root, paths)
-    propagation_stage(root, paths, are_new, nodes, NUM_SAMPLES - len(paths))
+    propagation_stage(
+        root, paths, are_new, nodes, NUM_SAMPLES - len(paths), simul_phantom)
     # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
@@ -361,7 +394,7 @@ def tree_policy(node):
         assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
         if node.colour is 'W':
             dye_to_the_next_red(start_node=node, last_red=nodes[prev_red_index])
-        if node.colour is 'R':
+        if 'Simulation' in node.children:
             prev_red_index = len(nodes)
         # NOTE: No need to distinguish red or black here
         nodes.append(node)
@@ -428,11 +461,22 @@ def execute_symbolically(state):
 def tree_policy_for_leaf(nodes, red_index):
     # NOTE: Roll back to the immediate red ancestor
     #  and only keep the path from root the that ancestor's simulation child
-    LOGGER.info("Select: {} as {} is a leaf".format(nodes[red_index], nodes[-1]))
+    LOGGER.info(
+        "Select: {} as {} is a leaf".format(nodes[red_index], nodes[-1]))
+    # TODO: mark the closest red parent as fully explored
 
-    # assert node is red and has simulation child
-    assert nodes[red_index].colour is 'R' and 'Simulation' in nodes[red_index].children
-    return nodes[:red_index + 1] + [nodes[red_index].children['Simulation']]
+    closest_branching_target = nodes[-1]
+    while all([child.fully_explored for name, child
+               in closest_branching_target.children.items()
+               if (name is not 'Simulation') and (not child.phantom)]):
+        closest_branching_target.mark_fully_explored()
+        closest_branching_target = closest_branching_target.parent
+        LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
+                    .format(gc.collect()))
+    while closest_branching_target and 'Simulation' not in closest_branching_target.children:
+        closest_branching_target = closest_branching_target.parent
+    closest_branching_target.remove_redundant_state()
+    return []
 
 
 @timer
@@ -466,7 +510,13 @@ def program(input_str):
     error_msg = msg[1]
     FOUND_BUG = sp.returncode == 100
     if FOUND_BUG:
-        print("\n*******************\n***** EUREKA! *****\n*******************\n")
+        print("\n*******************"
+              "\n***** EUREKA! *****"
+              "\n*******************\n")
+    sp.kill()
+    del sp
+    LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
+                .format(gc.collect()))
     return unpack(error_msg)
 
 
@@ -503,15 +553,21 @@ def expand_path(root, path):
 
 
 @timer
-def propagation_stage(root, paths, are_new, nodes, short=0):
+def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
     assert len(paths) == len(are_new)
     root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
-    # pdb.set_trace()
     for i in range(len(paths)):
-        neo_propagate_path(root, paths[i], are_new[i], nodes)
+        # NOTE: If the simulation is on a phantom node,
+        #   reset every node along the path as not fully explored
+        #   as the real node may be deeper than phantom
+        #   only do this for the first path,
+        #   as it is the only path that guarantees to preserve the real path
+        neo_propagate_path(
+            root, paths[i], are_new[i], nodes, is_phantom and not i)
 
     # NOTE: If number of inputs generated by fuzzer < NUM_SAMPLES,
-    #  then we need to update the node in :param nodes (whose addr might be different from :param paths)
+    #  then we need to update the node in :param nodes
+    #  (whose addr might be different from :param paths)
     #  otherwise we might be trapped in some nodes
     for node in nodes:
         node.visited += short
@@ -519,7 +575,6 @@ def propagation_stage(root, paths, are_new, nodes, short=0):
     for i in range(len(paths)):
         propagate_path(root, paths[i], are_new[i], nodes[-1])
     root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
-    # pdb.set_trace()
 
 
 def propagate_path(root, path, is_new, node):
@@ -540,15 +595,8 @@ def propagate_path(root, path, is_new, node):
     node.distinct += is_new
 
 
-# @timer
-# def propagation_stage(root, paths, are_new, nodes, short=0):
-#     assert len(paths) == len(are_new)
-#
-#     for i in range(len(paths)):
-#         propagate_path(root, paths[i], are_new[i], nodes)
-
-
-def neo_propagate_path(root, path, is_new, nodes):
+@timer
+def neo_propagate_path(root, path, is_new, nodes, is_phantom):
     global TTL_SEL
     # print("---------- sel ----------")
     # print(nodes)
@@ -585,7 +633,7 @@ def neo_propagate_path(root, path, is_new, nodes):
         # print("New" if is_new else "Old")
         node.sim_win += is_new
         node.sim_try += 1
-        # print(node, hex(addr))
+        node.fully_explored = node.fully_explored and not is_phantom
 
     # print(nodes[-1], hex(nodes[-1].addr))
     # print("New" if is_new else "Old")

@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 import pdb
@@ -9,7 +10,6 @@ import sys
 import time
 from math import sqrt, log
 
-import gc
 import angr
 
 from Results.pie_maker import make_pie
@@ -391,7 +391,8 @@ def tree_policy(node):
 
     while node.children:
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
-        assert not node.parent or node.parent.colour is 'R' or node.parent.colour is 'B'
+        assert not node.parent or node.parent.colour is 'R' \
+               or node.parent.colour is 'B'
         if node.colour is 'W':
             dye_to_the_next_red(start_node=node, last_red=nodes[prev_red_index])
         if 'Simulation' in node.children:
@@ -409,8 +410,9 @@ def dye_to_the_next_red(start_node, last_red):
     last_state = last_red.children['Simulation'].state
     succs = compute_line_children_states(state=last_state)
     while not dye_red_black_node(
-            candidate_node=start_node, target_states=succs, phantom_parent=last_red) and \
-        not start_node.is_diverging() and \
+            candidate_node=start_node, target_states=succs,
+            phantom_parent=last_red) and \
+            not start_node.is_diverging() and \
             start_node.children:
         start_node = next(v for v in start_node.children.values())
 
@@ -481,16 +483,8 @@ def tree_policy_for_leaf(nodes, red_index):
 
 @timer
 def simulation_stage(node, input_str=None):
-    # pdb.set_trace()
-    mutants = [bytes("".join(mutant), 'utf-8') for mutant in input_str] if input_str else node.mutate()
-    # pdb.set_trace()
-    # vals = [[b for b in m] for m in mutants]
-    # assert not vals or type(vals[0][0]) is int
-    # # pdb.set_trace()
-    # LOGGER.error("INPUT_val: {}".format(vals))
-    # mutants = [bytes(mutant) for mutant in mutants if mutant is not None]
-    # LOGGER.error("INPUT_bytes: {}".format(mutants))
-    # print(mutants)
+    mutants = [bytes("".join(mutant), 'utf-8')
+               for mutant in input_str] if input_str else node.mutate()
     return [program(mutant) for mutant in mutants]
 
 
@@ -504,7 +498,6 @@ def program(input_str):
         # NOTE: changed addr[0] to addr
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
-
     sp = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     msg = sp.communicate(input_str)
     error_msg = msg[1]
@@ -539,14 +532,16 @@ def expand_path(root, path):
     DSC_PATHS.add(tuple(path))
     LOGGER.info("INPUT_PATH: {}".format([hex(addr) for addr in path]))
 
-    assert (not root.addr or root.addr == path[0])  # Either Root before SEED or it must have an addr
+    # Either Root before SEED or it must have an addr
+    assert (not root.addr or root.addr == path[0])
 
     if not root.addr:  # NOTE: assign addr to root
         root.addr = path[0]
         root.children['Simulation'].addr = root.addr
     node, is_new = root, False
     for addr in path[1:]:
-        is_new = node.add_child(addr) or is_new  # have to put node.child(addr) first to avoid short circuit
+        # have to put node.child(addr) first to avoid short circuit
+        is_new = node.add_child(addr) or is_new
         node = node.children[addr]
 
     return is_new
@@ -598,60 +593,42 @@ def propagate_path(root, path, is_new, node):
 @timer
 def neo_propagate_path(root, path, is_new, nodes, is_phantom):
     global TTL_SEL
-    # print("---------- sel ----------")
-    # print(nodes)
-    # print(is_new, [hex(addr) for addr in path])
     preserved = True
     for i in range(len(nodes)-1):
-        # print(nodes[i], hex(path[i]) if len(path) > i else "")
-        # print("Preserved" if preserved and len(path) > i and path[i] == nodes[i].addr else "Deviated")
         preserved = preserved and len(path) > i and path[i] == nodes[i].addr
         nodes[i].sel_win += preserved
         nodes[i].sel_try += 1
         TTL_SEL += 1
-        # print(nodes[i], hex(path[i]) if len(path) > i else "")
-
-    # print(nodes[-1], hex(path[-1]) if preserved else "")
-    # print("Preserved" if preserved else "Deviated")
     nodes[-1].sel_win += preserved
     nodes[-1].sel_try += 1
     TTL_SEL += 1
-    # print(nodes[-1], hex(path[-1]) if preserved else "")
 
-    # print("---------- sim ----------")
     node = root
-    # print(node, hex(path[0]))
-    # print("New" if is_new else "Old")
     node.sim_win += is_new
     node.sim_try += 1
-    # print(node, hex(path[0]))
     for addr in path[1:]:
         if not node.children.get(addr):
             pdb.set_trace()
         node = node.children.get(addr)
-        # print(node, hex(addr))
-        # print("New" if is_new else "Old")
         node.sim_win += is_new
         node.sim_try += 1
         node.fully_explored = node.fully_explored and not is_phantom
 
-    # print(nodes[-1], hex(nodes[-1].addr))
-    # print("New" if is_new else "Old")
     nodes[-1].sim_win += is_new
     nodes[-1].sim_try += preserved
-    # print(nodes[-1], hex(nodes[-1].addr))
-    # print("---------- end ----------")
 
 
 def make_constraint_readable(constraint):
     con_str = "["
     for con in constraint:
-        con_ops = re.search(pattern='<Bool (.*?) [<=>]*? (.*)>', string=str(con))
+        con_ops = re.search(pattern='<Bool (.*?) [<=>]*? (.*)>',
+                            string=str(con))
         op_str1 = "INPUT_STR" if 'stdin' in con_ops[1] \
             else str(int(con_ops[1], 16) if '0x' in con_ops[1] else con_ops[1])
         op_str2 = "INPUT_STR" if 'stdin' in con_ops[2] \
             else str(int(con_ops[2], 16) if '0x' in con_ops[2] else con_ops[2])
-        con_str += con_ops[0].replace(con_ops[1], op_str1).replace(con_ops[2], op_str2)
+        con_str += con_ops[0].replace(con_ops[1], op_str1) \
+            .replace(con_ops[2], op_str2)
         con_str += ", "
 
     return con_str + "]"
@@ -716,4 +693,5 @@ if __name__ == "__main__" and len(sys.argv) > 1:
         pdb.set_trace()
 
     display_results()
-    make_pie(categories=categories, values=values, units=units, averages=averages)
+    make_pie(categories=categories, values=values,
+             units=units, averages=averages)

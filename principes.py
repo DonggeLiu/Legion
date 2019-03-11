@@ -100,8 +100,24 @@ class TreeNode:
         self.sim_win = 0
         self.distinct = 0
         self.visited = 0
-        if self.colour in ['G', 'P']:
-            self.samples = None
+
+    def __del__(self):
+        del self.visited
+        del self.distinct
+        del self.sim_try
+        del self.sim_win
+        del self.sel_try
+        del self.sel_win
+        del self.children
+        del self.fully_explored
+        del self.phantom
+        del self.colour
+        del self.samples
+        del self.state
+        del self.parent
+        del self.addr
+        del self.exhausted
+        del self
 
     def best_child(self):
 

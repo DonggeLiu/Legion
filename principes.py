@@ -52,7 +52,7 @@ SEEDS = [SEEDS]
 PROJ = None
 
 LOGGER = logging.getLogger("Principes")
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.ERROR)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
@@ -74,17 +74,11 @@ LOGGER.addHandler(sthl)
 #     # return timeit
 #     return
 
-    def timeit(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-        if method.__name__ in TIME_LOG:
-            TIME_LOG[method.__name__] += te - ts
-        else:
-            TIME_LOG[method.__name__] = te - ts
-        return result
 
-    return timeit
+def my_profile():
+    global MEMO_LOG
+    mem = os.popen("more /proc/{}/statm".format(PID)).read().split(" ")
+    MEMO_LOG.append([mem[0], mem[1]])
 
 
 def generate_random():
@@ -315,14 +309,6 @@ class TreeNode:
 
 # @timer
 def uct(node):
-    # if node.is_exhausted():
-    #     return -float('inf')
-    # if not node.visited:
-    #     return float('inf')
-    # if 'Simulation' in node.children:
-    #     return uct(node.children['Simulation'])
-    # exploit = node.distinct / node.visited
-    # explore = sqrt(log(CUR_ROUND + 1) / node.visited)
     if node.fully_explored:
         return 0
     if not node.sel_try:
@@ -426,6 +412,8 @@ def mcts(root):
 
 # @timer
 def selection_stage(node):
+    global MEMO_LOG
+
     nodes, prev_red_index = tree_policy(node=node)
     if nodes[-1].state:
         return nodes
@@ -522,11 +510,10 @@ def tree_policy_for_leaf(nodes, red_index):
                if (name is not 'Simulation') and (not child.phantom)]):
         closest_branching_target.mark_fully_explored()
         closest_branching_target = closest_branching_target.parent
-        LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
-                    .format(gc.collect()))
     while closest_branching_target and 'Simulation' not in closest_branching_target.children:
         closest_branching_target = closest_branching_target.parent
-    closest_branching_target.remove_redundant_state()
+    if closest_branching_target:
+        closest_branching_target.remove_redundant_state()
     return []
 
 
@@ -537,9 +524,20 @@ def simulation_stage(node, input_str=None):
     return [program(mutant) for mutant in mutants]
 
 
-@timer
+def binary_execute(input_str, binary):
+    sp = subprocess.Popen(
+        binary, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+    msg = sp.communicate(input_str)
+    returncode = sp.returncode
+    sp.kill()
+    del sp
+    gc.collect()
+    return msg, returncode
+
+
+# @timer
 def program(input_str):
-    global BINARY_EXECUTION_COUNT, FOUND_BUG
+    global BINARY_EXECUTION_COUNT, FOUND_BUG, MEMO_DIF
     BINARY_EXECUTION_COUNT += 1
 
     def unpack(output):
@@ -547,16 +545,14 @@ def program(input_str):
         # NOTE: changed addr[0] to addr
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
-    sp = subprocess.Popen(BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    msg = sp.communicate(input_str)
+
+    msg, return_code = binary_execute(input_str, BINARY)
     error_msg = msg[1]
-    FOUND_BUG = sp.returncode == 100
+    FOUND_BUG = return_code == 100
     if FOUND_BUG:
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
-    sp.kill()
-    del sp
     LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
                 .format(gc.collect()))
     return unpack(error_msg)
@@ -683,10 +679,10 @@ def make_constraint_readable(constraint):
     return con_str + "]"
 
 
-def display_results():
-    for i in range(len(categories)):
-        print("{:25s}: {:-9.6f} / {:-3d} = {:3.6f}"
-              .format(categories[i], values[i], units[i], averages[i]))
+# def display_results():
+#     for i in range(len(categories)):
+#         print("{:25s}: {:-9.6f} / {:-3d} = {:3.6f}"
+#               .format(categories[i], values[i], units[i], averages[i]))
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:
@@ -694,53 +690,60 @@ if __name__ == "__main__" and len(sys.argv) > 1:
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
+    PID = os.getpid()
+    # state = PROJ.factory.entry_state()
+    # pdb.set_trace()
+    run()
 
-    ITER_COUNT = run()[-1][0]
-    for method_name, method_time in TIME_LOG.items():
-        print("{:28s}: {}".format(method_name, method_time))
-
-    assert ITER_COUNT
-    categories = ['Iteration Number',
-                  'Samples Number / iter',
-                  'Total',
-                  'Initialisation',
-                  'Binary Execution',
-                  'Symbolic Execution',
-                  'Path Preserve Fuzzing',
-                  'Random Fuzzing',
-                  'Tree Expansion'
-                  ]
-
-    values = [ITER_COUNT,
-              NUM_SAMPLES,
-              TIME_LOG['run'],  # Time
-              TIME_LOG['initialisation'],  # Initialisation
-              TIME_LOG['program'],  # Binary execution
-              TIME_LOG['execute_symbolically'],  # Symbolic execution
-              TIME_LOG['quick_sampler'],  # Quick sampler
-              TIME_LOG['random_sampler'],  # Random sampler
-              TIME_LOG['expansion_stage']  # Expansion
-              ]
-
-    units = [1,
-             1,
-             ITER_COUNT * NUM_SAMPLES,  # Time
-             ITER_COUNT * NUM_SAMPLES,  # Initialisation
-             BINARY_EXECUTION_COUNT,  # Binary execution
-             SYMBOLIC_EXECUTION_COUNT,  # Symbolic execution
-             QS_COUNT,  # Quick sampler
-             RD_COUNT,  # Random sampler
-             MAX_PATHS  # Expansion time
-             ]
-
-    averages = [values[i] / units[i] for i in range(len(values))]
-
-    if not len(categories) == len(values) == len(units) == len(averages):
-        pdb.set_trace()
-
-    if len(DSC_PATHS) != MAX_PATHS:
-        pdb.set_trace()
-
-    display_results()
-    make_pie(categories=categories, values=values,
-             units=units, averages=averages)
+    # print(MEMO_LOG)
+    # print(MEMO_DIF)
+    # pdb.set_trace()
+    # ITER_COUNT = run()[-1][0]
+    # for method_name, method_time in TIME_LOG.items():
+    #     print("{:28s}: {}".format(method_name, method_time))
+    #
+    # assert ITER_COUNT
+    # categories = ['Iteration Number',
+    #               'Samples Number / iter',
+    #               'Total',
+    #               'Initialisation',
+    #               'Binary Execution',
+    #               'Symbolic Execution',
+    #               'Path Preserve Fuzzing',
+    #               'Random Fuzzing',
+    #               'Tree Expansion'
+    #               ]
+    #
+    # values = [ITER_COUNT,
+    #           NUM_SAMPLES,
+    #           TIME_LOG['run'],  # Time
+    #           TIME_LOG['initialisation'],  # Initialisation
+    #           TIME_LOG['program'],  # Binary execution
+    #           TIME_LOG['execute_symbolically'],  # Symbolic execution
+    #           TIME_LOG['quick_sampler'],  # Quick sampler
+    #           TIME_LOG['random_sampler'],  # Random sampler
+    #           TIME_LOG['expansion_stage']  # Expansion
+    #           ]
+    #
+    # units = [1,
+    #          1,
+    #          ITER_COUNT * NUM_SAMPLES,  # Time
+    #          ITER_COUNT * NUM_SAMPLES,  # Initialisation
+    #          BINARY_EXECUTION_COUNT,  # Binary execution
+    #          SYMBOLIC_EXECUTION_COUNT,  # Symbolic execution
+    #          QS_COUNT,  # Quick sampler
+    #          RD_COUNT,  # Random sampler
+    #          MAX_PATHS  # Expansion time
+    #          ]
+    #
+    # averages = [values[i] / units[i] for i in range(len(values))]
+    #
+    # if not len(categories) == len(values) == len(units) == len(averages):
+    #     pdb.set_trace()
+    #
+    # if len(DSC_PATHS) != MAX_PATHS:
+    #     pdb.set_trace()
+    #
+    # display_results()
+    # make_pie(categories=categories, values=values,
+    #          units=units, averages=averages)

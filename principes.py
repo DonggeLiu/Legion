@@ -400,6 +400,7 @@ def keep_fuzzing(root):
 def mcts(root):
     nodes = selection_stage(root)
     while not nodes:
+        gc.collect()
         nodes = selection_stage(root)
     paths = simulation_stage(nodes[-1])
     simul_phantom = nodes[-1].colour is 'P'
@@ -411,6 +412,7 @@ def mcts(root):
     if simul_phantom:
         del nodes[-1].parent.children[nodes[-1].addr]
         nodes.pop()
+        gc.collect()
     are_new = expansion_stage(root, paths)
     propagation_stage(
         root, paths, are_new, nodes, NUM_SAMPLES - len(paths), simul_phantom)

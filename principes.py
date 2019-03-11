@@ -7,12 +7,15 @@ import re
 import struct
 import subprocess
 import sys
-import time
+# import time
 from math import sqrt, log
 
 import angr
 
-from Results.pie_maker import make_pie
+# from memory_profiler import profile
+# from Results.pie_maker import make_pie
+# from binary_execution import binary_execute
+
 
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
@@ -89,6 +92,7 @@ class TreeNode:
         self.addr = addr
         self.parent = parent
         self.state = state
+        self.samples = None
         self.colour = colour
         self.phantom = phantom
         self.fully_explored = False
@@ -166,9 +170,13 @@ class TreeNode:
         self.exhausted = True
         if self.colour is 'R':
             self.children['Simulation'].exhausted = True
+            del self.children['Simulation'].samples
+            gc.collect()
         else:
             assert self.colour is 'G'
             self.parent.exhausted = True
+            del self.samples
+            gc.collect()
 
     def is_exhausted(self):
         return self.exhausted or ('Simulation' in self.children

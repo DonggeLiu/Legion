@@ -36,6 +36,10 @@ SYMBOLIC_EXECUTION_COUNT = 0
 FOUND_BUG = False
 
 TIME_LOG = {}
+MEMO_LOG = []
+MEMO_DIF = []
+PID = None
+ROOT = None
 
 BINARY = sys.argv[1]
 PRE_SEEDS = sys.argv[2:]
@@ -330,16 +334,17 @@ def uct(node):
 
 # @timer
 def run():
-    global CUR_ROUND
+    global CUR_ROUND, ROOT, PROJ
     history = []
-    root = initialisation()
+    ROOT = initialisation()
+    del PROJ
     CUR_ROUND += 1
-    root.pp()
-    while keep_fuzzing(root):
-        history.append([CUR_ROUND, root.distinct])
-        mcts(root)
+    ROOT.pp()
+    while keep_fuzzing(ROOT):
+        history.append([CUR_ROUND, ROOT.distinct])
+        mcts(ROOT)
         CUR_ROUND += 1
-    root.pp(forced=True)
+    ROOT.pp(forced=True)
     return history
 
 

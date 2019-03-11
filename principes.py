@@ -54,8 +54,21 @@ sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
 
-def timer(method):
-    global TIME_LOG
+# def timer(method):
+#     # global TIME_LOG
+#     #
+#     # def timeit(*args, **kw):
+#     #     ts = time.time()
+#     #     result = method(*args, **kw)
+#     #     te = time.time()
+#     #     if method.__name__ in TIME_LOG:
+#     #         TIME_LOG[method.__name__] += te - ts
+#     #     else:
+#     #         TIME_LOG[method.__name__] = te - ts
+#     #     return result
+#     #
+#     # return timeit
+#     return
 
     def timeit(*args, **kw):
         ts = time.time()
@@ -139,7 +152,7 @@ class TreeNode:
 
         return random.choice(candidates)
 
-    @timer
+    # @timer
     def next_non_black_child(self):
         if self.colour is not 'B':
             return self
@@ -150,7 +163,7 @@ class TreeNode:
                 list(self.children.keys())[0]].next_non_black_child()
         return self.best_child()
 
-    @timer
+    # @timer
     def dye(self, colour, state=None):
         assert self.colour is 'W'
         assert (colour is 'B' and not state) or (colour is 'R' and state)
@@ -182,13 +195,13 @@ class TreeNode:
         return self.exhausted or ('Simulation' in self.children
                                   and self.children['Simulation'].exhausted)
 
-    @timer
+    # @timer
     def mutate(self):
         if self.state.solver.constraints and not self.exhausted:
             return self.quick_sampler()
         return self.random_sampler()
 
-    @timer
+    # @timer
     def quick_sampler(self):
         global QS_COUNT
         QS_COUNT += NUM_SAMPLES
@@ -213,8 +226,9 @@ class TreeNode:
         results = [x.to_bytes(n, 'big') for x in vals]
         return results
 
-    @timer
-    def random_sampler(self):
+    # @timer
+    @staticmethod
+    def random_sampler():
         global RD_COUNT
         RD_COUNT += NUM_SAMPLES
         return [generate_random() for _ in range(NUM_SAMPLES)]
@@ -233,8 +247,12 @@ class TreeNode:
     def remove_redundant_state(self):
         if 'Simulation' in self.children:
             del self.children['Simulation']
+            gbc = gc.collect()
+            LOGGER.error(
+                "\033[1;32mGarbage collector: collected {} objects\033[0m"
+                    .format(gbc))
 
-    @timer
+    # @timer
     def pp(self, indent=0, mark_node=None, found=0, forced=False):
         if LOGGER.level > logging.INFO and not forced:
             return
@@ -291,7 +309,7 @@ class TreeNode:
                     phantom=self.phantom)
 
 
-@timer
+# @timer
 def uct(node):
     # if node.is_exhausted():
     #     return -float('inf')
@@ -310,7 +328,7 @@ def uct(node):
     return exploit + RHO * explore
 
 
-@timer
+# @timer
 def run():
     global CUR_ROUND
     history = []
@@ -325,20 +343,20 @@ def run():
     return history
 
 
-@timer
+# @timer
 def initialisation():
     initialise_angr()
     return initialise_seeds(
         TreeNode(addr=None, parent=None, state=None, colour='W'))
 
 
-@timer
+# @timer
 def initialise_angr():
     global PROJ
     PROJ = angr.Project(BINARY)
 
 
-@timer
+# @timer
 def initialise_seeds(root):
     # NOTE: prepare the root (dye red, add simulation child)
     #  otherwise the data in simulation stage of SEEDs
@@ -399,7 +417,7 @@ def mcts(root):
     # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
-@timer
+# @timer
 def selection_stage(node):
     nodes, prev_red_index = tree_policy(node=node)
     if nodes[-1].state:
@@ -409,7 +427,7 @@ def selection_stage(node):
     return tree_policy_for_leaf(nodes=nodes, red_index=prev_red_index)
 
 
-@timer
+# @timer
 def tree_policy(node):
     nodes, prev_red_index = [], 0
 
@@ -429,7 +447,7 @@ def tree_policy(node):
     return nodes, prev_red_index
 
 
-@timer
+# @timer
 def dye_to_the_next_red(start_node, last_red):
     last_state = last_red.children['Simulation'].state
     succs = compute_line_children_states(state=last_state)
@@ -441,7 +459,7 @@ def dye_to_the_next_red(start_node, last_red):
         start_node = next(v for v in start_node.children.values())
 
 
-@timer
+# @timer
 def compute_line_children_states(state):
     """
     Symbolically execute to the end of the line of the state
@@ -457,7 +475,7 @@ def compute_line_children_states(state):
     return children
 
 
-@timer
+# @timer
 def dye_red_black_node(candidate_node, target_states, phantom_parent):
     for state in target_states:
         if candidate_node.addr == state.addr and not candidate_node.phantom:
@@ -475,7 +493,7 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
     return False
 
 
-@timer
+# @timer
 def execute_symbolically(state):
     global SYMBOLIC_EXECUTION_COUNT
     SYMBOLIC_EXECUTION_COUNT += 1
@@ -483,7 +501,7 @@ def execute_symbolically(state):
     return state.step().successors
 
 
-@timer
+# @timer
 def tree_policy_for_leaf(nodes, red_index):
     # NOTE: Roll back to the immediate red ancestor
     #  and only keep the path from root the that ancestor's simulation child
@@ -505,7 +523,7 @@ def tree_policy_for_leaf(nodes, red_index):
     return []
 
 
-@timer
+# @timer
 def simulation_stage(node, input_str=None):
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
@@ -537,7 +555,7 @@ def program(input_str):
     return unpack(error_msg)
 
 
-@timer
+# @timer
 def expansion_stage(root, paths):
     are_new = []
     for path in paths:
@@ -550,7 +568,7 @@ def expansion_stage(root, paths):
     return are_new
 
 
-@timer
+# @timer
 def expand_path(root, path):
     global DSC_PATHS
     DSC_PATHS.add(tuple(path))
@@ -571,7 +589,7 @@ def expand_path(root, path):
     return is_new
 
 
-@timer
+# @timer
 def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
     assert len(paths) == len(are_new)
     root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
@@ -614,7 +632,7 @@ def propagate_path(root, path, is_new, node):
     node.distinct += is_new
 
 
-@timer
+# @timer
 def neo_propagate_path(root, path, is_new, nodes, is_phantom):
     global TTL_SEL
     preserved = True

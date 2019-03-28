@@ -250,6 +250,13 @@ class TreeNode:
                 "\033[1;32mGarbage collector: collected {} objects\033[0m"
                     .format(gbc))
 
+    def print_path(self):
+        path, parent = [self.addr] = self.parent
+        while parent:
+            path.append(parent.addr)
+            parent = parent.parent
+        return path[::-1]
+
     # @timer
     def pp(self, indent=0, mark_node=None, found=0, forced=False):
         if LOGGER.level > logging.INFO and not forced:

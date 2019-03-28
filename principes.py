@@ -531,9 +531,9 @@ def simulation_stage(node, input_str=None):
     return [program(mutant) for mutant in mutants]
 
 
-def binary_execute(input_str, binary):
+def binary_execute(input_str):
     sp = subprocess.Popen(
-        binary, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+        BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
     msg = sp.communicate(input_str)
     returncode = sp.returncode
     sp.kill()
@@ -553,7 +553,8 @@ def program(input_str):
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
 
-    msg, return_code = binary_execute(input_str, BINARY)
+    save_input_to_file(input_str)
+    msg, return_code = binary_execute(input_str)
     error_msg = msg[1]
     FOUND_BUG = return_code == 100
     if FOUND_BUG:
@@ -684,6 +685,13 @@ def make_constraint_readable(constraint):
         con_str += ", "
 
     return con_str + "]"
+
+
+def save_input_to_file(input_bytes):
+    binary_name = BINARY.split("/")[-1][:-6]
+    os.system("mkdir inputs/{}".format(binary_name))
+    with open('inputs/{}/{}'.format(binary_name, time.time()-TIME_START), 'wb') as input_file:
+        input_file.write(input_bytes)
 
 
 # def display_results():

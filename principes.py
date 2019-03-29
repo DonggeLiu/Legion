@@ -7,7 +7,7 @@ import re
 import struct
 import subprocess
 import sys
-# import time
+import time
 from math import sqrt, log
 
 import angr
@@ -478,11 +478,11 @@ def tree_policy(node):
 def dye_to_the_next_red(start_node, last_red):
     last_state = last_red.children['Simulation'].state
     succs = compute_line_children_states(state=last_state)
-    while not dye_red_black_node(
-            candidate_node=start_node, target_states=succs,
-            phantom_parent=last_red) and \
-            not start_node.is_diverging() and \
-            start_node.children:
+    while not dye_red_black_node(candidate_node=start_node,
+                                 target_states=succs,
+                                 phantom_parent=last_red) \
+            and not start_node.is_diverging() \
+            and start_node.children:
         start_node = next(v for v in start_node.children.values())
 
 

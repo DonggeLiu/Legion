@@ -40,6 +40,8 @@ MEMO_LOG = []
 MEMO_DIF = []
 PID = None
 ROOT = None
+PHANTOM = None
+PHANTOM_STATES = {}
 
 BINARY = sys.argv[1]
 PRE_SEEDS = sys.argv[2:]
@@ -231,11 +233,27 @@ class TreeNode:
         RD_COUNT += NUM_SAMPLES
         return [generate_random() for _ in range(NUM_SAMPLES)]
 
-    def add_child(self, addr):
-        if addr in self.children.keys():
-            return False
-        self.children[addr] = TreeNode(addr=addr, parent=self)
-        return True
+    def add_child(self, addr, passed_parent=False):
+        global PHANTOM
+        is_new_child = addr not in self.children.keys()
+        if is_new_child:
+            self.children[addr] = TreeNode(addr=addr, parent=self)
+        if PHANTOM and addr == PHANTOM.addr \
+                and passed_parent:
+            if self.children[addr].colour is 'W':
+                self.children[addr].dye(colour='R', state=PHANTOM.state)
+                parent = self
+                while parent.colour == 'W':
+                    parent.dye('B')
+                    parent = parent.parent
+                # while parent \
+                #         and all([child.colour not in ['P', 'W']
+                #                  for child in parent.children.values()]):
+                #     parent.remove_redundant_state()  # TODO: Test this!
+                #     parent = parent.parent
+            if self.children[addr].colour is 'R':
+                PHANTOM = None
+        return is_new_child
 
     def mark_fully_explored(self):
         self.fully_explored = True
@@ -243,7 +261,9 @@ class TreeNode:
         LOGGER.info("Mark {} as FULLY EXPLORED".format(self))
 
     def remove_redundant_state(self):
-        if 'Simulation' in self.children:
+        if 'Simulation' in self.children \
+                and all([child.colour not in ['P', 'W']
+                         for child in self.children.values()]):
             del self.children['Simulation']
             gbc = gc.collect()
             LOGGER.error(
@@ -396,24 +416,29 @@ def keep_fuzzing(root):
 
 
 def mcts(root):
+    global PHANTOM
     nodes = selection_stage(root)
     while not nodes:
         gc.collect()
         nodes = selection_stage(root)
+    PHANTOM = nodes[-1] if nodes[-1].colour is 'P' else None
+    if PHANTOM:
+        if PHANTOM.samples is not None:
+            pdb.set_trace()
     paths = simulation_stage(nodes[-1])
-    simul_phantom = nodes[-1].colour is 'P'
     # NOTE: What if len(paths) < NUM_SAMPLES?
     #  i.e. fuzzer finds less mutant than asked
     #  Without handling this, we will be trapped in the infeasible node,
     #  whose num_visited is always 0
     #  I saved all nodes along the path of selection stage and used them here
-    if simul_phantom:
-        del nodes[-1].parent.children[nodes[-1].addr]
+    if PHANTOM:
+        nodes[-1].parent.children.pop(nodes[-1].addr)
         nodes.pop()
         gc.collect()
     are_new = expansion_stage(root, paths)
     propagation_stage(
-        root, paths, are_new, nodes, NUM_SAMPLES - len(paths), simul_phantom)
+        root, paths, are_new, nodes, NUM_SAMPLES - len(paths),
+        PHANTOM is not None)
     # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
@@ -479,10 +504,18 @@ def compute_line_children_states(state):
 
 # @timer
 def dye_red_black_node(candidate_node, target_states, phantom_parent):
+    global PHANTOM_STATES
     for state in target_states:
         if candidate_node.addr == state.addr and not candidate_node.phantom:
             candidate_node.dye(colour='R', state=state)
             target_states.remove(state)
+
+            if state in PHANTOM_STATES:
+                print("Phantom Node {} turns out to be {}".format(
+                    PHANTOM_STATES[state], candidate_node))
+                del PHANTOM_STATES[state].parent.children[
+                    PHANTOM_STATES[state].addr]
+                del PHANTOM_STATES[state]
             break
     if candidate_node.colour is 'R':
         for state in target_states:
@@ -490,6 +523,7 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
                 continue
             phantom_parent.children[state.addr] = TreeNode(
                 addr=state.addr, parent=phantom_parent, state=state, colour='P')
+            PHANTOM_STATES[state] = phantom_parent.children[state.addr]
         return True
     candidate_node.dye(colour='B')
     return False
@@ -514,7 +548,7 @@ def tree_policy_for_leaf(nodes, red_index):
     closest_branching_target = nodes[-1]
     while all([child.fully_explored for name, child
                in closest_branching_target.children.items()
-               if (name is not 'Simulation') and (not child.phantom)]):
+               if (name is not 'Simulation')]):
         closest_branching_target.mark_fully_explored()
         closest_branching_target = closest_branching_target.parent
     while closest_branching_target and 'Simulation' not in closest_branching_target.children:
@@ -526,6 +560,10 @@ def tree_policy_for_leaf(nodes, red_index):
 
 # @timer
 def simulation_stage(node, input_str=None):
+    if PHANTOM and node.samples:
+        # NOTE: This should never happen, otherwise it is likely to trigger
+        #   the problem (that should never happen) below
+        pdb.set_trace()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
     return [program(mutant) for mutant in mutants]
@@ -581,7 +619,7 @@ def expansion_stage(root, paths):
 
 # @timer
 def expand_path(root, path):
-    global DSC_PATHS
+    global DSC_PATHS, PHANTOM
     DSC_PATHS.add(tuple(path))
     LOGGER.info("INPUT_PATH: {}".format([hex(addr) for addr in path]))
 
@@ -591,12 +629,29 @@ def expand_path(root, path):
     if not root.addr:  # NOTE: assign addr to root
         root.addr = path[0]
         root.children['Simulation'].addr = root.addr
-    node, is_new = root, False
+    node, is_new, passed_parent = root, False, False
+    # if PHANTOM and PHANTOM.addr not in path:
+    #     pdb.set_trace()
+    #     PHANTOM.parent.children[PHANTOM.addr] = PHANTOM
+    #     PHANTOM = None
     for addr in path[1:]:
+        if PHANTOM and node == PHANTOM.parent:
+            passed_parent = True or passed_parent
         # have to put node.child(addr) first to avoid short circuit
-        is_new = node.add_child(addr) or is_new
+        is_new = node.add_child(addr, passed_parent) or is_new
         node = node.children[addr]
-
+    if PHANTOM is not None:
+        # NOTE: This should not happen as the first input from QuickSampler
+        #   should guarantee to preserve the path
+        #   This is just a temp solution
+        pdb.set_trace()
+        # PHANTOM.samples = None
+        # new_path = program(PHANTOM.quick_sampler()[0])
+        # results = expand_path(root, new_path)
+        # pdb.set_trace()
+        # return results
+        # PHANTOM.parent.children[PHANTOM.addr] = PHANTOM
+        # PHANTOM = None
     return is_new
 
 

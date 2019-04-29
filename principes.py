@@ -102,6 +102,7 @@ class TreeNode:
             Red:    In TraceJump     + Confirmed in Angr     + has Symbolic state            + has Simulation child
             Black:  In TraceJump     + Confirmed not in Angr + No Symbolic state             + No Simulation child
             Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child
+            Purple: Unknown TJ path  + SymEx found in Angr   + has Symbolic state            + is a Phantom Node
     """
 
     def __init__(self, addr, parent=None, state=None, colour='W', phantom=False):

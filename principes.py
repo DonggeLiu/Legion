@@ -224,20 +224,20 @@ class TreeNode:
             if self.state.solver.SAMPLE_COUNT:
                 pdb.set_trace()
             self.samples = self.state.solver.iterate(e=target)
-        vals = []
+
+        results = []
+        n = (target.size() + 7) // 8  # Round up to the next full byte
         for _ in range(NUM_SAMPLES):
             try:
                 val = next(self.samples)
+                result = val.to_bytes(n, 'big')
+                results.append(result)
             except StopIteration:
                 # NOTE: Meaning the path is not feasible?
                 if self.colour == 'P' and not len(results):
                     pdb.set_trace()
                 self.exhausted = True
                 break
-            vals.append(val)
-        n = (target.size() + 7) // 8  # Round up to the next full byte
-        # 'Big' is default order of z3 BitVecVal
-        results = [x.to_bytes(n, 'big') for x in vals]
         return results
 
     # @timer

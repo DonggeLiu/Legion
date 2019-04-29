@@ -197,8 +197,9 @@ class TreeNode:
             gc.collect()
 
     def is_exhausted(self):
-        return self.exhausted or ('Simulation' in self.children
-                                  and self.children['Simulation'].exhausted)
+        return self.exhausted or \
+               ('Simulation' in self.children
+                and self.children['Simulation'].exhausted)
 
     # @timer
     def mutate(self):
@@ -482,7 +483,6 @@ def mcts(root):
     global PHANTOM
     nodes = selection_stage(root)
     while not nodes:
-        gc.collect()
         nodes = selection_stage(root)
     PHANTOM = nodes[-1] if nodes[-1].colour is 'P' else None
     if PHANTOM:

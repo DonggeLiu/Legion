@@ -526,7 +526,7 @@ def tree_policy(node):
             exit(3)
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         assert not node.parent or node.parent.colour is 'R' \
-               or node.parent.colour is 'B'
+            or node.parent.colour is 'B'
         if node.colour is 'W':
             dye_to_the_next_red(start_node=node, last_red=nodes[prev_red_index])
         if 'Simulation' in node.children:

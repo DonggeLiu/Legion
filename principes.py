@@ -105,12 +105,12 @@ class TreeNode:
             Purple: Unknown TJ path  + SymEx found in Angr   + has Symbolic state            + is a Phantom Node
     """
 
-    def __init__(self, addr, parent=None, state=None, colour='W', phantom=False):
+    def __init__(self, addr, parent=None, state=None, colour='W', phantom=False, samples=None):
         self.exhausted = False
         self.addr = addr
         self.parent = parent
         self.state = state
-        self.samples = None
+        self.samples = samples
         self.colour = colour
         self.phantom = phantom
         self.fully_explored = False
@@ -169,14 +169,14 @@ class TreeNode:
         return self.best_child()
 
     # @timer
-    def dye(self, colour, state=None):
+    def dye(self, colour, state=None, samples=None):
         assert self.colour is 'W'
         assert (colour is 'B' and not state) or (colour is 'R' and state)
 
         self.colour = colour
         if colour is 'R':
             self.children['Simulation'] \
-                = TreeNode(addr=self.addr, parent=self, state=state, colour='G')
+                = TreeNode(addr=self.addr, parent=self, state=state, colour='G', samples=samples)
         LOGGER.info("Dye {}".format(self))
 
     def is_diverging(self):
@@ -215,14 +215,23 @@ class TreeNode:
                      .format(hex(self.addr), self.state.solver.constraints))
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
+        if self.colour == 'P' and self.samples:
+            pdb.set_trace()
+            self.samples = None
+
         if not self.samples:
             assert not self.sel_try
+            if self.state.solver.SAMPLE_COUNT:
+                pdb.set_trace()
             self.samples = self.state.solver.iterate(e=target)
         vals = []
         for _ in range(NUM_SAMPLES):
             try:
                 val = next(self.samples)
             except StopIteration:
+                # NOTE: Meaning the path is not feasible?
+                if self.colour == 'P' and not len(results):
+                    pdb.set_trace()
                 self.exhausted = True
                 break
             vals.append(val)
@@ -243,21 +252,47 @@ class TreeNode:
         is_new_child = addr not in self.children.keys()
         if is_new_child:
             self.children[addr] = TreeNode(addr=addr, parent=self)
-        if PHANTOM and addr == PHANTOM.addr \
-                and passed_parent:
-            if self.children[addr].colour is 'W':
-                self.children[addr].dye(colour='R', state=PHANTOM.state)
-                parent = self
-                while parent.colour == 'W':
-                    parent.dye('B')
-                    parent = parent.parent
-                # while parent \
-                #         and all([child.colour not in ['P', 'W']
-                #                  for child in parent.children.values()]):
-                #     parent.remove_redundant_state()  # TODO: Test this!
-                #     parent = parent.parent
-            if self.children[addr].colour is 'R':
-                PHANTOM = None
+        if not PHANTOM or addr != PHANTOM.addr or not passed_parent:
+            return is_new_child
+        # pdb.set_trace()
+        if self.children[addr].colour != 'W':
+            # NOTE: Somehow the real node of the phantom is dyed
+            assert self.children[addr].colour == 'R'
+            # assert self.children[addr].state == PHANTOM.state
+            if self.children[addr].samples != PHANTOM.samples:
+                print("PHANTOM path: ", [hex(addr) for addr in PHANTOM.print_path()])
+                print("CURRENT path: ", [hex(addr) for addr in self.print_path()])
+                print("NEXT    addr: ", hex(addr))
+                # pdb.set_trace()
+            return is_new_child
+        self.children[addr].dye(colour='R', state=PHANTOM.state, samples=PHANTOM.samples)
+        parent = self
+        # pdb.set_trace()
+        while parent.colour == 'W':
+            parent.dye('B')
+            parent = parent.parent
+
+        parent = self
+        keep_state = False
+        # NOTE: Need to keep the closest state if at least
+        #  one child does not have a symbolic state
+        #  Otherwise, there will be no point to start future symbolic steps
+        while parent:
+            keep_state = keep_state or not parent.all_children_have_state()
+            # if keep_state or \
+            #         any([child.colour in ['P', 'W']
+            #              for child in parent.children.values()]):
+            if keep_state:
+                keep_state = 'Simulation' not in parent.children
+                parent = parent.parent
+                continue
+            parent.remove_redundant_state()  # TODO: Test this!
+            parent = parent.parent
+            # keep_state = parent.all_children_have_state()
+        if self.children[addr].colour is 'R':
+            PHANTOM = None
+        if PHANTOM:
+            pdb.set_trace()
         return is_new_child
 
     def mark_fully_explored(self):

@@ -222,8 +222,6 @@ class TreeNode:
 
         if not self.samples:
             assert not self.sel_try
-            if self.state.solver.SAMPLE_COUNT:
-                pdb.set_trace()
             self.samples = self.state.solver.iterate(e=target)
 
         results = []

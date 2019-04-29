@@ -474,7 +474,8 @@ def keep_fuzzing(root):
         pdb.set_trace()
     return len(DSC_PATHS) < MAX_PATHS \
         and CUR_ROUND < MAX_ROUNDS \
-        and not FOUND_BUG
+        and not FOUND_BUG \
+        and not ROOT.fully_explored
 
 
 def mcts(root):
@@ -521,6 +522,8 @@ def tree_policy(node):
     nodes, prev_red_index = [], 0
 
     while node.children:
+        if ROOT.fully_explored:
+            exit(3)
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         assert not node.parent or node.parent.colour is 'R' \
                or node.parent.colour is 'B'

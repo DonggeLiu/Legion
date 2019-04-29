@@ -286,7 +286,7 @@ class TreeNode:
                 keep_state = 'Simulation' not in parent.children
                 parent = parent.parent
                 continue
-            parent.remove_redundant_state()  # TODO: Test this!
+            parent.remove_redundant_state()
             parent = parent.parent
             # keep_state = parent.all_children_have_state()
         if self.children[addr].colour is 'R':
@@ -295,20 +295,42 @@ class TreeNode:
             pdb.set_trace()
         return is_new_child
 
+    def all_children_have_state(self):
+        # NOTE: starting from the current node, check if all children subtrees
+        #   have a symbolic state to execute from.
+        children = list(self.children.values())
+        # pdb.set_trace()
+        while children:
+            child = children.pop()
+            if child.colour in ['W', 'P']:
+                return False
+            if 'Simulation' in child.children:
+                assert child.children['Simulation'].state
+                continue
+            # NOTE: Red OR Black
+            children.extend(child.children.values())
+        return True
+
     def mark_fully_explored(self):
         self.fully_explored = True
         self.remove_redundant_state()
         LOGGER.info("Mark {} as FULLY EXPLORED".format(self))
 
     def remove_redundant_state(self):
-        if 'Simulation' in self.children \
-                and all([child.colour not in ['P', 'W']
-                         for child in self.children.values()]):
-            del self.children['Simulation']
-            gbc = gc.collect()
-            LOGGER.error(
-                "\033[1;32mGarbage collector: collected {} objects\033[0m"
-                    .format(gbc))
+        if any([child.colour == 'W'
+                for child in self.children.values()]):
+            return
+        if 'Simulation' not in self.children.keys():
+            return
+        # if 'Simulation' in self.children \
+        #         and all([child.colour not in ['P', 'W'] for child in self.children.values()]):
+        LOGGER.info("Remove Simulation Node {}".format(
+            self.children['Simulation']))
+        del self.children['Simulation']
+        gbc = gc.collect()
+        LOGGER.error(
+            "\033[1;32mGarbage collector: collected {} objects\033[0m"
+            .format(gbc))
 
     def print_path(self):
         path, parent = [self.addr] = self.parent

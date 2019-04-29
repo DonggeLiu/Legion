@@ -371,9 +371,9 @@ class TreeNode:
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
-        return "{uct:.4f}: {simw} / {simt} + {r} * sqrt({t_sel}/{sel_t})"\
+        return "{uct:.4f}: {simw:}/{simt} + {r:.4f}*sqrt({t_sel:.4f}/{sel_t}), {sel_w}"\
             .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
-                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try)
+                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try, sel_w=self.sel_win)
 
     def repr_node_state(self):
         return "State: {}".format(self.state if self.state else "None")

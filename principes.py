@@ -538,6 +538,8 @@ def tree_policy(node):
 
 # @timer
 def dye_to_the_next_red(start_node, last_red):
+    if 'Simulation' not in last_red.children:
+        pdb.set_trace()
     last_state = last_red.children['Simulation'].state
     succs = compute_line_children_states(state=last_state)
     while not dye_red_black_node(candidate_node=start_node,
@@ -612,10 +614,15 @@ def tree_policy_for_leaf(nodes, red_index):
                in closest_branching_target.children.items()
                if (name is not 'Simulation')]):
         closest_branching_target.mark_fully_explored()
+        if not closest_branching_target.parent:
+            exit(3)
         closest_branching_target = closest_branching_target.parent
+
+    all_explored = False
     while closest_branching_target and 'Simulation' not in closest_branching_target.children:
+        all_explored = all([child.fully_explored for child in closest_branching_target.children.values()])
         closest_branching_target = closest_branching_target.parent
-    if closest_branching_target:
+    if closest_branching_target and all_explored:
         closest_branching_target.remove_redundant_state()
     return []
 

@@ -91,4 +91,6 @@ Second version of Legion, with progresses and TODOs
 
 ## Changes to dependencies
 1. Angr: Fixed the loggers of angr, so that it will not affect importers
-2. Claripy: Added a new approximate constraint solver backend: Quick Sampler
+2. Claripy: 
+    * Added a new approximate constraint solver backend: Quick Sampler
+    * An assertion on the length of `exprs`

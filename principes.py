@@ -333,7 +333,7 @@ class TreeNode:
             .format(gbc))
 
     def print_path(self):
-        path, parent = [self.addr] = self.parent
+        path, parent = [self.addr], self.parent
         while parent:
             path.append(parent.addr)
             parent = parent.parent

@@ -87,7 +87,9 @@ def my_profile():
 
 def generate_random():
     random_bytes = b''
-    for _ in SEEDS[0]:
+    # for _ in SEEDS[0]:
+    # Assume 100 bytes input should be long enough for all binaries
+    for _ in range(100):
         random_bytes += os.urandom(1)
     return random_bytes
 

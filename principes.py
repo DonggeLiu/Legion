@@ -35,6 +35,7 @@ SYMBOLIC_EXECUTION_COUNT = 0
 
 FOUND_BUG = False
 
+TIME_START = time.time()
 TIME_LOG = {}
 MEMO_LOG = []
 MEMO_DIF = []
@@ -744,8 +745,10 @@ def make_constraint_readable(constraint):
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]
-    os.system("mkdir inputs/{}".format(binary_name))
-    with open('inputs/{}/{}'.format(binary_name, time.time()-TIME_START), 'wb') as input_file:
+    if binary_name not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}".format(binary_name))
+    time_stamp = time.time()-TIME_START
+    with open('inputs/{}/{}'.format(binary_name, time_stamp), 'wb') as input_file:
         input_file.write(input_bytes)
 
 

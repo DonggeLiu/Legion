@@ -60,6 +60,7 @@ sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
+BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
 
 # def timer(method):
 #     # global TIME_LOG
@@ -573,12 +574,17 @@ def simulation_stage(node, input_str=None):
 def binary_execute(input_str):
     sp = subprocess.Popen(
         BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-    msg = sp.communicate(input_str)
-    returncode = sp.returncode
-    sp.kill()
-    del sp
-    gc.collect()
-    return msg, returncode
+    try:
+        msg = sp.communicate(input_str, timeout=30)
+        returncode = sp.returncode
+        sp.kill()
+        del sp
+        # gc.collect()
+        return msg, returncode
+    except subprocess.TimeoutExpired:
+        with open(BLACKLIST, 'a') as blacklist:
+            blacklist.writelines(['\n'+BINARY[36:-4]])
+        exit(2)
 
 
 # @timer

@@ -669,16 +669,20 @@ def program(input_str):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     save_input_to_file(input_str)
-    msg, return_code = binary_execute(input_str)
-    error_msg = msg[1]
-    FOUND_BUG = return_code == 100
-    if FOUND_BUG:
-        print("\n*******************"
-              "\n***** EUREKA! *****"
-              "\n*******************\n")
-    LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
-                .format(gc.collect()))
-    return unpack(error_msg)
+    report = binary_execute(input_str)
+    if report:
+        msg, return_code = report
+        error_msg = msg[1]
+        FOUND_BUG = return_code == 100
+        if FOUND_BUG:
+            print("\n*******************"
+                  "\n***** EUREKA! *****"
+                  "\n*******************\n")
+        # LOGGER.info("\033[1;32mGarbage collector: collected {} objects\033[0m"
+        #             .format(gc.collect()))
+        return unpack(error_msg)
+    pdb.set_trace()
+    return [ROOT.addr]
 
 
 # @timer

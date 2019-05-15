@@ -40,7 +40,6 @@ TIME_START = time.time()
 TIME_LOG = {}
 MEMO_LOG = []
 MEMO_DIF = []
-PID = None
 ROOT = None
 PHANTOM = None
 PHANTOM_STATES = {}
@@ -62,28 +61,6 @@ sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
 BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
-
-# def timer(method):
-#     # global TIME_LOG
-#     #
-#     # def timeit(*args, **kw):
-#     #     ts = time.time()
-#     #     result = method(*args, **kw)
-#     #     te = time.time()
-#     #     if method.__name__ in TIME_LOG:
-#     #         TIME_LOG[method.__name__] += te - ts
-#     #     else:
-#     #         TIME_LOG[method.__name__] = te - ts
-#     #     return result
-#     #
-#     # return timeit
-#     return
-
-
-def my_profile():
-    global MEMO_LOG
-    mem = os.popen("more /proc/{}/statm".format(PID)).read().split(" ")
-    MEMO_LOG.append([mem[0], mem[1]])
 
 
 def generate_random():
@@ -880,60 +857,7 @@ if __name__ == "__main__" and len(sys.argv) > 1:
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
-    PID = os.getpid()
     # state = PROJ.factory.entry_state()
     # pdb.set_trace()
     run()
 
-    # print(MEMO_LOG)
-    # print(MEMO_DIF)
-    # pdb.set_trace()
-    # ITER_COUNT = run()[-1][0]
-    # for method_name, method_time in TIME_LOG.items():
-    #     print("{:28s}: {}".format(method_name, method_time))
-    #
-    # assert ITER_COUNT
-    # categories = ['Iteration Number',
-    #               'Samples Number / iter',
-    #               'Total',
-    #               'Initialisation',
-    #               'Binary Execution',
-    #               'Symbolic Execution',
-    #               'Path Preserve Fuzzing',
-    #               'Random Fuzzing',
-    #               'Tree Expansion'
-    #               ]
-    #
-    # values = [ITER_COUNT,
-    #           NUM_SAMPLES,
-    #           TIME_LOG['run'],  # Time
-    #           TIME_LOG['initialisation'],  # Initialisation
-    #           TIME_LOG['program'],  # Binary execution
-    #           TIME_LOG['execute_symbolically'],  # Symbolic execution
-    #           TIME_LOG['quick_sampler'],  # Quick sampler
-    #           TIME_LOG['random_sampler'],  # Random sampler
-    #           TIME_LOG['expansion_stage']  # Expansion
-    #           ]
-    #
-    # units = [1,
-    #          1,
-    #          ITER_COUNT * NUM_SAMPLES,  # Time
-    #          ITER_COUNT * NUM_SAMPLES,  # Initialisation
-    #          BINARY_EXECUTION_COUNT,  # Binary execution
-    #          SYMBOLIC_EXECUTION_COUNT,  # Symbolic execution
-    #          QS_COUNT,  # Quick sampler
-    #          RD_COUNT,  # Random sampler
-    #          MAX_PATHS  # Expansion time
-    #          ]
-    #
-    # averages = [values[i] / units[i] for i in range(len(values))]
-    #
-    # if not len(categories) == len(values) == len(units) == len(averages):
-    #     pdb.set_trace()
-    #
-    # if len(DSC_PATHS) != MAX_PATHS:
-    #     pdb.set_trace()
-    #
-    # display_results()
-    # make_pie(categories=categories, values=values,
-    #          units=units, averages=averages)

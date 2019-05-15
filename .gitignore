@@ -114,3 +114,7 @@ venv.bak/
 **/*.pyc
 /venv/
 **/*.idea
+
+
+# Ignore input files
+inputs/

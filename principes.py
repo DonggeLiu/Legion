@@ -216,6 +216,8 @@ class TreeNode:
                      .format(hex(self.addr), self.state.solver.constraints))
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
+        assert not self.exhausted
+
         if self.colour == 'P' and self.samples:
             pdb.set_trace()
             self.samples = None
@@ -226,16 +228,20 @@ class TreeNode:
 
         results = []
         n = (target.size() + 7) // 8  # Round up to the next full byte
-        for _ in range(NUM_SAMPLES):
+        while len(results) < NUM_SAMPLES:
             try:
                 val = next(self.samples)
+                if val is None:
+                    break
                 result = val.to_bytes(n, 'big')
                 results.append(result)
             except StopIteration:
                 # NOTE: Meaning the path is not feasible?
-                if self.colour == 'P' and not len(results):
-                    pdb.set_trace()
+                # if self.colour == 'P' and not len(results):
+                #     pdb.set_trace()
                 self.exhausted = True
+                self.samples = None
+                gc.collect()
                 break
         return results
 

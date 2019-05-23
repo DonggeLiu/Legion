@@ -262,14 +262,23 @@ class TreeNode:
         # pdb.set_trace()
         if self.children[addr].colour != 'W':
             # NOTE: Somehow the real node of the phantom is dyed
-            assert self.children[addr].colour == 'R'
-            # assert self.children[addr].state == PHANTOM.state
-            if self.children[addr].samples != PHANTOM.samples:
-                print("PHANTOM path: ", [hex(addr) for addr in PHANTOM.print_path()])
-                print("CURRENT path: ", [hex(addr) for addr in self.print_path()])
-                print("NEXT    addr: ", hex(addr))
-                # pdb.set_trace()
-            return is_new_child
+            if not self.children[addr].colour == 'R':
+                if self.children[addr].colour == 'B':
+                    self.children[addr].colour = 'W'
+                else:
+                    pdb.set_trace()
+            else:
+                PHANTOM = None
+                return is_new_child
+            # Note: if it is red
+
+            # # assert self.children[addr].state == PHANTOM.state
+            # if self.children[addr].samples != PHANTOM.samples:
+            #     LOGGER.debug("PHANTOM path: ", [hex(addr) for addr in PHANTOM.print_path()])
+            #     LOGGER.debug("CURRENT path: ", [hex(addr) for addr in self.print_path()])
+            #     LOGGER.debug("NEXT    addr: ", hex(addr))
+            #     # pdb.set_trace()
+            # return is_new_child
         self.children[addr].dye(colour='R', state=PHANTOM.state, samples=PHANTOM.samples)
         parent = self
         # pdb.set_trace()

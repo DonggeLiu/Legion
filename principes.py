@@ -478,14 +478,19 @@ def initialise_seeds(root):
 
 
 def keep_fuzzing(root):
-    LOGGER.error("\033[1;35m== Iter:{} == Tree path:{} == Set path:{} "
+    LOGGER.error(
+        msg="\033[1;35m== Iter:{} == Time:{} == Path:{}"
                  "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
-                 .format(CUR_ROUND, root.distinct, len(DSC_PATHS),
-                         BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT))
-    if not root.distinct == len(DSC_PATHS):
+                 .format(CUR_ROUND, int(time.time()-TIME_START), root.distinct,
+                         BINARY_EXECUTION_COUNT, QS_COUNT, RD_COUNT)
+    )
+    # We probably should remove this restriction, consider the following two paths:
+    # path1 = [1,2,3], path2 = [1,2,3,4]
+    # There are two distinct paths in DSC_PATHS but the same for legion (and software testing).
+    # if not root.distinct == len(DSC_PATHS):
         # for path in DSC_PATHS:
         #     print([hex(addr) for addr in path])
-        pdb.set_trace()
+    #    pdb.set_trace()
     return len(DSC_PATHS) < MAX_PATHS \
         and CUR_ROUND < MAX_ROUNDS \
         and not FOUND_BUG \
@@ -538,8 +543,9 @@ def tree_policy(node):
         if ROOT.fully_explored:
             exit(3)
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
-        assert not node.parent or node.parent.colour is 'R' \
-            or node.parent.colour is 'B'
+        # if not (not node.parent or node.parent.colour is 'R'
+        #     or node.parent.colour is 'B'):
+        #     pdb.set_trace()
         if node.colour is 'W':
             dye_to_the_next_red(start_node=node, last_red=nodes[prev_red_index])
         if 'Simulation' in node.children:
@@ -658,7 +664,7 @@ def binary_execute(input_str):
     sp = subprocess.Popen(
         BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
     try:
-        msg = sp.communicate(input_str, timeout=30)
+        msg = sp.communicate(input_str, timeout=30*60*60)
         returncode = sp.returncode
         sp.kill()
         del sp

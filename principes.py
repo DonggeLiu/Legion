@@ -582,7 +582,7 @@ def compute_line_children_states(state):
     """
     children = execute_symbolically(state=state)
     ls = []
-    while len(children) == 1:
+    while children is not None and len(children) == 1:
         ls.append(children[0])
         children = execute_symbolically(state=children[0])
     return children
@@ -597,7 +597,7 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
             target_states.remove(state)
 
             if state in PHANTOM_STATES:
-                print("Phantom Node {} turns out to be {}".format(
+                LOGGER.debug("Phantom Node {} turns out to be {}".format(
                     PHANTOM_STATES[state], candidate_node))
                 del PHANTOM_STATES[state].parent.children[
                     PHANTOM_STATES[state].addr]
@@ -617,10 +617,16 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
 
 @timer
 def execute_symbolically(state):
-    global SYMBOLIC_EXECUTION_COUNT
-    SYMBOLIC_EXECUTION_COUNT += 1
-    LOGGER.debug("Step: {}".format(hex(state.addr)))
-    return state.step().successors
+    succ = []
+    try:
+        global SYMBOLIC_EXECUTION_COUNT
+        SYMBOLIC_EXECUTION_COUNT += 1
+        LOGGER.debug("Step: {}".format(hex(state.addr)))
+        succ = state.step().successors
+    except:
+        pass
+        # pdb.set_trace()
+    return succ
 
 
 # @timer

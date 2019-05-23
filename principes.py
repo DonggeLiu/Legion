@@ -844,10 +844,10 @@ def make_constraint_readable(constraint):
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]
-    if binary_name not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}".format(binary_name))
+    if "{}_{}".format(binary_name , NUM_SAMPLES) not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}_{}".format(binary_name, NUM_SAMPLES))
     time_stamp = time.time()-TIME_START
-    with open('inputs/{}/{}'.format(binary_name, time_stamp), 'wb') as input_file:
+    with open('inputs/{}_{}/{}'.format(binary_name, NUM_SAMPLES, time_stamp), 'wb') as input_file:
         input_file.write(input_bytes)
 
 

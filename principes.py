@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import time
+from multiprocessing import Pool
 from math import sqrt, log
 
 import angr
@@ -518,7 +519,7 @@ def mcts(root):
         gc.collect()
     are_new = expansion_stage(root, paths)
     propagation_stage(
-        root, paths, are_new, nodes, NUM_SAMPLES - len(paths),
+        root, paths, are_new, nodes, 0,
         PHANTOM is not None)
     # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
@@ -663,7 +664,10 @@ def simulation_stage(node, input_str=None):
         pdb.set_trace()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
-    return [program(mutant) for mutant in mutants]
+    # paths = [program(mutant) for mutant in mutants]
+    paths = pool.map(program, mutants)
+    return paths
+
 
 @timer
 def binary_execute(input_str):
@@ -865,6 +869,7 @@ def save_input_to_file(input_bytes):
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
+    pool = Pool(NUM_SAMPLES)
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)

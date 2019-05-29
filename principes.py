@@ -20,7 +20,7 @@ import angr
 
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-NUM_SAMPLES = int(sys.argv[1])
+MIN_SAMPLES = int(sys.argv[1])
 
 DSC_PATHS = set()
 PST_INSTRS = set()
@@ -232,7 +232,7 @@ class TreeNode:
         while len(results) < 100:
             try:
                 val = next(self.samples)
-                if (val is None) and len(results) > NUM_SAMPLES:
+                if (val is None) and len(results) > MIN_SAMPLES:
                     break
                 if val is None:
                     continue
@@ -253,8 +253,8 @@ class TreeNode:
     @staticmethod
     def random_sampler():
         global RD_COUNT
-        RD_COUNT += NUM_SAMPLES
-        return [generate_random() for _ in range(NUM_SAMPLES)]
+        RD_COUNT += MIN_SAMPLES
+        return [generate_random() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
         global PHANTOM
@@ -857,10 +857,10 @@ def make_constraint_readable(constraint):
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]
-    if "{}_{}".format(binary_name , NUM_SAMPLES) not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}_{}".format(binary_name, NUM_SAMPLES))
+    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
     time_stamp = time.time()-TIME_START
-    with open('inputs/{}_{}/{}'.format(binary_name, NUM_SAMPLES, time_stamp), 'wb') as input_file:
+    with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
         input_file.write(input_bytes)
 
 
@@ -872,7 +872,7 @@ def save_input_to_file(input_bytes):
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
-    pool = Pool(NUM_SAMPLES)
+    pool = Pool(MIN_SAMPLES)
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
@@ -900,7 +900,7 @@ if __name__ == "__main__" and len(sys.argv) > 1:
                   ]
 
     values = [CUR_ROUND,
-              NUM_SAMPLES,
+              MIN_SAMPLES,
               TIME_LOG['run'],  # Time
               # Symbolic execution
               TIME_LOG['initialisation'] + TIME_LOG['execute_symbolically'],

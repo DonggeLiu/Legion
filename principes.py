@@ -211,7 +211,6 @@ class TreeNode:
     @timer
     def quick_sampler(self):
         global QS_COUNT
-        QS_COUNT += NUM_SAMPLES
         LOGGER.info("Using quick sampler")
         LOGGER.debug("{}'s constraint: {}"
                      .format(hex(self.addr), self.state.solver.constraints))
@@ -229,11 +228,13 @@ class TreeNode:
 
         results = []
         n = (target.size() + 7) // 8  # Round up to the next full byte
-        while len(results) < NUM_SAMPLES:
+        while len(results) < 100:
             try:
                 val = next(self.samples)
-                if val is None:
+                if (val is None) and len(results) > NUM_SAMPLES:
                     break
+                if val is None:
+                    continue
                 result = val.to_bytes(n, 'big')
                 results.append(result)
             except StopIteration:
@@ -244,6 +245,7 @@ class TreeNode:
                 self.samples = None
                 gc.collect()
                 break
+        QS_COUNT += len(results)
         return results
 
     # @timer

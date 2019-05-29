@@ -61,7 +61,8 @@ sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
-BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
+# BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
+BLACKLIST = "./BlacklistBenchmarks"
 
 
 def timer(method):
@@ -684,7 +685,7 @@ def binary_execute(input_str):
         return msg, returncode
     except subprocess.TimeoutExpired:
         with open(BLACKLIST, 'a') as blacklist:
-            blacklist.writelines(['\n'+BINARY[36:-4]])
+            blacklist.writelines(['\n'+BINARY[:-4]])
         exit(2)
 
 

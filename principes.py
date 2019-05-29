@@ -437,7 +437,7 @@ def run():
         history.append([CUR_ROUND, ROOT.distinct])
         mcts(ROOT)
         CUR_ROUND += 1
-    ROOT.pp(forced=True)
+    # ROOT.pp(forced=True)
     return history
 
 

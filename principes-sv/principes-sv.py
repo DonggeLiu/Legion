@@ -48,6 +48,10 @@ PHANTOM_STATES = {}
 C_FILE = sys.argv[1]
 
 def instrument_c():
+    if 'instrs' not in os.listdir('.'):
+        os.mkdir('instrs')
+    if 'inputs' not in os.listdir('.'):
+        os.mkdir('inputs')
     assert C_FILE[-2:] == '.c'
     c_name = C_FILE.split("/")[-1]
     instr = C_FILE[:-2] + '.instr'
@@ -904,7 +908,6 @@ def save_input_to_file(input_bytes):
 if __name__ == "__main__" and len(sys.argv) > 1:
     # assert BINARY and SEEDS
     pool = Pool(MIN_SAMPLES*2)
-
 
     assert BINARY
     LOGGER.info(BINARY)

@@ -897,7 +897,7 @@ def instrument_c():
     c_name = C_FILE.split("/")[-1]
     BINARY = C_FILE[-2:] + '.instr'
     os.system(f"make {BINARY}")
-    BINARY = f"./instr/{}".format(c_name[-2:] + '.instr')
+    BINARY = "./instr/{}".format(c_name[-2:] + '.instr')
 
 
 if __name__ == "__main__" and len(sys.argv) > 1:

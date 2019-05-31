@@ -891,10 +891,21 @@ def save_input_to_file(input_bytes):
 #               .format(categories[i], values[i], units[i], averages[i]))
 
 
-if __name__ == "__main__" and len(sys.argv) > 1:
-    assert BINARY and SEEDS
-    pool = Pool(MIN_SAMPLES)
+def instrument_c():
+    global BINARY
+    assert C_FILE[-2:] == '.c'
+    c_name = C_FILE.split("/")[-1]
+    BINARY = C_FILE[-2:] + '.instr'
+    os.system(f"make {BINARY}")
+    BINARY = f"./instr/{}".format(c_name[-2:] + '.instr')
 
+
+if __name__ == "__main__" and len(sys.argv) > 1:
+    # assert BINARY and SEEDS
+    pool = Pool(MIN_SAMPLES*2)
+    instrument_c()
+
+    assert BINARY
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
     PID = os.getpid()

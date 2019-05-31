@@ -20,7 +20,7 @@ import angr
 
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MIN_SAMPLES = int(sys.argv[1])
+MIN_SAMPLES = 3
 
 DSC_PATHS = set()
 PST_INSTRS = set()
@@ -45,8 +45,9 @@ ROOT = None
 PHANTOM = None
 PHANTOM_STATES = {}
 
-BINARY = sys.argv[2]
-PRE_SEEDS = sys.argv[3:]
+C_FILE = sys.argv[1]
+BINARY = None
+PRE_SEEDS = [b'0']
 SEEDS = []
 for seed in PRE_SEEDS:
     SEEDS.append(seed)

@@ -46,13 +46,12 @@ PHANTOM = None
 PHANTOM_STATES = {}
 
 C_FILE = sys.argv[1]
-BINARY = None
-PRE_SEEDS = [b'0']
-SEEDS = []
-for seed in PRE_SEEDS:
-    SEEDS.append(seed)
-    SEEDS.append('\n')
-SEEDS = [SEEDS]
+# PRE_SEEDS = ['0']
+# SEEDS = []
+# for seed in PRE_SEEDS:
+#     SEEDS.append(seed)
+#     SEEDS.append('\n')
+SEEDS = ['0\n']
 
 PROJ = None
 

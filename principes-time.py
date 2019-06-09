@@ -365,11 +365,14 @@ class TreeNode:
         #         and all([child.colour not in ['P', 'W'] for child in self.children.values()]):
         LOGGER.info("Remove Simulation Node {}".format(
             self.children['Simulation']))
-        del self.children['Simulation']
-        gbc = gc.collect()
-        LOGGER.error(
-            "\033[1;32mGarbage collector: collected {} objects\033[0m"
-            .format(gbc))
+
+        # del self.children['Simulation']
+        self.children['Simulation'].fully_explored = True
+
+        # gbc = gc.collect()
+        # LOGGER.debug(
+        #     "\033[1;32mGarbage collector: collected {} objects\033[0m"
+        #     .format(gbc))
 
     def print_path(self):
         path, parent = [self.addr], self.parent

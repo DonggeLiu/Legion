@@ -49,8 +49,8 @@ PHANTOM = None
 REAL_PHAN = None
 PHANTOM_STATES = {}
 
-BINARY = sys.argv[2]
-PRE_SEEDS = sys.argv[3:]
+BINARY = sys.argv[3]
+PRE_SEEDS = sys.argv[4:]
 SEEDS = []
 for seed in PRE_SEEDS:
     SEEDS.append(seed)
@@ -67,6 +67,9 @@ LOGGER.addHandler(sthl)
 
 # BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
 BLACKLIST = "./BlacklistBenchmarks"
+
+binary_name = BINARY.split("/")[-1][:-6]
+DIR_NAME = "{}_{}_{}_{}".format(binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
 
 def timer(method):
@@ -834,7 +837,10 @@ def expand_path(root, path):
         # NOTE: This should not happen as the first input from QuickSampler
         #   should guarantee to preserve the path
         #   This is just a temp solution
-        pdb.set_trace()
+        # pdb.set_trace()
+        print("Incorrect Phantom path found, restart...")
+        os.system("rm -rf inputs/{}".format(DIR_NAME))
+        exit(1)
         # PHANTOM.samples = None
         # new_path = program(PHANTOM.quick_sampler()[0])
         # results = expand_path(root, new_path)
@@ -939,11 +945,12 @@ def make_constraint_readable(constraint):
 
 
 def save_input_to_file(input_bytes):
-    binary_name = BINARY.split("/")[-1][:-6]
-    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
-    time_stamp = time.time()-TIME_START
-    with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
+    if DIR_NAME not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}".format(DIR_NAME))
+
+    time_stamp = time.time() - TIME_START
+    with open('inputs/{}/{}_{}'.format(
+            DIR_NAME, time_stamp, SIMUL_COUNT), 'wb') as input_file:
         input_file.write(input_bytes)
 
 # def save_input_to_file(input_bytes):

@@ -444,14 +444,14 @@ class TreeNode:
         #             else "as above" if self.colour == 'B'
         #             else 'Omitted' if 'Simulation' not in self.children
         #             else self.children['Simulation'].state.solver.constraints)
-        return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
+        return '\033[1;{colour}m{name}: {data}, {phantom}\033[0m'\
             .format(colour=30 if self.colour is 'B' else
                     31 if self.colour is 'R' else
                     33 if self.colour is 'G' else
                     37 if self.colour is 'W' else
                     35 if self.colour is 'P' else 32,
                     name=self.repr_node_name(),
-                    state=self.repr_node_state(),
+                    # state=self.repr_node_state(),
                     data=self.repr_node_data(),
                     children=self.repr_node_child(),
                     phantom=self.phantom)
@@ -505,7 +505,7 @@ def run():
         history.append([CUR_ROUND, ROOT.distinct])
         mcts(ROOT)
         CUR_ROUND += 1
-    # ROOT.pp(forced=True)
+    ROOT.pp()
     return history
 
 
@@ -550,7 +550,7 @@ def initialise_seeds(root):
 
 
 def keep_fuzzing(root):
-    LOGGER.error(
+    LOGGER.info(
         msg="\033[1;35m== Iter:{} == Time:{} == Path:{}"
                  "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
                  .format(CUR_ROUND, int(time.time()-TIME_START), root.distinct,
@@ -616,6 +616,7 @@ def tree_policy(node):
 
     while node.children:
         if ROOT.fully_explored:
+            ROOT.pp()
             exit(3)
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         # if not (not node.parent or node.parent.colour is 'R'
@@ -718,6 +719,7 @@ def tree_policy_for_leaf(nodes, red_index):
                if (name is not 'Simulation')]):
         closest_branching_target.mark_fully_explored()
         if not closest_branching_target.parent:
+            ROOT.pp()
             exit(3)
         closest_branching_target = closest_branching_target.parent
 
@@ -755,7 +757,8 @@ def simulation_stage(node, input_str=None):
 @timer
 def binary_execute(input_str):
     sp = subprocess.Popen(
-        BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+        BINARY, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE, close_fds=True)
     try:
         msg = sp.communicate(input_str, timeout=30*60*60)
         returncode = sp.returncode
@@ -854,7 +857,7 @@ def expand_path(root, path):
 # @timer
 def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
     assert len(paths) == len(are_new)
-    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
     for i in range(len(paths)):
         # NOTE: If the simulation is on a phantom node,
         #   reset every node along the path as not fully explored

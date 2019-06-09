@@ -446,7 +446,7 @@ class TreeNode:
 # @timer
 def uct(node):
     if node.fully_explored:
-        return 0
+        return -float('inf')
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)

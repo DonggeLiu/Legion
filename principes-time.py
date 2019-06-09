@@ -243,7 +243,7 @@ class TreeNode:
         while len(results) < 100:
             try:
                 val = next(self.samples)
-                if (val is None) and len(results) > MIN_SAMPLES:
+                if (val is None) and len(results) >= MIN_SAMPLES:
                     break
                 if val is None:
                     continue

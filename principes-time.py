@@ -734,6 +734,8 @@ def tree_policy_for_leaf(nodes, red_index):
 
 # @timer
 def simulation_stage(node, input_str=None):
+    global SIMUL_COUNT
+    SIMUL_COUNT += 1
     if PHANTOM and node.samples:
         # NOTE: This should never happen, otherwise it is likely to trigger
         #   the problem (that should never happen) below

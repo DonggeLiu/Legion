@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from multiprocessing import Pool
-from math import sqrt, log
+from math import sqrt, log, ceil
 
 import angr
 
@@ -26,6 +26,9 @@ DSC_PATHS = set()
 PST_INSTRS = set()
 CUR_ROUND = 0
 TTL_SEL = 0
+
+SIMUL_COUNT = 0
+TIME_COEFF = int(sys.argv[2])
 
 RHO = sqrt(2)
 
@@ -124,6 +127,9 @@ class TreeNode:
         self.sim_win = 0
         self.distinct = 0
         self.visited = 0
+        self.accumulated_time = 0
+        self.count = 0
+        # self.average_time = 0
 
     def __del__(self):
         del self.visited
@@ -212,6 +218,7 @@ class TreeNode:
     @timer
     def quick_sampler(self):
         global QS_COUNT
+        self.count += 1
         LOGGER.info("Using quick sampler")
         LOGGER.debug("{}'s constraint: {}"
                      .format(hex(self.addr), self.state.solver.constraints))
@@ -389,9 +396,13 @@ class TreeNode:
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
-        return "{uct:.4f}: {simw:}/{simt} + {r:.4f}*sqrt({t_sel:.4f}/{sel_t}), {sel_w}"\
+        return "{uct:.2f}: {simw:}/{simt} + {r:.2f}*sqrt({t_sel:.2f}/{sel_t}), " \
+               "({sel_w}) - {time:.4f} / 2^(log_2({samples}) + {count}) "\
             .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
-                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try, sel_w=self.sel_win)
+                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try,
+                    sel_w=self.sel_win,
+                    time=self.accumulated_time, samples=MIN_SAMPLES,
+                    count=self.count)
 
     def repr_node_state(self):
         return "State: {}".format(self.state if self.state else "None")
@@ -429,12 +440,37 @@ class TreeNode:
 # @timer
 def uct(node):
     if node.fully_explored:
-        return 0
+        return -float('inf')
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
     explore = sqrt(log(TTL_SEL + 1) / node.sel_try)
-    return exploit + RHO * explore
+
+    # Note: Only the first time to solve a node takes
+    #   ceil(log_2(MIN_SAMPLES) + 1)
+    #   number of constraint solving
+    #   The rest only needs 1
+    #   So if a node has not been selected before,
+    #   its estimated time penalisation is
+    #   that number * its parent's average constraint solving time
+    #   If that node has been selected before,
+    #   its estimated time penalisation is
+    #   1 * its own average constraint solving time
+
+    # Note: Similarly, given a node that has been counted N times (N>0),
+    #  the estimated number of constraint solving it conducted is
+    #  ceil(log_2(MIN_SAMPLES) + 1) + (N-1)
+    #  hence average constraint solving time is:
+    #  accumulated_time / (ceil(log_2(MIN_SAMPLES)) + N)
+
+    if node.count or not node.parent:
+        time_penalisation \
+            = node.accumulated_time / ceil(log(MIN_SAMPLES, 2) + node.count)
+    else:
+        time_penalisation \
+            = node.parent.accumulated_time / ceil(log(MIN_SAMPLES, 2))
+
+    return exploit + RHO * explore - time_penalisation * TIME_COEFF
 
 
 @timer
@@ -677,10 +713,19 @@ def simulation_stage(node, input_str=None):
         # NOTE: This should never happen, otherwise it is likely to trigger
         #   the problem (that should never happen) below
         pdb.set_trace()
+
+    start_solving = time.time()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
-    # paths = [program(mutant) for mutant in mutants]
-    paths = pool.map(program, mutants)
+    end_solving = time.time()
+
+    paths = [program(mutant) for mutant in mutants]
+    # paths = pool.map(program, mutants)
+    # print(len(node.state.solver.constraints), time.time() - start_solving)
+    node.accumulated_time += (end_solving - start_solving)
+    # Note; if not paths then the node's quick sampler is exhausted.
+    #  It will only be fuzzed with the random sampler.
+
     return paths
 
 
@@ -802,7 +847,13 @@ def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
 
     for i in range(len(paths)):
         propagate_path(root, paths[i], are_new[i], nodes[-1])
-    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+
+    for node in nodes[::-1]:
+        if node.is_diverging():
+            break
+        node.accumulated_time = nodes[-1].accumulated_time
+        node.count = nodes[-1].count
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
 def propagate_path(root, path, is_new, node):

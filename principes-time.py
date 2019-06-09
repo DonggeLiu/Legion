@@ -198,12 +198,12 @@ class TreeNode:
         if self.colour is 'R':
             self.children['Simulation'].exhausted = True
             del self.children['Simulation'].samples
-            gc.collect()
+            # gc.collect()
         else:
             assert self.colour is 'G'
             self.parent.exhausted = True
             del self.samples
-            gc.collect()
+            # gc.collect()
 
     def is_exhausted(self):
         return self.exhausted or \
@@ -252,7 +252,7 @@ class TreeNode:
                 #     pdb.set_trace()
                 self.exhausted = True
                 self.samples = None
-                gc.collect()
+                # gc.collect()
                 break
         QS_COUNT += len(results)
         return results
@@ -584,7 +584,7 @@ def mcts(root):
     if PHANTOM:
         nodes[-1].parent.children.pop(nodes[-1].addr)
         nodes.pop()
-        gc.collect()
+        # gc.collect()
     are_new = expansion_stage(root, paths)
     if REAL_PHAN:
         nodes.extend([REAL_PHAN, REAL_PHAN.children['Simulation']])

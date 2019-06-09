@@ -43,6 +43,7 @@ MEMO_DIF = []
 PID = None
 ROOT = None
 PHANTOM = None
+REAL_PHAN = None
 PHANTOM_STATES = {}
 
 C_FILE = sys.argv[1]
@@ -265,12 +266,12 @@ class TreeNode:
     # @timer
     @staticmethod
     def random_sampler():
-        global RD_COUNT
+        global RD_COUNT, REAL_PHAN
         RD_COUNT += MIN_SAMPLES
         return [generate_random() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
-        global PHANTOM
+        global PHANTOM, REAL_PHAN
         is_new_child = addr not in self.children.keys()
         if is_new_child:
             self.children[addr] = TreeNode(addr=addr, parent=self)
@@ -297,6 +298,8 @@ class TreeNode:
             #     # pdb.set_trace()
             # return is_new_child
         self.children[addr].dye(colour='R', state=PHANTOM.state, samples=PHANTOM.samples)
+        # self.children[addr].children['Simulation'].average_time = PHANTOM.average_time
+        REAL_PHAN = self.children[addr]
         parent = self
         # pdb.set_trace()
         while parent.colour == 'W':
@@ -322,6 +325,7 @@ class TreeNode:
             # keep_state = parent.all_children_have_state()
         if self.children[addr].colour is 'R':
             PHANTOM = None
+            REAL_PHAN = self.children[addr]
         if PHANTOM:
             pdb.set_trace()
         return is_new_child
@@ -527,7 +531,7 @@ def keep_fuzzing(root):
 
 
 def mcts(root):
-    global PHANTOM
+    global PHANTOM, REAL_PHAN
     nodes = selection_stage(root)
     while not nodes:
         nodes = selection_stage(root)
@@ -546,6 +550,9 @@ def mcts(root):
         nodes.pop()
         # gc.collect()
     are_new = expansion_stage(root, paths)
+    if REAL_PHAN:
+        nodes.extend([REAL_PHAN, REAL_PHAN.children['Simulation']])
+        REAL_PHAN = None
     propagation_stage(
         root, paths, are_new, nodes, 0,
         PHANTOM is not None)

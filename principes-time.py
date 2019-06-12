@@ -464,8 +464,8 @@ def uct(node):
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
-    explore = sqrt(log(TTL_SEL + 1) / node.sel_try)
-
+    N = node.parent.sel_try if node.parent else TTL_SEL
+    explore = sqrt(log(N + 1) / node.sel_try)
     # Note: Only the first time to solve a node takes
     #   ceil(log_2(MIN_SAMPLES) + 1)
     #   number of constraint solving

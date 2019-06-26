@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import gc
 import logging
 import os
@@ -52,7 +54,7 @@ def instrument_c():
         os.mkdir('instrs')
     if 'inputs' not in os.listdir('.'):
         os.mkdir('inputs')
-    assert C_FILE[-2:] == '.c'
+    # assert C_FILE[-2:] == '.c'
     c_name = C_FILE.split("/")[-1]
     instr = C_FILE[:-2] + '.instr'
     os.system("make {}".format(instr))

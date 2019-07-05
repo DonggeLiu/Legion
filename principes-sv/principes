@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 export PYTHONPATH=lib
-python3 ./principes-sv.py $@
+python3.6 ./principes-sv.py $@

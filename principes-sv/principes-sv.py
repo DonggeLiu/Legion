@@ -50,15 +50,14 @@ PHANTOM_STATES = {}
 C_FILE = sys.argv[1]
 
 def instrument_c():
-    if 'instrs' not in os.listdir('.'):
-        os.mkdir('instrs')
     if 'inputs' not in os.listdir('.'):
         os.mkdir('inputs')
     # assert C_FILE[-2:] == '.c'
     c_name = C_FILE.split("/")[-1]
     instr = C_FILE[:-2] + '.instr'
+    cmd = "make {}".format(instr)
     os.system("make {}".format(instr))
-    return "./instrs/{}".format(c_name[:-2] + '.instr')
+    return "./{}".format(c_name[:-2] + '.instr')
 
 BINARY = instrument_c()
 # PRE_SEEDS = ['0']
@@ -732,7 +731,7 @@ def program(input_str):
     if report:
         msg, return_code = report
         error_msg = msg[1]
-        FOUND_BUG = return_code == 100
+        FOUND_BUG = return_code != 0
         if FOUND_BUG:
             print("\n*******************"
                   "\n***** EUREKA! *****"

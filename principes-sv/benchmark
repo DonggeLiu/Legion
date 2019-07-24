@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export PYTHONPATH=lib
+python3.6 lib/benchmark.py -t ReachSafety-BitVectors --cloud --cloudMaster localhost legion.xml

@@ -1,2 +1,0 @@
-#!/bin/sh
-benchmark.py -t ReachSafety-BitVectors --cloud --cloudMaster localhost /home/ernst/tools/bench-defs/benchmark-defs/legion.xml

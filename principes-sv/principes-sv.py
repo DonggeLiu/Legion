@@ -700,19 +700,24 @@ def simulation_stage(node, input_str=None):
 
 @timer
 def binary_execute(input_str):
-    sp = subprocess.Popen(
-        BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-    try:
-        msg = sp.communicate(input_str, timeout=30*60*60)
-        returncode = sp.returncode
-        sp.kill()
-        del sp
-        # gc.collect()
-        return msg, returncode
-    except subprocess.TimeoutExpired:
-        with open(BLACKLIST, 'a') as blacklist:
-            blacklist.writelines(['\n'+BINARY[:-4]])
-        exit(2)
+    with open_input_to_file() as fd:
+        sp = subprocess.Popen(
+            BINARY,
+            stdin=subprocess.PIPE,
+            stdout=fd,
+            stderr=subprocess.PIPE,
+            close_fds=True)
+        try:
+            msg = sp.communicate(input_str, timeout=30*60*60)
+            returncode = sp.returncode
+            sp.kill()
+            del sp
+            # gc.collect()
+            return msg, returncode
+        except subprocess.TimeoutExpired:
+            with open(BLACKLIST, 'a') as blacklist:
+                blacklist.writelines(['\n'+BINARY[:-4]])
+            exit(2)
 
 
 # @timer
@@ -880,6 +885,12 @@ def make_constraint_readable(constraint):
 
     return con_str + "]"
 
+def open_input_to_file():
+    binary_name = BINARY.split("/")[-1][:-6]
+    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
+    time_stamp = time.time()-TIME_START
+    return open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb')
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]

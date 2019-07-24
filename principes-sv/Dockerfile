@@ -18,8 +18,7 @@ WORKDIR /mnt
 
 RUN mkdir lib
 RUN pip install dep/claripy dep/angr dep/benchexec --target lib
+RUN cp dep/benchmark.py dep/benchmark lib/ -r
 
 COPY principes principes-sv.py tracejump.py __trace_jump.s __VERIFIER.c Makefile /mnt/
-
-COPY test.c /mnt/
-RUN ./principes test.c
+COPY benchmark legion.xml /mnt/

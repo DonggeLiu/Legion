@@ -144,6 +144,38 @@ class TreeNode:
 
         return uct_score - TIME_COEFF * time_penalisation()
 
+    def mark_fully_explored(self):
+        """
+        Mark a node fully explored
+        If the node is simulation node, mark its parent fully explored
+        If the node is red, mark its simulation child fully explored
+        If all block siblings are fully explored, mark its parent fully explored
+        :return:
+        """
+
+        if self.colour is Colour.W:
+            return
+
+        if not all([c.fully_explored for c in self.children.values() if
+                    c.colour is not Colour.G]):
+            return
+
+        if not self.sel_try:
+            return
+
+        LOGGER.info("Fully explored {}".format(self))
+        self.fully_explored = True
+
+        # if self.colour is Colour.G:
+        #     self.parent.fully_explored = True
+
+        if self.colour is Colour.R:
+            LOGGER.info("Fully explored {}".format(self.children['Simulation']))
+            self.children['Simulation'].fully_explored = True
+
+        if self.parent:
+            self.parent.mark_fully_explored()
+
     def best_child(self) -> 'TreeNode':
         """
         Select the child of the highest uct score, break tie uniformly

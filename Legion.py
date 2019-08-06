@@ -705,8 +705,8 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             exit(2)
 
     def save_tests_to_file(data):
-        if DIR_NAME not in os.listdir('tests'):
-            os.system("mkdir tests/{}".format(DIR_NAME))
+        # if DIR_NAME not in os.listdir('tests'):
+        os.system("mkdir -p tests/{}".format(DIR_NAME))
 
         with open('tests/{}/{}_{}'.format(
                 DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
@@ -717,8 +717,8 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             input_file.write('</testcase>\n')
 
     def save_input_to_file():
-        if DIR_NAME not in os.listdir('inputs'):
-            os.system("mkdir inputs/{}".format(DIR_NAME))
+        # if DIR_NAME not in os.listdir('inputs'):
+        os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
         with open('inputs/{}/{}_{}'.format(
                 DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
@@ -861,7 +861,7 @@ if __name__ == '__main__':
     #                     help='Specify assembler binary')
     parser.add_argument('--save-inputs', type=bool, default=SAVE_TESTINPUTS,
                         help='Save inputs as binary files')
-    parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES
+    parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES,
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')

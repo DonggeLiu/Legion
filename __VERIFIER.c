@@ -4,7 +4,7 @@
 #include <assert.h>
 
 void __VERIFIER_error() {
-    exit(101);
+    exit(100);
 }
 
 int __VERIFIER_nondet_int() {

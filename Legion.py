@@ -42,7 +42,8 @@ DIR_NAME = "{}_{}_{}_{}".format(
     binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 SEEDS = sys.argv[4:]
 BUG_RET = 100  # the return code when finding a bug
-
+SAVE_TESTINPUTS = False
+SAVE_TESTCASES = False
 
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
@@ -685,6 +686,8 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     :return: the execution trace in a list
     """
 
+    time_stamp = time.time() - TIME_START
+
     def unpack(output):
         assert (len(output) % 8 == 0)
         # NOTE: changed addr[0] to addr
@@ -704,24 +707,42 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         except sp.TimeoutExpired:
             exit(2)
 
+    def save_tests_to_file(data):
+        if DIR_NAME not in os.listdir('tests'):
+            os.system("mkdir tests/{}".format(DIR_NAME))
+
+        with open('tests/{}/{}_{}'.format(
+                DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
+            input_file.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+            input_file.write('<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+            input_file.write('<testcase>\n')
+            input_file.write(data)
+            input_file.write('</testcase>\n')
+
     def save_input_to_file():
         if DIR_NAME not in os.listdir('inputs'):
             os.system("mkdir inputs/{}".format(DIR_NAME))
 
-        time_stamp = time.time() - TIME_START
         with open('inputs/{}/{}_{}'.format(
                 DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
             input_file.write(input_bytes)
 
     global FOUND_BUG
 
-    save_input_to_file()
+    if SAVE_TESTINPUTS:
+        save_input_to_file()
+
     report = execute()
     if not report:
         pdb.set_trace()
 
     report_msg, return_code = report
+    output_msg = report_msg[0]
     error_msg = report_msg[1]
+
+    if SAVE_TESTCASES:
+        save_tests_to_file(output_msg)
+
     if return_code == BUG_RET:
         FOUND_BUG = True
         print("\n*******************"

@@ -65,12 +65,11 @@ class Colour(enum.Enum):
 # TreeNode:
 class TreeNode:
     """
-    Colour | Tracejump    | Angr         | Symex state
+    Colour | TraceJump    | ANGR         | Symex state
     White  | True         | Undetermined | Undetermined
     Red    | True         | True         | False, stored in its simulation child
     Gold   | False        | False        | True, stores its parent's state
-    Black  | True         | False        | False
-    Purple | Undetermined | True         | True, stores its own state
+    Black  | True         | no sibling   | False
     """
 
     def __init__(self, addr: int = -1, parent: 'TreeNode' = None,

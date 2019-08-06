@@ -127,3 +127,10 @@ venv/
 
 # helpers
 coverage_plotter.py
+ProgramUnderTest
+Results
+Benchmarks
+
+
+## MacOS
+**/.DS_Store

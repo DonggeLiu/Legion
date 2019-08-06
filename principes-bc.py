@@ -8,7 +8,7 @@ import struct
 import subprocess
 import sys
 import time
-from multiprocessing import Pool
+import math
 from math import sqrt, log
 
 import angr
@@ -19,8 +19,8 @@ import angr
 
 
 MAX_PATHS = float('inf')
-MAX_ROUNDS = float('inf')
-MIN_SAMPLES = int(sys.argv[1])
+MAX_ROUNDS = 800
+NUM_SAMPLES = 5
 
 DSC_PATHS = set()
 PST_INSTRS = set()
@@ -40,13 +40,14 @@ TIME_START = time.time()
 TIME_LOG = {}
 MEMO_LOG = []
 MEMO_DIF = []
-PID = None
 ROOT = None
 PHANTOM = None
 PHANTOM_STATES = {}
+TARGET = None
+COV_INC = []
 
-BINARY = sys.argv[2]
-PRE_SEEDS = sys.argv[3:]
+BINARY = sys.argv[1]
+PRE_SEEDS = sys.argv[2:]
 SEEDS = []
 for seed in PRE_SEEDS:
     SEEDS.append(seed)
@@ -61,30 +62,7 @@ sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
-# BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
-BLACKLIST = "./BlacklistBenchmarks"
-
-
-def timer(method):
-    global TIME_LOG
-
-    def timeit(*args, **kw):
-        ts = time.time()
-        result = method(*args, **kw)
-        te = time.time()
-        if method.__name__ in TIME_LOG:
-            TIME_LOG[method.__name__] += te - ts
-        else:
-            TIME_LOG[method.__name__] = te - ts
-        return result
-
-    return timeit
-
-
-def my_profile():
-    global MEMO_LOG
-    mem = os.popen("more /proc/{}/statm".format(PID)).read().split(" ")
-    MEMO_LOG.append([mem[0], mem[1]])
+BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
 
 
 def generate_random():
@@ -124,6 +102,7 @@ class TreeNode:
         self.sim_win = 0
         self.distinct = 0
         self.visited = 0
+        self.inc_cov = 0
 
     def __del__(self):
         del self.visited
@@ -209,15 +188,14 @@ class TreeNode:
             return self.quick_sampler()
         return self.random_sampler()
 
-    @timer
+    # @timer
     def quick_sampler(self):
         global QS_COUNT
+        QS_COUNT += NUM_SAMPLES
         LOGGER.info("Using quick sampler")
         LOGGER.debug("{}'s constraint: {}"
                      .format(hex(self.addr), self.state.solver.constraints))
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
-
-        assert not self.exhausted
 
         if self.colour == 'P' and self.samples:
             pdb.set_trace()
@@ -229,13 +207,9 @@ class TreeNode:
 
         results = []
         n = (target.size() + 7) // 8  # Round up to the next full byte
-        while len(results) < 100:
+        for _ in range(NUM_SAMPLES):
             try:
                 val = next(self.samples)
-                if (val is None) and len(results) > MIN_SAMPLES:
-                    break
-                if val is None:
-                    continue
                 result = val.to_bytes(n, 'big')
                 results.append(result)
             except StopIteration:
@@ -243,18 +217,15 @@ class TreeNode:
                 # if self.colour == 'P' and not len(results):
                 #     pdb.set_trace()
                 self.exhausted = True
-                self.samples = None
-                gc.collect()
                 break
-        QS_COUNT += len(results)
         return results
 
     # @timer
     @staticmethod
     def random_sampler():
         global RD_COUNT
-        RD_COUNT += MIN_SAMPLES
-        return [generate_random() for _ in range(MIN_SAMPLES)]
+        RD_COUNT += NUM_SAMPLES
+        return [generate_random() for _ in range(NUM_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
         global PHANTOM
@@ -335,6 +306,7 @@ class TreeNode:
         LOGGER.info("Mark {} as FULLY EXPLORED".format(self))
 
     def remove_redundant_state(self):
+        # return None
         if any([child.colour == 'W'
                 for child in self.children.values()]):
             return
@@ -389,9 +361,11 @@ class TreeNode:
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
-        return "{uct:.4f}: {simw:}/{simt} + {r:.4f}*sqrt({t_sel:.4f}/{sel_t}), {sel_w}"\
-            .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
-                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try, sel_w=self.sel_win)
+        # return "{uct:.4f}: {simw:}/{simt} + {r:.4f}*sqrt({t_sel:.4f}/{sel_t}), {sel_w}"\
+        #     .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
+        #             r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try, sel_w=self.sel_win)
+        return "{uct:.4f}: {cov}"\
+            .format(uct=uct(self), cov=self.inc_cov)
 
     def repr_node_state(self):
         return "State: {}".format(self.state if self.state else "None")
@@ -401,6 +375,18 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
+        # return '\033[1;{colour}m{name}: {state}, {con}\033[0m'\
+        #     .format(colour=30 if self.colour is 'B' else
+        #             31 if self.colour is 'R' else
+        #             33 if self.colour is 'G' else
+        #             37 if self.colour is 'W' else
+        #             35 if self.colour is 'P' else 32,
+        #             name=self.repr_node_name(),
+        #             state=self.repr_node_state(),
+        #             con=self.state.solver.constraints if self.state
+        #             else "as above" if self.colour == 'B'
+        #             else 'Omitted' if 'Simulation' not in self.children
+        #             else self.children['Simulation'].state.solver.constraints)
         return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
             .format(colour=30 if self.colour is 'B' else
                     31 if self.colour is 'R' else
@@ -416,17 +402,23 @@ class TreeNode:
 
 # @timer
 def uct(node):
+    # if node.fully_explored:
+    #     return 0
+    # if not node.sel_try:
+    #     return float('inf')
+    # exploit = node.sim_win / (node.sim_try + 1)
+    # explore = sqrt(log(TTL_SEL + 1) / node.sel_try)
+    # return exploit + RHO * explore
     if node.fully_explored:
         return 0
     if not node.sel_try:
         return float('inf')
-    exploit = node.sim_win / (node.sim_try + 1)
-    N = node.parent.sel_try if node.parent else TTL_SEL
-    explore = sqrt(log(N + 1) / node.sel_try)
+    exploit = node.inc_cov / (node.sim_try + 1)
+    explore = sqrt(log(TTL_SEL + 1) / node.sel_try)
     return exploit + RHO * explore
 
 
-@timer
+# @timer
 def run():
     global CUR_ROUND, ROOT, PROJ
     history = []
@@ -438,11 +430,11 @@ def run():
         history.append([CUR_ROUND, ROOT.distinct])
         mcts(ROOT)
         CUR_ROUND += 1
-    # ROOT.pp(forced=True)
+    ROOT.pp(forced=True)
     return history
 
 
-@timer
+# @timer
 def initialisation():
     initialise_angr()
     return initialise_seeds(
@@ -457,6 +449,7 @@ def initialise_angr():
 
 # @timer
 def initialise_seeds(root):
+    global TARGET
     # NOTE: prepare the root (dye red, add simulation child)
     #  otherwise the data in simulation stage of SEEDs
     #   cannot be recorded without building another special case
@@ -468,6 +461,7 @@ def initialise_seeds(root):
     #       which does not exist for root
     root.dye(colour='R', state=PROJ.factory.entry_state(
         stdin=angr.storage.file.SimFileStream))
+    TARGET = root
     seed_paths = simulation_stage(node=root.children['Simulation'],
                                   input_str=SEEDS)
     are_new = expansion_stage(root, seed_paths)
@@ -503,12 +497,14 @@ def keep_fuzzing(root):
 
 
 def mcts(root):
-    global PHANTOM
+    global PHANTOM, TARGET
     nodes = selection_stage(root)
     while not nodes:
         nodes = selection_stage(root)
     PHANTOM = nodes[-1] if nodes[-1].colour is 'P' else None
+    TARGET = nodes[-1]
     if PHANTOM:
+        # pdb.set_trace()
         if PHANTOM.samples is not None:
             pdb.set_trace()
     paths = simulation_stage(nodes[-1])
@@ -523,9 +519,10 @@ def mcts(root):
         gc.collect()
     are_new = expansion_stage(root, paths)
     propagation_stage(
-        root, paths, are_new, nodes, 0,
+        root, paths, are_new, nodes, NUM_SAMPLES - len(paths),
         PHANTOM is not None)
-    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new), forced=not math.fmod(CUR_ROUND, 50))
+    # pdb.set_trace()
 
 
 # @timer
@@ -620,7 +617,7 @@ def dye_red_black_node(candidate_node, target_states, phantom_parent):
     return False
 
 
-@timer
+# @timer
 def execute_symbolically(state):
     succ = []
     try:
@@ -668,13 +665,11 @@ def simulation_stage(node, input_str=None):
         pdb.set_trace()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
-    # paths = [program(mutant) for mutant in mutants]
-    paths = pool.map(program, mutants)
-    return paths
+    return [program(mutant) for mutant in mutants]
 
 
-@timer
 def binary_execute(input_str):
+    # print(BINARY)
     sp = subprocess.Popen(
         BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
     try:
@@ -693,15 +688,19 @@ def binary_execute(input_str):
 # @timer
 def program(input_str):
     global BINARY_EXECUTION_COUNT, FOUND_BUG, MEMO_DIF
+    global COV_INC
     BINARY_EXECUTION_COUNT += 1
 
     def unpack(output):
+        # print(output)
         assert (len(output) % 8 == 0)
         # NOTE: changed addr[0] to addr
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
 
-    save_input_to_file(input_str)
+    timestamp = save_input_to_file(input_str)
+    cov_inc = get_coverage_val(timestamp)
+    COV_INC.append(cov_inc)
     report = binary_execute(input_str)
     if report:
         msg, return_code = report
@@ -718,7 +717,7 @@ def program(input_str):
     return [ROOT.addr]
 
 
-@timer
+# @timer
 def expansion_stage(root, paths):
     are_new = []
     for path in paths:
@@ -780,7 +779,7 @@ def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
         #   only do this for the first path,
         #   as it is the only path that guarantees to preserve the real path
         neo_propagate_path(
-            root, paths[i], are_new[i], nodes, is_phantom and not i)
+            root, paths[i], are_new[i], nodes, is_phantom and not i, COV_INC[i])
 
     # NOTE: If number of inputs generated by fuzzer < NUM_SAMPLES,
     #  then we need to update the node in :param nodes
@@ -803,6 +802,7 @@ def propagate_path(root, path, is_new, node):
     for addr in path[1:]:
         node.visited += 1
         node.distinct += is_new
+
         # assert node.distinct <= MAX_PATHS
         if addr not in node.children:
             pdb.set_trace()
@@ -813,7 +813,7 @@ def propagate_path(root, path, is_new, node):
 
 
 # @timer
-def neo_propagate_path(root, path, is_new, nodes, is_phantom):
+def neo_propagate_path(root, path, is_new, nodes, is_phantom, cov_inc):
     global TTL_SEL
     preserved = True
     for i in range(len(nodes)-1):
@@ -827,16 +827,19 @@ def neo_propagate_path(root, path, is_new, nodes, is_phantom):
 
     node = root
     node.sim_win += is_new
+    node.inc_cov += cov_inc
     node.sim_try += 1
     for addr in path[1:]:
         if not node.children.get(addr):
             pdb.set_trace()
         node = node.children.get(addr)
         node.sim_win += is_new
+        node.inc_cov += cov_inc
         node.sim_try += 1
         node.fully_explored = node.fully_explored and not is_phantom
 
     nodes[-1].sim_win += is_new
+    nodes[-1].inc_cov += cov_inc
     nodes[-1].sim_try += preserved
 
 
@@ -858,12 +861,30 @@ def make_constraint_readable(constraint):
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]
-    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
+    if binary_name not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}".format(binary_name))
     time_stamp = time.time()-TIME_START
-    with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
+    with open('inputs/{}/{}'.format(binary_name, time_stamp), 'wb') as input_file:
         input_file.write(input_bytes)
+    return time_stamp
 
+
+def get_coverage_val(time_stamp):
+    binary_name = BINARY.split("/")[-1][:-6]
+    pre_per = os.popen('(cd {}; gcov -abcu {} '
+                       '| grep -Eo "Taken at least once:(.*?)% of [0-9]*" '
+                       '| cut -d: -f2 | cut -d " " -f1 | cut -d "%" -f1)'
+                        .format(BINARY[:-13], binary_name)).read()
+
+    os.system("(cd {}; ./{} < ../../../../Principes/inputs/{}/{};)".format(
+        BINARY[:-13], BINARY[-13:-6], binary_name, time_stamp))
+
+    new_per = os.popen('(cd {}; gcov -abcu {} '
+                       '| grep -Eo "Taken at least once:(.*?)% of [0-9]*" '
+                       '| cut -d: -f2 | cut -d " " -f1 | cut -d "%" -f1)'
+                       .format(BINARY[:-13], binary_name)).read()
+    # pdb.set_trace()
+    return float(new_per[:-1]) - float(pre_per[:-1] if pre_per else 0.0)
 
 # def display_results():
 #     for i in range(len(categories)):
@@ -873,67 +894,11 @@ def save_input_to_file(input_bytes):
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
-    pool = Pool(MIN_SAMPLES)
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
-    PID = os.getpid()
     # state = PROJ.factory.entry_state()
     # pdb.set_trace()
+
     run()
 
-    print(MEMO_LOG)
-    print(MEMO_DIF)
-    # pdb.set_trace()
-    # ITER_COUNT = run()[-1][0]
-    for method_name, method_time in TIME_LOG.items():
-        print("{:28s}: {}".format(method_name, method_time))
-
-    assert CUR_ROUND
-    categories = ['Iteration Number',
-                  'Samples Number / iter',
-                  'Total time',
-                  'Symbolic Execution',
-                  'Binary Execution',
-                  'Path Preserve Fuzzing',
-                  # 'Random Fuzzing',
-                  # 'Tree Expansion'
-                  ]
-
-    values = [CUR_ROUND,
-              MIN_SAMPLES,
-              TIME_LOG['run'],  # Time
-              # Symbolic execution
-              TIME_LOG['initialisation'] + TIME_LOG['execute_symbolically'],
-              TIME_LOG['binary_execute'],  # Binary execution
-              TIME_LOG['quick_sampler'],  # Quick sampler
-              # TIME_LOG['random_sampler'],  # Random sampler
-              # TIME_LOG['expansion_stage']  # Expansion
-              ]
-
-    units = [1,
-             1,
-             QS_COUNT + RD_COUNT,  # Time
-             # ITER_COUNT * NUM_SAMPLES,  # Time
-             SYMBOLIC_EXECUTION_COUNT,  # Binary execution
-             # ITER_COUNT * NUM_SAMPLES,  # Initialisation
-             BINARY_EXECUTION_COUNT,  # Binary execution
-             # SYMBOLIC_EXECUTION_COUNT,  # Symbolic execution
-             QS_COUNT,  # Quick sampler
-             # RD_COUNT,  # Random sampler
-             # MAX_PATHS  # Expansion time
-             ]
-
-    averages = [values[i] / units[i] for i in range(len(values))]
-
-    if not len(categories) == len(values) == len(units) == len(averages):
-        pdb.set_trace()
-
-    # if len(DSC_PATHS) != MAX_PATHS:
-    #     pdb.set_trace()
-    for i in range(len(categories)):
-        print(categories[i], values[i], units[i])
-    # print(values, units)
-    # display_results()
-    # make_pie(categories=categories, values=values,
-    #          units=units, averages=averages)

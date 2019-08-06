@@ -20,12 +20,14 @@ import angr
 
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MIN_SAMPLES = int(sys.argv[1])
+NUM_SAMPLES = int(sys.argv[1])
 
 DSC_PATHS = set()
 PST_INSTRS = set()
 CUR_ROUND = 0
 TTL_SEL = 0
+
+SIMUL_COUNT = 0
 
 RHO = sqrt(2)
 
@@ -61,8 +63,9 @@ sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 
-# BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
-BLACKLIST = "./BlacklistBenchmarks"
+BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
+
+
 
 
 def timer(method):
@@ -212,6 +215,7 @@ class TreeNode:
     @timer
     def quick_sampler(self):
         global QS_COUNT
+
         LOGGER.info("Using quick sampler")
         LOGGER.debug("{}'s constraint: {}"
                      .format(hex(self.addr), self.state.solver.constraints))
@@ -232,7 +236,7 @@ class TreeNode:
         while len(results) < 100:
             try:
                 val = next(self.samples)
-                if (val is None) and len(results) > MIN_SAMPLES:
+                if (val is None) and len(results) >= NUM_SAMPLES:
                     break
                 if val is None:
                     continue
@@ -253,8 +257,8 @@ class TreeNode:
     @staticmethod
     def random_sampler():
         global RD_COUNT
-        RD_COUNT += MIN_SAMPLES
-        return [generate_random() for _ in range(MIN_SAMPLES)]
+        RD_COUNT += NUM_SAMPLES
+        return [generate_random() for _ in range(NUM_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
         global PHANTOM
@@ -401,6 +405,18 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
+        # return '\033[1;{colour}m{name}: {state}, {con}\033[0m'\
+        #     .format(colour=30 if self.colour is 'B' else
+        #             31 if self.colour is 'R' else
+        #             33 if self.colour is 'G' else
+        #             37 if self.colour is 'W' else
+        #             35 if self.colour is 'P' else 32,
+        #             name=self.repr_node_name(),
+        #             state=self.repr_node_state(),
+        #             con=self.state.solver.constraints if self.state
+        #             else "as above" if self.colour == 'B'
+        #             else 'Omitted' if 'Simulation' not in self.children
+        #             else self.children['Simulation'].state.solver.constraints)
         return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
             .format(colour=30 if self.colour is 'B' else
                     31 if self.colour is 'R' else
@@ -522,10 +538,13 @@ def mcts(root):
         nodes.pop()
         gc.collect()
     are_new = expansion_stage(root, paths)
+    # propagation_stage(
+    #     root, paths, are_new, nodes, NUM_SAMPLES - len(paths),
+    #     PHANTOM is not None)
     propagation_stage(
         root, paths, are_new, nodes, 0,
         PHANTOM is not None)
-    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new), forced=not math.fmod(CUR_ROUND, 50))
 
 
 # @timer
@@ -662,14 +681,28 @@ def tree_policy_for_leaf(nodes, red_index):
 
 # @timer
 def simulation_stage(node, input_str=None):
+    global SIMUL_COUNT
+    SIMUL_COUNT += 1
     if PHANTOM and node.samples:
         # NOTE: This should never happen, otherwise it is likely to trigger
         #   the problem (that should never happen) below
         pdb.set_trace()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
-    # paths = [program(mutant) for mutant in mutants]
-    paths = pool.map(program, mutants)
+
+    # start = time.time()
+    # pool = Pool()
+    paths = [program(mutant) for mutant in mutants]
+    # paths = pool.map(program, mutants)
+    # POOL.wait()
+    # POOL.close()
+    # POOL.join()
+    # return [program(mutant) for mutant in mutants]
+    # results = [POOL.apply_async(program, args=(mutant,))
+    #            for mutant in mutants[1:]]
+    # paths = [program(mutants[0])] + [r.get() for r in results]
+    # print(time.time() - start)
+    # pdb.set_trace()
     return paths
 
 
@@ -690,7 +723,6 @@ def binary_execute(input_str):
         exit(2)
 
 
-# @timer
 def program(input_str):
     global BINARY_EXECUTION_COUNT, FOUND_BUG, MEMO_DIF
     BINARY_EXECUTION_COUNT += 1
@@ -857,13 +889,25 @@ def make_constraint_readable(constraint):
 
 
 def save_input_to_file(input_bytes):
+
     binary_name = BINARY.split("/")[-1][:-6]
-    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
-    time_stamp = time.time()-TIME_START
-    with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
+    dir_name = "{}_{}_{}".format(binary_name, NUM_SAMPLES, TIME_START)
+    if dir_name not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}".format(dir_name))
+
+    time_stamp = time.time() - TIME_START
+    with open('inputs/{}/{}_{}'.format(
+            dir_name, time_stamp, SIMUL_COUNT), 'wb') as input_file:
         input_file.write(input_bytes)
 
+# def save_input_to_file(input_bytes):
+#     binary_name = BINARY.split("/")[-1][:-6]
+#     if "{}_{}".format(binary_name, TIME_START) not in os.listdir('inputs'):
+#         os.system("mkdir inputs/{}_{}".format(binary_name, TIME_START))
+#     time_stamp = time.time()-TIME_START
+#     with open('inputs/{}_{}/{}'.format(binary_name, TIME_START, time_stamp),
+#               'wb') as input_file:
+#         input_file.write(input_bytes)
 
 # def display_results():
 #     for i in range(len(categories)):
@@ -873,7 +917,8 @@ def save_input_to_file(input_bytes):
 
 if __name__ == "__main__" and len(sys.argv) > 1:
     assert BINARY and SEEDS
-    pool = Pool(MIN_SAMPLES)
+
+    pool = Pool(NUM_SAMPLES)
 
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
@@ -901,7 +946,7 @@ if __name__ == "__main__" and len(sys.argv) > 1:
                   ]
 
     values = [CUR_ROUND,
-              MIN_SAMPLES,
+              NUM_SAMPLES,
               TIME_LOG['run'],  # Time
               # Symbolic execution
               TIME_LOG['initialisation'] + TIME_LOG['execute_symbolically'],

@@ -18,8 +18,8 @@ Second version of Legion, with progresses and TODOs
 
 ### Tracer optimisation
 
-1. [ ] Check into `constraints()` to see how constraints are collected
-2. [ ] In expansion stage, run `tracer` starting from the node selected in tree policy, instead of from the root.
+1. [x] Check into `constraints()` to see how constraints are collected
+2. [x] In expansion stage, run `tracer` starting from the node selected in tree policy, instead of from the root.
     * [x] Call `step()` on states:
         * Cannot tell which successor to choose
     * [x] `simgr.explore()`:
@@ -27,34 +27,34 @@ Second version of Legion, with progresses and TODOs
     * [x] `simgr.run()`:
         * Runs into a dead-end state
         * Uses `step()` internally
-    * [ ] Alternatives?
-3. [ ] Run on pre-instrumentation binary
+    * [x] Fixed the logic to choose successors
+3. [ ] ~~Run on pre-instrumentation binary~~
 
 ### Program Under Test
 
-1. [ ] Program with loops:
+1. [x] Program with loops:
     * [x] Why constraints are missing?:
         * Cause repeated bytes recorded by `tracejump` are not recorded by SIMGR
-    * [ ] match the bytes recorded by `tracejump` with the ones in SIMGR
+    * [x] match the bytes recorded by `tracejump` with the ones in SIMGR
 2. [ ] CGC programs
 3. [ ] LAVA-M programs
-4. [ ] Four-byte-word sample PUT
+4. [x] Four-byte-word sample PUT
 5. [x] Replace `QEMU` with `tracejump`
 
 ### Solver optimisation
 
 1. [x] Quick Sampler
-2. [ ] Keep $\delta$ instead of constraints?
+2. [ ] ~~Keep $\delta$ instead of constraints?~~
 
 ### Experiments
 
-1. [ ] Compare time: Legion - `tracejump` ?= random - `tracejump`:
+1. [x] Compare time: Legion - `tracejump` ?= random - `tracejump`:
     * [x] Legion is way more slower on one-byte-input
-    * [ ] Test on inputs with more bytes (choke-point)
-2. [ ] simpler loop:
+    * [x] Test on inputs with more bytes (choke-point)
+2. [x] simpler loop:
     * [x] `simple_while.c`:
     * [x] check assembly, make sure loops are not simplified away
-    * [ ] `for` loops
+    * [x] `for` loops
 
 ## Progress
 
@@ -69,12 +69,12 @@ Second version of Legion, with progresses and TODOs
 ## Next
 1. [x] Correct the names in Pie Chart
 2. [x] Correct the counters in the algorithm
-3. [ ] Test on inputs with more bytes
-4. [ ] Test on inputs with `for` loops
-5. [ ] Optimisation: avoid executing the binary on inputs that showed up before
+3. [x] Test on inputs with more bytes
+4. [x] Test on inputs with `for` loops
+5. ~~Optimisation: avoid executing the binary on inputs that showed up before~~
 6. [x] Fixing the mismatch between instrumentation and tracer
 7. [x] Mark a node as exhausted if quick sampler cannot find any new in_str from it
-8. [ ] A automatic program to compare the performance between legion and given benchmark
+8. [x] A automatic program to compare the performance between legion and given benchmark
 9. [x] Fix back-propagation: assign rewards according to the in_str generated
 10. [x] Version-control Angr
 
@@ -85,9 +85,12 @@ Second version of Legion, with progresses and TODOs
     2. Red:    In TraceJump     + Confirmed in Angr     + has Symbolic state            + has Simulation child
     3. Black:  In TraceJump     + Confirmed not in Angr + No Symbolic state             + No Simulation child
     4. Gold:   Not in TraceJump + Not in Angr           + Same Symbolic state as parent + is a Simulation child
+    5. Purple: Unknown TJ path  + SymEx found in Angr   + has Symbolic state            + is a Phantom Node
 3. Installation order: `Angr` -> `Cle` -> `Claripy`
 
 
 ## Changes to dependencies
 1. Angr: Fixed the loggers of angr, so that it will not affect importers
-2. Claripy: Added a new approximate constraint solver backend: Quick Sampler
+2. Claripy: 
+    * Added a new approximate constraint solver backend: Quick Sampler
+    * An assertion on the length of `exprs`

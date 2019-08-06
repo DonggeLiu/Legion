@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from multiprocessing import Pool
-from math import sqrt, log
+from math import sqrt, log, ceil
 
 import angr
 
@@ -27,6 +27,9 @@ PST_INSTRS = set()
 CUR_ROUND = 0
 TTL_SEL = 0
 
+SIMUL_COUNT = 0
+TIME_COEFF = int(sys.argv[2])
+
 RHO = sqrt(2)
 
 QS_COUNT = 0
@@ -43,10 +46,11 @@ MEMO_DIF = []
 PID = None
 ROOT = None
 PHANTOM = None
+REAL_PHAN = None
 PHANTOM_STATES = {}
 
-BINARY = sys.argv[2]
-PRE_SEEDS = sys.argv[3:]
+BINARY = sys.argv[3]
+PRE_SEEDS = sys.argv[4:]
 SEEDS = []
 for seed in PRE_SEEDS:
     SEEDS.append(seed)
@@ -63,6 +67,9 @@ LOGGER.addHandler(sthl)
 
 # BLACKLIST = "../Benchmarks/sv-benchmarks/BlacklistBenchmarks"
 BLACKLIST = "./BlacklistBenchmarks"
+
+binary_name = BINARY.split("/")[-1][:-6]
+DIR_NAME = "{}_{}_{}_{}".format(binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
 
 def timer(method):
@@ -124,6 +131,9 @@ class TreeNode:
         self.sim_win = 0
         self.distinct = 0
         self.visited = 0
+        self.accumulated_time = 0
+        self.count = 0
+        # self.average_time = 0
 
     def __del__(self):
         del self.visited
@@ -191,12 +201,12 @@ class TreeNode:
         if self.colour is 'R':
             self.children['Simulation'].exhausted = True
             del self.children['Simulation'].samples
-            gc.collect()
+            # gc.collect()
         else:
             assert self.colour is 'G'
             self.parent.exhausted = True
             del self.samples
-            gc.collect()
+            # gc.collect()
 
     def is_exhausted(self):
         return self.exhausted or \
@@ -212,6 +222,7 @@ class TreeNode:
     @timer
     def quick_sampler(self):
         global QS_COUNT
+        self.count += 1
         LOGGER.info("Using quick sampler")
         LOGGER.debug("{}'s constraint: {}"
                      .format(hex(self.addr), self.state.solver.constraints))
@@ -232,7 +243,7 @@ class TreeNode:
         while len(results) < 100:
             try:
                 val = next(self.samples)
-                if (val is None) and len(results) > MIN_SAMPLES:
+                if (val is None) and len(results) >= MIN_SAMPLES:
                     break
                 if val is None:
                     continue
@@ -244,7 +255,7 @@ class TreeNode:
                 #     pdb.set_trace()
                 self.exhausted = True
                 self.samples = None
-                gc.collect()
+                # gc.collect()
                 break
         QS_COUNT += len(results)
         return results
@@ -257,7 +268,7 @@ class TreeNode:
         return [generate_random() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
-        global PHANTOM
+        global PHANTOM, REAL_PHAN
         is_new_child = addr not in self.children.keys()
         if is_new_child:
             self.children[addr] = TreeNode(addr=addr, parent=self)
@@ -284,6 +295,18 @@ class TreeNode:
             #     # pdb.set_trace()
             # return is_new_child
         self.children[addr].dye(colour='R', state=PHANTOM.state, samples=PHANTOM.samples)
+        # self.children[addr].children['Simulation'].average_time = PHANTOM.average_time
+
+        self.children[addr].count = 1
+        self.children[addr].accumulated_time = PHANTOM.accumulated_time
+        self.children[addr].children['Simulation'].count = 1
+        self.children[addr].children['Simulation'].accumulated_time = PHANTOM.accumulated_time
+        REAL_PHAN = self.children[addr]
+
+        # self.children[addr].children['Simulation'].sim_try = PHANTOM.sel_try
+        # self.children[addr].children['Simulation'].sim_try = PHANTOM.sel_win
+        # self.children[addr].children['Simulation'].sim_try = PHANTOM.sim_try
+        # self.children[addr].children['Simulation'].sim_try = PHANTOM.sim_win
         parent = self
         # pdb.set_trace()
         while parent.colour == 'W':
@@ -309,6 +332,7 @@ class TreeNode:
             # keep_state = parent.all_children_have_state()
         if self.children[addr].colour is 'R':
             PHANTOM = None
+            REAL_PHAN = self.children[addr]
         if PHANTOM:
             pdb.set_trace()
         return is_new_child
@@ -344,11 +368,14 @@ class TreeNode:
         #         and all([child.colour not in ['P', 'W'] for child in self.children.values()]):
         LOGGER.info("Remove Simulation Node {}".format(
             self.children['Simulation']))
-        del self.children['Simulation']
-        gbc = gc.collect()
-        LOGGER.error(
-            "\033[1;32mGarbage collector: collected {} objects\033[0m"
-            .format(gbc))
+
+        # del self.children['Simulation']
+        self.children['Simulation'].fully_explored = True
+
+        # gbc = gc.collect()
+        # LOGGER.debug(
+        #     "\033[1;32mGarbage collector: collected {} objects\033[0m"
+        #     .format(gbc))
 
     def print_path(self):
         path, parent = [self.addr], self.parent
@@ -389,9 +416,13 @@ class TreeNode:
                + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self):
-        return "{uct:.4f}: {simw:}/{simt} + {r:.4f}*sqrt({t_sel:.4f}/{sel_t}), {sel_w}"\
+        return "{uct:.2f}: {simw:}/{simt} + {r:.2f}*sqrt({t_sel:.2f}/{sel_t}), " \
+               "({sel_w}) - {time:.4f} / 2^(log_2({samples}) + {count}) "\
             .format(uct=uct(self), simw=self.sim_win, simt=self.sim_try+1,
-                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try, sel_w=self.sel_win)
+                    r=RHO, t_sel=log(TTL_SEL+1), sel_t=self.sel_try,
+                    sel_w=self.sel_win,
+                    time=self.accumulated_time, samples=MIN_SAMPLES,
+                    count=self.count)
 
     def repr_node_state(self):
         return "State: {}".format(self.state if self.state else "None")
@@ -401,14 +432,26 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
-        return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
+        # return '\033[1;{colour}m{name}: {state}, {con}\033[0m'\
+        #     .format(colour=30 if self.colour is 'B' else
+        #             31 if self.colour is 'R' else
+        #             33 if self.colour is 'G' else
+        #             37 if self.colour is 'W' else
+        #             35 if self.colour is 'P' else 32,
+        #             name=self.repr_node_name(),
+        #             state=self.repr_node_state(),
+        #             con=self.state.solver.constraints if self.state
+        #             else "as above" if self.colour == 'B'
+        #             else 'Omitted' if 'Simulation' not in self.children
+        #             else self.children['Simulation'].state.solver.constraints)
+        return '\033[1;{colour}m{name}: {data}, {phantom}\033[0m'\
             .format(colour=30 if self.colour is 'B' else
                     31 if self.colour is 'R' else
                     33 if self.colour is 'G' else
                     37 if self.colour is 'W' else
                     35 if self.colour is 'P' else 32,
                     name=self.repr_node_name(),
-                    state=self.repr_node_state(),
+                    # state=self.repr_node_state(),
                     data=self.repr_node_data(),
                     children=self.repr_node_child(),
                     phantom=self.phantom)
@@ -417,13 +460,37 @@ class TreeNode:
 # @timer
 def uct(node):
     if node.fully_explored:
-        return 0
+        return -float('inf')
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
     N = node.parent.sel_try if node.parent else TTL_SEL
     explore = sqrt(log(N + 1) / node.sel_try)
-    return exploit + RHO * explore
+    # Note: Only the first time to solve a node takes
+    #   ceil(log_2(MIN_SAMPLES) + 1)
+    #   number of constraint solving
+    #   The rest only needs 1
+    #   So if a node has not been selected before,
+    #   its estimated time penalisation is
+    #   that number * its parent's average constraint solving time
+    #   If that node has been selected before,
+    #   its estimated time penalisation is
+    #   1 * its own average constraint solving time
+
+    # Note: Similarly, given a node that has been counted N times (N>0),
+    #  the estimated number of constraint solving it conducted is
+    #  ceil(log_2(MIN_SAMPLES) + 1) + (N-1)
+    #  hence average constraint solving time is:
+    #  accumulated_time / (ceil(log_2(MIN_SAMPLES)) + N)
+
+    if node.count or not node.parent:
+        time_penalisation \
+            = node.accumulated_time / ceil(log(MIN_SAMPLES, 2) + node.count)
+    else:
+        time_penalisation \
+            = node.parent.accumulated_time / ceil(log(MIN_SAMPLES, 2))
+
+    return exploit + RHO * explore - time_penalisation * TIME_COEFF
 
 
 @timer
@@ -438,7 +505,7 @@ def run():
         history.append([CUR_ROUND, ROOT.distinct])
         mcts(ROOT)
         CUR_ROUND += 1
-    # ROOT.pp(forced=True)
+    ROOT.pp()
     return history
 
 
@@ -483,7 +550,7 @@ def initialise_seeds(root):
 
 
 def keep_fuzzing(root):
-    LOGGER.error(
+    LOGGER.info(
         msg="\033[1;35m== Iter:{} == Time:{} == Path:{}"
                  "== SAMPLE_COUNT:{} == QS: {} == RD: {} ==\033[0m"
                  .format(CUR_ROUND, int(time.time()-TIME_START), root.distinct,
@@ -503,7 +570,7 @@ def keep_fuzzing(root):
 
 
 def mcts(root):
-    global PHANTOM
+    global PHANTOM, REAL_PHAN
     nodes = selection_stage(root)
     while not nodes:
         nodes = selection_stage(root)
@@ -520,12 +587,15 @@ def mcts(root):
     if PHANTOM:
         nodes[-1].parent.children.pop(nodes[-1].addr)
         nodes.pop()
-        gc.collect()
+        # gc.collect()
     are_new = expansion_stage(root, paths)
+    if REAL_PHAN:
+        nodes.extend([REAL_PHAN, REAL_PHAN.children['Simulation']])
+        REAL_PHAN = None
     propagation_stage(
         root, paths, are_new, nodes, 0,
         PHANTOM is not None)
-    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new), forced=not math.fmod(CUR_ROUND, 50))
 
 
 # @timer
@@ -546,6 +616,7 @@ def tree_policy(node):
 
     while node.children:
         if ROOT.fully_explored:
+            ROOT.pp()
             exit(3)
         LOGGER.info("\033[1;32mSelect\033[0m: {}".format(node))
         # if not (not node.parent or node.parent.colour is 'R'
@@ -648,6 +719,7 @@ def tree_policy_for_leaf(nodes, red_index):
                if (name is not 'Simulation')]):
         closest_branching_target.mark_fully_explored()
         if not closest_branching_target.parent:
+            ROOT.pp()
             exit(3)
         closest_branching_target = closest_branching_target.parent
 
@@ -662,21 +734,33 @@ def tree_policy_for_leaf(nodes, red_index):
 
 # @timer
 def simulation_stage(node, input_str=None):
+    global SIMUL_COUNT
+    SIMUL_COUNT += 1
     if PHANTOM and node.samples:
         # NOTE: This should never happen, otherwise it is likely to trigger
         #   the problem (that should never happen) below
         pdb.set_trace()
+
+    start_solving = time.time()
     mutants = [bytes("".join(mutant), 'utf-8')
                for mutant in input_str] if input_str else node.mutate()
-    # paths = [program(mutant) for mutant in mutants]
-    paths = pool.map(program, mutants)
+    end_solving = time.time()
+
+    paths = [program(mutant) for mutant in mutants]
+    # paths = pool.map(program, mutants)
+    # print(len(node.state.solver.constraints), time.time() - start_solving)
+    node.accumulated_time += (end_solving - start_solving)
+    # Note; if not paths then the node's quick sampler is exhausted.
+    #  It will only be fuzzed with the random sampler.
+
     return paths
 
 
 @timer
 def binary_execute(input_str):
     sp = subprocess.Popen(
-        BINARY, stdin=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+        BINARY, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE, close_fds=True)
     try:
         msg = sp.communicate(input_str, timeout=30*60*60)
         returncode = sp.returncode
@@ -758,7 +842,10 @@ def expand_path(root, path):
         # NOTE: This should not happen as the first input from QuickSampler
         #   should guarantee to preserve the path
         #   This is just a temp solution
-        pdb.set_trace()
+        # pdb.set_trace()
+        print("Incorrect Phantom path found, restart...")
+        os.system("rm -rf inputs/{}".format(DIR_NAME))
+        exit(1)
         # PHANTOM.samples = None
         # new_path = program(PHANTOM.quick_sampler()[0])
         # results = expand_path(root, new_path)
@@ -772,7 +859,7 @@ def expand_path(root, path):
 # @timer
 def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
     assert len(paths) == len(are_new)
-    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
     for i in range(len(paths)):
         # NOTE: If the simulation is on a phantom node,
         #   reset every node along the path as not fully explored
@@ -791,7 +878,13 @@ def propagation_stage(root, paths, are_new, nodes, short=0, is_phantom=False):
 
     for i in range(len(paths)):
         propagate_path(root, paths[i], are_new[i], nodes[-1])
-    root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+
+    for node in nodes[::-1]:
+        if node.is_diverging():
+            break
+        node.accumulated_time = nodes[-1].accumulated_time
+        node.count = nodes[-1].count
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
 
 
 def propagate_path(root, path, is_new, node):
@@ -857,13 +950,22 @@ def make_constraint_readable(constraint):
 
 
 def save_input_to_file(input_bytes):
-    binary_name = BINARY.split("/")[-1][:-6]
-    if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
-        os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
-    time_stamp = time.time()-TIME_START
-    with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
+    if DIR_NAME not in os.listdir('inputs'):
+        os.system("mkdir inputs/{}".format(DIR_NAME))
+
+    time_stamp = time.time() - TIME_START
+    with open('inputs/{}/{}_{}'.format(
+            DIR_NAME, time_stamp, SIMUL_COUNT), 'wb') as input_file:
         input_file.write(input_bytes)
 
+# def save_input_to_file(input_bytes):
+#     binary_name = BINARY.split("/")[-1][:-6]
+#     if "{}_{}".format(binary_name, TIME_START) not in os.listdir('inputs'):
+#         os.system("mkdir inputs/{}_{}".format(binary_name, TIME_START))
+#     time_stamp = time.time()-TIME_START
+#     with open('inputs/{}_{}/{}'.format(binary_name, TIME_START, time_stamp),
+#               'wb') as input_file:
+#         input_file.write(input_bytes)
 
 # def display_results():
 #     for i in range(len(categories)):

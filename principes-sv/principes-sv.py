@@ -20,7 +20,7 @@ import angr
 
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MIN_SAMPLES = int(sys.argv[1])
+MIN_SAMPLES = 3
 
 DSC_PATHS = set()
 PST_INSTRS = set()
@@ -43,15 +43,29 @@ MEMO_DIF = []
 PID = None
 ROOT = None
 PHANTOM = None
+REAL_PHAN = None
 PHANTOM_STATES = {}
 
-BINARY = sys.argv[2]
-PRE_SEEDS = sys.argv[3:]
-SEEDS = []
-for seed in PRE_SEEDS:
-    SEEDS.append(seed)
-    SEEDS.append('\n')
-SEEDS = [SEEDS]
+C_FILE = sys.argv[1]
+
+def instrument_c():
+    if 'instrs' not in os.listdir('.'):
+        os.mkdir('instrs')
+    if 'inputs' not in os.listdir('.'):
+        os.mkdir('inputs')
+    assert C_FILE[-2:] == '.c'
+    c_name = C_FILE.split("/")[-1]
+    instr = C_FILE[:-2] + '.instr'
+    os.system("make {}".format(instr))
+    return "./instrs/{}".format(c_name[:-2] + '.instr')
+
+BINARY = instrument_c()
+# PRE_SEEDS = ['0']
+# SEEDS = []
+# for seed in PRE_SEEDS:
+#     SEEDS.append(seed)
+#     SEEDS.append('\n')
+SEEDS = ['0\n']
 
 PROJ = None
 
@@ -191,12 +205,12 @@ class TreeNode:
         if self.colour is 'R':
             self.children['Simulation'].exhausted = True
             del self.children['Simulation'].samples
-            gc.collect()
+            # gc.collect()
         else:
             assert self.colour is 'G'
             self.parent.exhausted = True
             del self.samples
-            gc.collect()
+            # gc.collect()
 
     def is_exhausted(self):
         return self.exhausted or \
@@ -244,7 +258,7 @@ class TreeNode:
                 #     pdb.set_trace()
                 self.exhausted = True
                 self.samples = None
-                gc.collect()
+                # gc.collect()
                 break
         QS_COUNT += len(results)
         return results
@@ -252,12 +266,12 @@ class TreeNode:
     # @timer
     @staticmethod
     def random_sampler():
-        global RD_COUNT
+        global RD_COUNT, REAL_PHAN
         RD_COUNT += MIN_SAMPLES
         return [generate_random() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, addr, passed_parent=False):
-        global PHANTOM
+        global PHANTOM, REAL_PHAN
         is_new_child = addr not in self.children.keys()
         if is_new_child:
             self.children[addr] = TreeNode(addr=addr, parent=self)
@@ -284,6 +298,8 @@ class TreeNode:
             #     # pdb.set_trace()
             # return is_new_child
         self.children[addr].dye(colour='R', state=PHANTOM.state, samples=PHANTOM.samples)
+        # self.children[addr].children['Simulation'].average_time = PHANTOM.average_time
+        REAL_PHAN = self.children[addr]
         parent = self
         # pdb.set_trace()
         while parent.colour == 'W':
@@ -309,6 +325,7 @@ class TreeNode:
             # keep_state = parent.all_children_have_state()
         if self.children[addr].colour is 'R':
             PHANTOM = None
+            REAL_PHAN = self.children[addr]
         if PHANTOM:
             pdb.set_trace()
         return is_new_child
@@ -345,10 +362,10 @@ class TreeNode:
         LOGGER.info("Remove Simulation Node {}".format(
             self.children['Simulation']))
         del self.children['Simulation']
-        gbc = gc.collect()
-        LOGGER.error(
-            "\033[1;32mGarbage collector: collected {} objects\033[0m"
-            .format(gbc))
+        # gbc = gc.collect()
+        # LOGGER.error(
+        #     "\033[1;32mGarbage collector: collected {} objects\033[0m"
+        #     .format(gbc))
 
     def print_path(self):
         path, parent = [self.addr], self.parent
@@ -401,6 +418,18 @@ class TreeNode:
                 for _, child in self.children.items()]
 
     def __repr__(self):
+        # return '\033[1;{colour}m{name}: {state}, {con}\033[0m'\
+        #     .format(colour=30 if self.colour is 'B' else
+        #             31 if self.colour is 'R' else
+        #             33 if self.colour is 'G' else
+        #             37 if self.colour is 'W' else
+        #             35 if self.colour is 'P' else 32,
+        #             name=self.repr_node_name(),
+        #             state=self.repr_node_state(),
+        #             con=self.state.solver.constraints if self.state
+        #             else "as above" if self.colour == 'B'
+        #             else 'Omitted' if 'Simulation' not in self.children
+        #             else self.children['Simulation'].state.solver.constraints)
         return '\033[1;{colour}m{name}: {state}, {data}, {phantom}\033[0m'\
             .format(colour=30 if self.colour is 'B' else
                     31 if self.colour is 'R' else
@@ -417,7 +446,7 @@ class TreeNode:
 # @timer
 def uct(node):
     if node.fully_explored:
-        return 0
+        return -float('inf')
     if not node.sel_try:
         return float('inf')
     exploit = node.sim_win / (node.sim_try + 1)
@@ -503,7 +532,7 @@ def keep_fuzzing(root):
 
 
 def mcts(root):
-    global PHANTOM
+    global PHANTOM, REAL_PHAN
     nodes = selection_stage(root)
     while not nodes:
         nodes = selection_stage(root)
@@ -520,12 +549,15 @@ def mcts(root):
     if PHANTOM:
         nodes[-1].parent.children.pop(nodes[-1].addr)
         nodes.pop()
-        gc.collect()
+        # gc.collect()
     are_new = expansion_stage(root, paths)
+    if REAL_PHAN:
+        nodes.extend([REAL_PHAN, REAL_PHAN.children['Simulation']])
+        REAL_PHAN = None
     propagation_stage(
         root, paths, are_new, nodes, 0,
         PHANTOM is not None)
-    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new))
+    # root.pp(indent=0, mark_node=nodes[-1], found=sum(are_new), forced=not math.fmod(CUR_ROUND, 50))
 
 
 # @timer
@@ -864,6 +896,14 @@ def save_input_to_file(input_bytes):
     with open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb') as input_file:
         input_file.write(input_bytes)
 
+# def save_input_to_file(input_bytes):
+#     binary_name = BINARY.split("/")[-1][:-6]
+#     if "{}_{}".format(binary_name, TIME_START) not in os.listdir('inputs'):
+#         os.system("mkdir inputs/{}_{}".format(binary_name, TIME_START))
+#     time_stamp = time.time()-TIME_START
+#     with open('inputs/{}_{}/{}'.format(binary_name, TIME_START, time_stamp),
+#               'wb') as input_file:
+#         input_file.write(input_bytes)
 
 # def display_results():
 #     for i in range(len(categories)):
@@ -871,10 +911,13 @@ def save_input_to_file(input_bytes):
 #               .format(categories[i], values[i], units[i], averages[i]))
 
 
-if __name__ == "__main__" and len(sys.argv) > 1:
-    assert BINARY and SEEDS
-    pool = Pool(MIN_SAMPLES)
 
+
+if __name__ == "__main__" and len(sys.argv) > 1:
+    # assert BINARY and SEEDS
+    pool = Pool(MIN_SAMPLES*2)
+
+    assert BINARY
     LOGGER.info(BINARY)
     LOGGER.info(SEEDS)
     PID = os.getpid()

@@ -473,9 +473,34 @@ def selection() -> TreeNode:
     """
     node = ROOT
     while node.colour is not Colour.G:
+
+        # If the nod is already a red leaf, mark it as fully explored
+        # Note: Must check this before dying,
+        #  otherwise a phantom red node added when dying its sibling will be wrongly marked as fully explored
+        if node.is_leaf() and node.colour is Colour.R:
+            node.mark_fully_explored()
+
+        # If the node is white, dye it
+        if node.colour is Colour.W:
+            states_left = dye_node(target=node, states=states_left)
+
+        # IF the node is dyed to black and there is no states left,
+        # it implies the previous parent state does not have any diverging
+        # descendants found by `compute_to_diverging()`, hence the rest of the
+        # tree must be fully explored, and there is no difference in fuzzing
+        # any of them
+        if node.colour is Colour.B and not states_left:
+            node.fully_explored = True
+
+        # If the node's score is the minimum, return ROOT to restart
+        if node.score() == -inf:
+            return ROOT
+
         node = tree_policy(node=node)
 
+    assert not states_left
     assert node.colour is Colour.G
+
     return node
 
 

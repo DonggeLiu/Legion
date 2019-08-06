@@ -42,12 +42,13 @@ DIR_NAME = "{}_{}_{}_{}".format(
 SEEDS = sys.argv[4:]
 BUG_RET = 100  # the return code when finding a bug
 
+
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
 
 # Logging
 LOGGER = logging.getLogger("Legion")
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.ERROR)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
@@ -347,7 +348,7 @@ class TreeNode:
         s = ""
         for _ in range(indent - 1):
             s += "|  "
-        if indent > 15 and self.parent and self.parent.colour is 'W':
+        if indent > 15 and self.parent and self.parent.colour is Colour.W:
             LOGGER.info("...")
             return
         if indent:
@@ -408,7 +409,6 @@ def run() -> None:
     ROOT.pp()
     while has_budget():
         mcts()
-        ROOT.pp()
 
 
 def initialisation():
@@ -459,7 +459,7 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return ROOT.sim_win < MAX_PATHS and CUR_ROUND < MAX_ROUNDS \
-           and not ROOT.fully_explored
+           and (time.time() - TIME_START) < MAX_TIME and ROOT.score() > -inf
 
 
 def mcts():
@@ -473,6 +473,7 @@ def mcts():
     are_new = expansion(traces=traces)
     assert len(traces) == len(are_new)
     propagation(node=node, traces=traces, are_new=are_new)
+    ROOT.pp(mark=node, found=sum(are_new))
 
 
 def selection() -> TreeNode:
@@ -523,6 +524,7 @@ def selection() -> TreeNode:
             return ROOT
 
         node = tree_policy(node=node)
+        LOGGER.info("Select: {}".format(node))
 
     assert not states_left
     assert node.colour is Colour.G
@@ -824,3 +826,4 @@ def propagate_execution_traces(traces: List[List[int]],
 
 if __name__ == '__main__':
     run()
+    ROOT.pp()

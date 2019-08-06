@@ -459,6 +459,8 @@ def mcts():
     The four steps of MCTS
     """
     node = selection()
+    if node is ROOT:
+        return
     traces = simulation(node=node)
     are_new = expansion(traces=traces)
     assert len(traces) == len(are_new)

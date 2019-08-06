@@ -117,7 +117,10 @@ venv.bak/
 
 
 # Ignore input files
-inputs/
+**/inputs/
+
+# Ignore instrumented binaries
+**/instrs/
 
 # Proof of error
 PoE/

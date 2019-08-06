@@ -767,6 +767,7 @@ def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
     """
     while node:
         node.sel_try += len(are_new)
+        # node.sim_win += sum(are_new)
         node = node.parent
 
 

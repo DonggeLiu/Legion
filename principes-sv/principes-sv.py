@@ -70,7 +70,7 @@ SEEDS = ['0\n']
 PROJ = None
 
 LOGGER = logging.getLogger("Principes")
-LOGGER.setLevel(logging.ERROR)
+LOGGER.setLevel(logging.DEBUG)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)

@@ -701,6 +701,10 @@ def simulation_stage(node, input_str=None):
 @timer
 def binary_execute(input_str):
     with open_input_to_file() as fd:
+        fd.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+        fd.write('<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+        fd.write('<testcase>\n')
+        fd.flush()
         sp = subprocess.Popen(
             BINARY,
             stdin=subprocess.PIPE,
@@ -718,6 +722,9 @@ def binary_execute(input_str):
             with open(BLACKLIST, 'a') as blacklist:
                 blacklist.writelines(['\n'+BINARY[:-4]])
             exit(2)
+        finally:
+            fd.write('</testcase>\n')
+            fd.flush()
 
 
 # @timer

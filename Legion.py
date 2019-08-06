@@ -529,25 +529,46 @@ def tree_policy(node: TreeNode) -> TreeNode:
     return node.best_child()
 
 
-def dye_siblings(parent: TreeNode) -> List[State]:
+def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     """
-    If a child of the parent is found white, then all children of the parent must also be white;
+    If a child of the parent is found white,
+    then all children of the parent must also be white;
     This function dyes them all.
     :param parent: the parent of the white child
-    :return: a list of states that do not match with any of the existing children of the parent,
-                they correspond to the child nodes of the parent who have not been found by TraceJump
+    :param target_states: previous left states
+    :return: a list of states that
+            do not match with any of the existing children of the parent,
+            they correspond to the child nodes of the parent who
+            have not been found by TraceJump
     """
-    parent_state = parent.children['Simulation'].state
-    child_states = compute_to_diverge(state=parent_state)
+
+    # if not ('Simulation' in parent.children) ^ bool(target_states):
+    #     pdb.set_trace()
+
+    # Case 1: parent is red, then execute parent's state to find states of sibs
+    # Case 2: parent is black, use the states left to dye siblings
+    # Either 1 or 2, not both
+    assert (parent.colour is Colour.R) ^ bool(target_states)
+
+    if parent.colour is Colour.R:
+        assert not target_states
+        parent_state = parent.children['Simulation'].state
+        target_states = compute_to_diverge(state=parent_state)
+
+    # # NOTE: Empty target states implies
+    # #  the symbolic execution has reached the end of program
+    # #  without seeing any divergence after the parent's state
+    # #  hence the parent is fully explored
+    # if not target_states:
+    #     parent.fully_explored = True
 
     for child_node in parent.children.values():
         if child_node.colour is Colour.G:
             continue
-        child_states = match_node_states(node=child_node, states=child_states)
-        if child_node.colour is not Colour.R:
-            pdb.set_trace()
-        assert child_node.colour is Colour.R
-    return child_states
+        target_states = match_node_states(node=child_node, states=target_states)
+        assert child_node.colour in [Colour.R, Colour.B]
+
+    return target_states
 
 
 def compute_to_diverge(state: State):

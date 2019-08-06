@@ -701,8 +701,8 @@ def simulation_stage(node, input_str=None):
 @timer
 def binary_execute(input_str):
     with open_input_to_file() as fd:
-        fd.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-        fd.write('<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+        fd.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
+        fd.write('<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         fd.write('<testcase>\n')
         fd.flush()
         sp = subprocess.Popen(
@@ -738,7 +738,7 @@ def program(input_str):
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
 
-    save_input_to_file(input_str)
+    # save_input_to_file(input_str)
     report = binary_execute(input_str)
     if report:
         msg, return_code = report
@@ -897,7 +897,7 @@ def open_input_to_file():
     if "{}_{}".format(binary_name , MIN_SAMPLES) not in os.listdir('inputs'):
         os.system("mkdir inputs/{}_{}".format(binary_name, MIN_SAMPLES))
     time_stamp = time.time()-TIME_START
-    return open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wb')
+    return open('inputs/{}_{}/{}'.format(binary_name, MIN_SAMPLES, time_stamp), 'wt')
 
 def save_input_to_file(input_bytes):
     binary_name = BINARY.split("/")[-1][:-6]

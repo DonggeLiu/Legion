@@ -693,7 +693,18 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         except sp.TimeoutExpired:
             exit(2)
 
+    def save_input_to_file():
+        if DIR_NAME not in os.listdir('inputs'):
+            os.system("mkdir inputs/{}".format(DIR_NAME))
+
+        time_stamp = time.time() - TIME_START
+        with open('inputs/{}/{}_{}'.format(
+                DIR_NAME, time_stamp, SIMUL_COUNT), 'wb') as input_file:
+            input_file.write(input_bytes)
+
     global FOUND_BUG
+
+    save_input_to_file()
     report = execute()
     if not report:
         pdb.set_trace()
@@ -705,6 +716,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
+        exit()
     return unpack(error_msg)
 
 

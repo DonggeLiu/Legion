@@ -10,35 +10,35 @@ void __VERIFIER_error() {
 int __VERIFIER_nondet_int() {
     int x = 0;
     read(0, (char *)&x, sizeof(x));
-    printf("<input type=\"int\">%d</input>", x);
+    printf("<input type=\"int\">%d</input>\n", x);
 	return x;
 }
 
 short __VERIFIER_nondet_short() {
 	short x = 0;
 	read(0, (char *)&x, sizeof(x));
-    printf("<input type=\"short\">%hd</input>", x);
+    printf("<input type=\"short\">%hd</input>\n", x);
 	return x;
 }
 
 unsigned long __VERIFIER_nondet_ulong() {
 	unsigned long x = 0;
 	read(0, (char *)&x, sizeof(x));
-    printf("<input type=\"unsigned long\">%lu</input>", x);
+    printf("<input type=\"unsigned long\">%lu</input>\n", x);
 	return x;
 }
 
 float __VERIFIER_nondet_float() {
 	float x = 0.0;
 	read(0, (char *)&x, sizeof(x));
-    printf("<input type=\"float\">%f</input>", x);
+    printf("<input type=\"float\">%f</input>\n", x);
 	return x;
 }
 
 char __VERIFIER_nondet_char() {
 	char x = 0;
 	read(0, &x, sizeof(x));
-    printf("<input type=\"char\">%hhd</input>", x);
+    printf("<input type=\"char\">%hhd</input>\n", x);
 	return x;
 }
 

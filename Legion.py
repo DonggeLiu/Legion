@@ -792,6 +792,10 @@ def propagate_execution_traces(traces: List[List[int]],
             node = node.children[addr]
             record_simulation(node=node, new=is_new)
 
+        # NOTE: mark the last node as fully explored
+        #   as fuzzing it will not give any new path
+        node.mark_fully_explored()
+
     def record_simulation(node: TreeNode, new: bool) -> None:
         """
         Record a node has been traversed in simulation

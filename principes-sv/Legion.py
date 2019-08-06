@@ -20,8 +20,8 @@ MAX_SAMPLES = 100
 # TIME_COEFF = float(sys.argv[2])
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
-
 MAX_BYTES = 100  # Max bytes per input
+
 
 # Budget
 MAX_PATHS = float('inf')
@@ -35,8 +35,26 @@ TIME_START = time.time()
 SOLVING_COUNT = 0
 
 # Execution
-BINARY = sys.argv[3]
+C_FILE = sys.argv[3]
+
+
+def instrument_c():
+    if 'instrs' not in os.listdir('.'):
+        os.mkdir('instrs')
+    if 'inputs' not in os.listdir('.'):
+        os.mkdir('inputs')
+    assert C_FILE[-2:] == '.i'
+    c_name = C_FILE.split("/")[-1]
+    instr = C_FILE[:-2] + '.instr'
+    os.system("cp {} ./".format(C_FILE))
+    os.system("make {}".format(instr))
+    os.system("rm ./{}".format(C_FILE.split("/")[-1]))
+    return "./instrs/{}".format(c_name[:-2] + '.instr')
+
+
+BINARY = instrument_c()
 binary_name = BINARY.split("/")[-1][:-6]
+
 DIR_NAME = "{}_{}_{}_{}".format(
     binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 SEEDS = sys.argv[4:]

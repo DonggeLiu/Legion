@@ -581,12 +581,20 @@ def compute_to_diverge(state: State):
         could be empty if the line is a leaf
     """
     child_states = symex(state=state)
+
+    # Terminate if there is a choice
     while len(child_states) == 1:
-        print(child_states)
-        if len(child_states[0].solver.constraints) > len(
-                state.solver.constraints):
-            break
+        # if len(child_states[0].solver.constraints) > len(state.solver.constraints):
+        #     # Note: There is at least one unsatisfiable state ignored by ANGR:
+        #     #  Because child_state's constraint is different from its parent,
+        #     #  but child state does not have any sibling.
+        #     #  We should ignore this when fuzzing input
+        #     #  cause it does not give us an alternative state to fuzz with
+        #     continue
         child_states = symex(state=child_states[0])
+
+    if not child_states:
+        LOGGER.info("Symbolic execution reached the end of the program")
 
     return child_states
 

@@ -471,7 +471,23 @@ def selection() -> TreeNode:
     # :param node: the node to start selection on
     :return: nodes along the selection path
     """
-    node = ROOT
+
+    def dye_node(target: TreeNode, states: List[State]) -> List[State]:
+        """
+        Since the target is white, dye it and its siblings
+        :param target: the node to dye
+        :param states: the states to dye the target and its siblings
+        :return: the states left after dying (i.e. because the node is black)
+        """
+        states = dye_siblings(parent=target.parent, target_states=states)
+        # NOTE: if the node is dyed to red,
+        #  it means all states left must belong to its siblings
+        if target.colour is Colour.R:
+            add_children(parent=target.parent, states=states)
+            states = []
+        return states
+
+    node, states_left = ROOT, []
     while node.colour is not Colour.G:
 
         # If the nod is already a red leaf, mark it as fully explored
@@ -507,13 +523,9 @@ def selection() -> TreeNode:
 def tree_policy(node: TreeNode) -> TreeNode:
     """
     Select the best child of the node
-    dye the node if it is white
     :param node: the node to select child from
     :return: the child selected
     """
-    if node.colour is Colour.W:
-        untraced_states = dye_siblings(parent=node.parent)
-        add_children(parent=node.parent, states=untraced_states)
     return node.best_child()
 
 

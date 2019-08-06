@@ -116,7 +116,11 @@ class TreeNode:
             the rest doubles the number of all solutions
             :return: MIN_SAMPLES * 2 ^ number of times sampled
             """
-            return MIN_SAMPLES * pow(2, self.sel_try)
+            return min(MAX_SAMPLES, MIN_SAMPLES * pow(2, self.sel_try))
+
+        # # Evaluate to minimum value if block node does not have any non-simulation child
+        # if self.colour is not Colour.G and (len(self.children.values()) - ('Simulation' in self.children)) == 0:
+        #     return -inf
 
         # Evaluate to minimum value if fully explored
         if self.fully_explored:

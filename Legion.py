@@ -612,16 +612,29 @@ def match_node_states(node: TreeNode, states: List[State]) -> List[State]:
     """
     If the node matches one of the states, then dye node to red
         and remove it from the list of states
-
+    Else dye the node to black
     :param node: the node to match with state
     :param states: a list of states to match with the node
     :return: a list of states that does not match with the node
     """
+    if not states:
+        node.dye(colour=Colour.B)
+        # NOTE: Empty target states implies
+        #  the symbolic execution has reached the end of program
+        #  without seeing any divergence after the parent's state
+        #  hence the parent is fully explored
+        node.mark_fully_explored()
+        return states
+
     for state in states:
         # try to match each state to the node
         if node.addr == state.addr:
             node.dye(colour=Colour.R, state=state)
             states.remove(state)
+
+    if node.colour is Colour.W:
+        node.dye(colour=Colour.B)
+
     return states
 
 

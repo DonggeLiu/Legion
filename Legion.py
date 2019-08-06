@@ -16,9 +16,8 @@ from angr.storage.file import SimFileStream
 from math import sqrt, log, ceil, inf
 
 # Hyper-parameters
-MIN_SAMPLES = int(sys.argv[1])
+MIN_SAMPLES = 5
 MAX_SAMPLES = 100
-# TIME_COEFF = float(sys.argv[2])
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 
@@ -36,11 +35,9 @@ TIME_START = time.time()
 SOLVING_COUNT = 0
 
 # Execution
-BINARY = sys.argv[3]
-binary_name = BINARY.split("/")[-1][:-6]
-DIR_NAME = "{}_{}_{}_{}".format(
-    binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
-SEEDS = sys.argv[4:]
+BINARY = None
+DIR_NAME = None
+SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
@@ -847,5 +844,54 @@ def propagate_execution_traces(traces: List[List[int]],
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Legion')
+    parser.add_argument('--min-samples', type=int, default=MIN_SAMPLES,
+                        help='Minimum number of samples per iteration')
+    parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
+                        help='Maximum number of samples per iteration')
+    parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
+                        help='Penalty factor for constraints that take longer to solve')
+    # parser.add_argument('--sv-comp', action="store_true",
+    #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
+    # parser.add_argument('--source', action="store_true",
+    #                     help='Input file is C source code (implicit for *.c)')
+    # parser.add_argument('--cc',
+    #                     help='Specify compiler binary')
+    # parser.add_argument('--as',
+    #                     help='Specify assembler binary')
+    parser.add_argument('-v', '--verbose', action="store_true",
+                        help='Increase output verbosity')
+    parser.add_argument("file",
+                        help='Binary or source file')
+    parser.add_argument("seeds", nargs='*',
+                        help='Optional input seeds')
+    args = parser.parse_args()
+
+    MIN_SAMPLES = args.min_samples
+    MAX_SAMPLES = args.max_samples
+    TIME_COEFF  = args.time_penalty
+
+    if args.verbose:
+        LOGGER.setLevel(logging.DEBUG)
+
+    is_c = args.file[-2:] == '.c'
+    is_i = args.file[-2:] == '.i'
+    is_source = is_c or is_i
+
+    if is_source:
+        source = args.file
+        stem = source[:-2]
+        BINARY = stem + '.instr'
+        LOGGER.info('Building {}'.format(BINARY))
+        os.system("make {}".format(BINARY))
+    else:
+        BINARY = args.file
+
+    binary_name = BINARY.split("/")[-1]
+    DIR_NAME = "{}_{}_{}_{}".format(
+        binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
+
+    SEEDS = args.seeds
+
     run()
     ROOT.pp()

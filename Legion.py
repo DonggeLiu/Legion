@@ -17,7 +17,8 @@ from math import sqrt, log, ceil, inf
 # Hyper-parameters
 MIN_SAMPLES = int(sys.argv[1])
 MAX_SAMPLES = 100
-TIME_COEFF = float(sys.argv[2])
+# TIME_COEFF = float(sys.argv[2])
+TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 
 MAX_BYTES = 100  # Max bytes per input
@@ -25,6 +26,7 @@ MAX_BYTES = 100  # Max bytes per input
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
+MAX_TIME = 900
 FOUND_BUG = False  # type: bool
 
 # Statistics
@@ -34,6 +36,9 @@ SOLVING_COUNT = 0
 
 # Execution
 BINARY = sys.argv[3]
+binary_name = BINARY.split("/")[-1][:-6]
+DIR_NAME = "{}_{}_{}_{}".format(
+    binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 SEEDS = sys.argv[4:]
 BUG_RET = 100  # the return code when finding a bug
 

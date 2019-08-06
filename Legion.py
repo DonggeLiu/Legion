@@ -30,6 +30,7 @@ FOUND_BUG = False  # type: bool
 # Statistics
 CUR_ROUND = 0
 TIME_START = time.time()
+SOLVING_COUNT = 0
 
 # Execution
 BINARY = sys.argv[3]
@@ -247,7 +248,9 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
-        if self.state.solver.constraints:
+        global SOLVING_COUNT
+        SOLVING_COUNT += 1
+        if self.state and self.state.solver.constraints:
             return self.app_fuzzing()
         return self.random_fuzzing()
 
@@ -699,7 +702,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
 
         time_stamp = time.time() - TIME_START
         with open('inputs/{}/{}_{}'.format(
-                DIR_NAME, time_stamp, SIMUL_COUNT), 'wb') as input_file:
+                DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
             input_file.write(input_bytes)
 
     global FOUND_BUG

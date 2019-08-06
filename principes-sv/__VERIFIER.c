@@ -4,37 +4,37 @@
 #include <assert.h>
 
 void __VERIFIER_error() {
-	exit(101);
+	exit(100);
 }
 
 int __VERIFIER_nondet_int() {
         int x = 0;
-        read(0, (char *)&x, sizeof(x));
+        read(0, (int *)&x, sizeof(x));
 	// printf("x = %d\n", x);
 	return x;
 }
 
 short __VERIFIER_nondet_short() {
 	short x = 0;
-	read(0, (char *)&x, sizeof(x));
+	read(0, (short *)&x, sizeof(x));
 	return x;
 }
 
 unsigned long __VERIFIER_nondet_ulong() {
 	unsigned long x = 0;
-	read(0, (char *)&x, sizeof(x));
+	read(0, (unsigned long *)&x, sizeof(x));
 	return x;
 }
 
 float __VERIFIER_nondet_float() {
 	float x = 0.0;
-	read(0, (char *)&x, sizeof(x));
+	read(0, (float *)&x, sizeof(x));
 	return x;
 }
 
 char __VERIFIER_nondet_char() {
 	char x = 0;
-	read(0, &x, sizeof(x));
+	read(0, (char *)&x, sizeof(x));
 	return x;
 }
 

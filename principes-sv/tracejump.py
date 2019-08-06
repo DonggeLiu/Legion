@@ -5,21 +5,8 @@
 
 import sys
 
-code_sections = [
-    '\t.text\n',
-    '\t.section\t.text',
-    '\t.section\t__TEXT,__text',
-    '\t.section __TEXT,__text'
-    ]
+# import pdb
 
-data_sections = [
-    '\t.section',
-    '\t.',
-    '\t.',
-    '\t.'
-    ]
-
-is64 = True
 
 # registers used by __trace_jump
 # rax, rdi, rsi, rdx
@@ -27,106 +14,107 @@ is64 = True
 # registers used by write
 # rcx, r11
 
-def trace_jump_set(output):
-    assert is64
-    output.write('\tpush %rax\n')
-    output.write('\tcall\t__trace_jump_set\n')
-    output.write('\tpop  %rax\n')    
+
+NUM_SET = 0
+NUM_TRACED = 0
+JUMP_TARGETS = set()
+
+
+def set_jump(output):
+    global NUM_SET
+    NUM_SET += 1
+
+    output.append('\tsub $128,%rsp\n')
+    output.append('\tpush %rax\n')
+    output.append('\tcall\t__trace_jump_set\n')
+    output.append('\tpop  %rax\n')
+    output.append('\tadd $128,%rsp\n')
+
 
 def trace_jump(output):
-    assert is64
-    
-    # output.write('.align 4\n')
-    output.write('\tsub $128,%rsp\n')
-    output.write('\tpush %rax\n')
-    output.write('\tpush %rdi\n')
-    output.write('\tpush %rsi\n')
-    output.write('\tpush %rdx\n')
-    output.write('\tpush %rcx\n')
-    output.write('\tpush %r11\n')
-    output.write('\tcall\t__trace_jump\n')
-    output.write('\tpop  %r11\n')
-    output.write('\tpop  %rcx\n')
-    output.write('\tpop  %rdx\n')
-    output.write('\tpop  %rsi\n')
-    output.write('\tpop  %rdi\n')
-    output.write('\tpop  %rax\n')
-    output.write('\tadd $128,%rsp\n')
+    global NUM_TRACED
+    NUM_TRACED += 1
+
+    output.append('\tsub $128,%rsp\n')
+    output.append('\tpush %rax\n')
+    output.append('\tpush %rdi\n')
+    output.append('\tpush %rsi\n')
+    output.append('\tpush %rdx\n')
+    output.append('\tpush %rcx\n')
+    output.append('\tpush %r11\n')
+    output.append('\tcall\t__trace_jump\n')
+    output.append('\tpop  %r11\n')
+    output.append('\tpop  %rcx\n')
+    output.append('\tpop  %rdx\n')
+    output.append('\tpop  %rsi\n')
+    output.append('\tpop  %rdi\n')
+    output.append('\tpop  %rax\n')
+    output.append('\tadd $128,%rsp\n')
 
 
-# see afl-as.c add_instrumentation
-def instrument():
-    global data_sections, is64
-    
-    ins_lines = 0
-    instr_ok = False
-    skip_csect = False
-    skip_next_label = False
-    skip_intel = False
-    skip_app = False
-    instrument_next = False
+def collect_jump_targets():
+    entry_label = False
+    compare_set = False
+    file = []
 
-    for line in asm_file:
-        if not skip_intel and not skip_app and not skip_csect and instr_ok and instrument_next and line[0] == '\t' and str.isalpha(line[1]):
-            trace_jump(ins_file)
-            ins_lines += 1
-            instrument_next = False
+    lines = asm_file.readlines()
 
-        # do we want to instrument call instructions too?
-        if line[0] == '\t' and line[1] == 'j':
-            trace_jump_set(ins_file)
-            # ins_lines += 1
-            
-        ins_file.write(line)
+    for i in range(len(lines)):
+        line = lines[i]
+        instruction = line[:-1]
+        if entry_label:
+            # Case 0: TraceJump the beginning of Main()
+            JUMP_TARGETS.add(instruction[:-1])
+            entry_label = False
 
-        if line[0] == '\t' and line[1] == '.':
-            if line == '\t.text\n' or line.startswith('\t.section\t.text') or line.startswith('\t.section\t__TEXT,__text') or line.startswith('\t.section __TEXT,__text'):
-                instr_ok = True
-                continue
-            
-            if line == '\t.bss\n' or line == '\t.data\n' or line.startswith('\t.section\t') or line.startswith('\t.section '):
-                instr_ok = False
-                continue
-            
-            if '.code' in line:
-                if '.code32' in line:
-                    is64 = False
-                if '.code64' in line:
-                    is64 = True
-                    
-            if '.intel_syntax' in line:
-                skip_intel = True
-            if '.att_syntax' in line:
-                skip_intel = False
-                
-        if line.startswith('##'):
-            if '#APP' in line:
-                skip_app = True
-            if '#NO_APP' in line:
-                skip_app = False
-                
-        if skip_intel or skip_app or skip_csect or not instr_ok or line[0] == '#' or line[0] == ' ':
-            continue
-        
-        if line[0] == '\t':
-            if line[1] == 'j' and line[2] != 'm':
-                trace_jump(ins_file)
-                ins_lines += 1
-            continue
-        
-        if line[0] == '.' and ':' in line:
-            if str.isdigit(line[2]):
-                if not skip_next_label:
-                    instrument_next = True
-                else:
-                    skip_next_label = False
-            else:
-                instrument_next = True
-                    
-    return ins_lines
+        # The Entry
+        if instruction == "main:":
+            # instrument the beginning of Main()
+            entry_label = True
+
+        # If the next instruction is a conditional jump
+        # TraceJumpSet before the current one:
+        if (i + 1) < len(lines):
+            next_instruction = lines[i + 1]
+            if next_instruction.startswith("\t"):
+                if (next_instruction[1] == "j") and (
+                        next_instruction[2] != "m"):
+                    set_jump(file)
+                    compare_set = True
+
+        file.append(line)
+
+        # Check each instructions:
+        if instruction.startswith("\t"):
+
+            if (instruction[1] == "j") and (instruction[2] != "m"):
+                assert compare_set
+                compare_set = False
+                # Case 1: TraceJump after a label of conditional jump
+                JUMP_TARGETS.add(instruction.split("\t")[2])
+                # Case 2: TraceJump after conditional jump
+                trace_jump(file)
+    return file
+
+
+def instrument_jump_targets(intermediate):
+    file = []
+    for line in intermediate:
+        file.append(line)
+        instruction = line[:-2]
+        if instruction in JUMP_TARGETS:
+            trace_jump(file)
+
+    return file
 
 
 if __name__ == "__main__" and len(sys.argv) > 2:
     asm_file = open(sys.argv[1], 'r')
     ins_file = open(sys.argv[2], 'w')
-    print('instrumented {} lines'.format(instrument()))
+
+    inter = collect_jump_targets()
+    final = instrument_jump_targets(intermediate=inter)
+    ins_file.writelines(final)
+
+    print('SetJump   {} lines'.format(NUM_SET))
+    print('TraceJump {} lines'.format(NUM_TRACED))

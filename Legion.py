@@ -39,7 +39,7 @@ BINARY = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
-SAVE_TESTINPUTS = False
+SAVE_TESTINPUTS = True
 SAVE_TESTCASES = False
 
 # cache Node
@@ -859,6 +859,10 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
+    parser.add_argument('--save-inputs', type=bool, default=SAVE_TESTINPUTS,
+                        help='Save inputs as binary files')
+    parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES
+                        help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
     parser.add_argument("file",
@@ -870,6 +874,8 @@ if __name__ == '__main__':
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
     TIME_COEFF  = args.time_penalty
+    SAVE_TESTINPUTS = args.save_inputs
+    SAVE_TESTCASES  = args.save_tests
 
     if args.verbose:
         LOGGER.setLevel(logging.DEBUG)

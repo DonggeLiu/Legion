@@ -289,7 +289,8 @@ class TreeNode:
                 #       even if not, the next constraint solving will take long
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
-                self.fully_explored = True
+                LOGGER.info("Fully explored {}".format(self))
+                self.mark_fully_explored()
                 break
         return results
 

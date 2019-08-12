@@ -613,6 +613,7 @@ def symex(state: State) -> List[State]:
     :param state: the state to execute from
     :return: the resulting state(s) of symbolic execution
     """
+    LOGGER.debug(state)
     return state.step().successors
 
 
@@ -744,7 +745,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
-        exit()
+        exit(0)
     return unpack(error_msg)
 
 

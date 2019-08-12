@@ -6,7 +6,6 @@ import pdb
 import random
 import struct
 import subprocess as sp
-import sys
 import time
 from typing import Dict, List
 
@@ -82,6 +81,7 @@ class TreeNode:
 
         # classifiers
         self.colour = colour  # type: Colour
+        self.phantom = False  # type: bool
 
         # concolic execution
         self.state = state  # type: State
@@ -322,10 +322,21 @@ class TreeNode:
         :param addr: the address to check
         :return: if the addr corresponds to a new path
         """
-        # check if the addr corresponds to a new path
-        is_new = addr not in self.children
-        if is_new:
+        # check if the addr corresponds to a new path:
+        # Note: There are two cases for addr to be new:
+        #   1. addr is not a child of self
+        #   2. addr is a phantom child
+
+        is_new = addr not in self.children or self.children[addr].phantom
+
+        # Case 1: Add addr as a child of self
+        if is_new and addr not in self.children:
             self.add_child(key=addr, new_child=TreeNode(addr=addr, parent=self))
+
+        # Case 2: set phantom back to False
+        if self.children[addr].phantom:
+            self.children[addr].phantom = False
+
         return is_new
 
     def print_path(self) -> List[str]:
@@ -661,6 +672,8 @@ def add_children(parent: TreeNode, states: List[State]) -> None:
         parent.add_child(key=state.addr,
                          new_child=TreeNode(addr=state.addr, parent=parent))
         parent.children[state.addr].dye(colour=Colour.R, state=state)
+        parent.children[state.addr].phantom = True
+        LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
 def simulation(node: TreeNode, input_strs: List[str] = None) -> List[List[int]]:

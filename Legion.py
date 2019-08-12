@@ -6,7 +6,6 @@ import pdb
 import random
 import struct
 import subprocess as sp
-import sys
 import time
 from typing import Dict, List
 
@@ -566,12 +565,12 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
         parent_state = parent.children['Simulation'].state
         target_states = compute_to_diverge(state=parent_state)
 
-    # # NOTE: Empty target states implies
-    # #  the symbolic execution has reached the end of program
-    # #  without seeing any divergence after the parent's state
-    # #  hence the parent is fully explored
-    # if not target_states:
-    #     parent.fully_explored = True
+        # NOTE: Empty target states implies
+        #  the symbolic execution has reached the end of program
+        #  without seeing any divergence after the parent's state
+        #  hence the parent is fully explored
+        if not target_states:
+            parent.fully_explored = True
 
     for child_node in parent.children.values():
         if child_node.colour is Colour.G:

@@ -119,6 +119,9 @@ venv.bak/
 # Ignore input files
 **/inputs/
 
+# Ignore test cases
+**/tests/
+
 # Ignore instrumented binaries
 **/instrs/
 
@@ -132,7 +135,7 @@ venv/
 coverage_plotter.py
 ProgramUnderTest
 Results
-Benchmarks
+#Baselines
 
 
 ## MacOS

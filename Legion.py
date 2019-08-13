@@ -422,7 +422,9 @@ def run() -> None:
 
 def initialisation():
     def init_angr():
-        return Project(BINARY)
+        return Project(thing=BINARY, ignore_functions=['printf',
+                                                       '__trace_jump',
+                                                       '__trace_jump_set'])
 
     def init_root() -> TreeNode:
         """

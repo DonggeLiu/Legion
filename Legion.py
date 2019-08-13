@@ -41,6 +41,10 @@ BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = True
 SAVE_TESTCASES = False
 
+INPUTS = []  # type: List
+MSGS = []  # type: List
+TIMES = []  # type: List
+
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
 
@@ -462,6 +466,7 @@ def initialisation():
     are_new = expansion(traces=traces)
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
+    save_news_to_file(are_new=are_new)
 
 
 def has_budget() -> bool:
@@ -485,6 +490,7 @@ def mcts():
     assert len(traces) == len(are_new)
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
+    save_news_to_file(are_new=are_new)
 
 
 def selection() -> TreeNode:
@@ -720,48 +726,28 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         except sp.TimeoutExpired:
             exit(2)
 
-    def save_tests_to_file(data):
-        # if DIR_NAME not in os.listdir('tests'):
-        os.system("mkdir -p tests/{}".format(DIR_NAME))
-
-        with open('tests/{}/{}_{}'.format(
-                DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
-            input_file.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-            input_file.write('<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
-            input_file.write('<testcase>\n')
-            input_file.write(data)
-            input_file.write('</testcase>\n')
-
-    def save_input_to_file():
-        # if DIR_NAME not in os.listdir('inputs'):
-        os.system("mkdir -p inputs/{}".format(DIR_NAME))
-
-        with open('inputs/{}/{}_{}'.format(
-                DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
-            input_file.write(input_bytes)
-
-    global FOUND_BUG
-
-    if SAVE_TESTINPUTS:
-        save_input_to_file()
+    global FOUND_BUG, MSGS, INPUTS, TIMES
 
     report = execute()
     if not report:
         pdb.set_trace()
 
     report_msg, return_code = report
-    output_msg = report_msg[0]
+    output_msg = report_msg[0].decode('utf-8')
     error_msg = report_msg[1]
 
-    if SAVE_TESTCASES:
-        save_tests_to_file(output_msg)
+    if SAVE_TESTCASES or SAVE_TESTINPUTS:
+        TIMES.append(time_stamp)
+        if SAVE_TESTCASES:
+            MSGS.append(output_msg)
+        if SAVE_TESTINPUTS:
+            INPUTS.append(input_bytes)
 
     if return_code == BUG_RET:
         FOUND_BUG = True
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
-        exit(0)
     return unpack(error_msg)
 
 
@@ -857,6 +843,55 @@ def propagate_execution_traces(traces: List[List[int]],
     assert len(traces) == len(are_new)
     for i in range(len(traces)):
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
+
+
+def save_news_to_file(are_new):
+    """
+    Save data to file only if it is new
+    :param are_new: a list to represent whether each datum
+                    contributes to a new path
+    """
+    global MSGS, INPUTS, TIMES
+    debug_assertion(len(are_new) == len(MSGS) == len(INPUTS) == len(TIMES))
+    if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
+        return
+    for i in range(len(are_new)):
+        if are_new[i] and SAVE_TESTCASES:
+            save_tests_to_file(TIMES[i], MSGS[i])
+        if are_new[i] and SAVE_TESTINPUTS:
+            save_input_to_file(TIMES[i], INPUTS[i])
+    MSGS, INPUTS, TIMES = [], [], []
+
+
+def save_tests_to_file(time_stamp, data):
+    # if DIR_NAME not in os.listdir('tests'):
+    os.system("mkdir -p tests/{}".format(DIR_NAME))
+
+    with open('tests/{}/{}_{}'.format(
+            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
+        input_file.write(
+            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+        input_file.write(
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+        input_file.write('<testcase>\n')
+        input_file.write(data)
+        input_file.write('</testcase>\n')
+
+
+def save_input_to_file(time_stamp, input_bytes):
+    # if DIR_NAME not in os.listdir('inputs'):
+    os.system("mkdir -p inputs/{}".format(DIR_NAME))
+
+    with open('inputs/{}/{}_{}'.format(
+            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
+        input_file.write(input_bytes)
+
+
+def debug_assertion(assertion: bool) -> None:
+    if LOGGER.level <= logging.DEBUG and not assertion:
+        pdb.set_trace()
+        return
+    assert assertion
 
 
 if __name__ == '__main__':

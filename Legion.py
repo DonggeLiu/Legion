@@ -229,14 +229,14 @@ class TreeNode:
         :return:
         """
         # Don't double dye a node
-        assert self.colour is Colour.W
+        debug_assertion(self.colour is Colour.W)
         # All colours should come with a state, except black
-        assert bool(colour is Colour.B) ^ bool(state)
+        debug_assertion(bool(colour is Colour.B) ^ bool(state))
 
         self.colour = colour
         if colour is Colour.R:
             # No pre-existing simulation child
-            assert 'Simulation' not in self.children
+            debug_assertion('Simulation' not in self.children)
             self.add_child(key='Simulation',
                            new_child=TreeNode(addr=self.addr, parent=self))
             self.children['Simulation'].dye(
@@ -316,7 +316,7 @@ class TreeNode:
         return [random_bytes() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:
-        assert (key == 'Simulation') ^ (key == new_child.addr)
+        debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
         self.children[key] = new_child
 
     def match_child(self, addr: int) -> bool:
@@ -487,7 +487,7 @@ def mcts():
         return
     traces = simulation(node=node)
     are_new = expansion(traces=traces)
-    assert len(traces) == len(are_new)
+    debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
     save_news_to_file(are_new=are_new)
@@ -544,8 +544,8 @@ def selection() -> TreeNode:
         node = tree_policy(node=node)
         LOGGER.info("Select: {}".format(node))
 
-    assert not states_left
-    assert node.colour is Colour.G
+    debug_assertion(not states_left)
+    debug_assertion(node.colour is Colour.G)
 
     return node
 
@@ -578,10 +578,10 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     # Case 1: parent is red, then execute parent's state to find states of sibs
     # Case 2: parent is black, use the states left to dye siblings
     # Either 1 or 2, not both
-    assert (parent.colour is Colour.R) ^ bool(target_states)
+    debug_assertion((parent.colour is Colour.R) ^ bool(target_states))
 
     if parent.colour is Colour.R:
-        assert not target_states
+        debug_assertion(not target_states)
         parent_state = parent.children['Simulation'].state
         target_states = compute_to_diverge(state=parent_state)
 
@@ -596,7 +596,7 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
         if child_node.colour is Colour.G:
             continue
         target_states = match_node_states(node=child_node, states=target_states)
-        assert child_node.colour in [Colour.R, Colour.B]
+        debug_assertion(child_node.colour in [Colour.R, Colour.B])
 
     return target_states
 
@@ -677,7 +677,7 @@ def add_children(parent: TreeNode, states: List[State]) -> None:
     :return:
     """
     for state in states:
-        assert state.addr not in parent.children
+        debug_assertion(state.addr not in parent.children)
         parent.add_child(key=state.addr,
                          new_child=TreeNode(addr=state.addr, parent=parent))
         parent.children[state.addr].dye(colour=Colour.R, state=state)
@@ -708,7 +708,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     time_stamp = time.time() - TIME_START
 
     def unpack(output):
-        assert (len(output) % 8 == 0)
+        debug_assertion((len(output) % 8 == 0))
         # NOTE: changed addr[0] to addr
         return [addr for i in range(int(len(output) / 8))
                 for addr in struct.unpack_from('q', output, i * 8)]
@@ -729,8 +729,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     global FOUND_BUG, MSGS, INPUTS, TIMES
 
     report = execute()
-    if not report:
-        pdb.set_trace()
+    debug_assertion(bool(report))
 
     report_msg, return_code = report
     output_msg = report_msg[0].decode('utf-8')
@@ -767,7 +766,7 @@ def integrate_path(trace: List[int]) -> bool:
     :param trace: the trace to be integrated into the tree
     :return: a bool representing whether the trace contributes to a new path
     """
-    assert trace[0] == ROOT.addr
+    debug_assertion(trace[0] == ROOT.addr)
 
     node, is_new = ROOT, False
     for addr in trace[1:]:
@@ -816,7 +815,7 @@ def propagate_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
-        assert trace[0] == ROOT.addr
+        debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, new=is_new)
         for addr in trace[1:]:
@@ -840,7 +839,7 @@ def propagate_execution_traces(traces: List[List[int]],
         if 'Simulation' in node.children:
             node.children['Simulation'].sim_try += 1
 
-    assert len(traces) == len(are_new)
+    debug_assertion(len(traces) == len(are_new))
     for i in range(len(traces)):
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 

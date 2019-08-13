@@ -7,12 +7,12 @@ import random
 import struct
 import subprocess as sp
 import time
+from math import sqrt, log, ceil, inf
 from typing import Dict, List
 
 from angr import Project
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
-from math import sqrt, log, ceil, inf
 
 # Hyper-parameters
 MIN_SAMPLES = 5
@@ -402,9 +402,9 @@ class TreeNode:
     def __repr__(self) -> str:
         return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
             .format(colour=30 if self.colour is Colour.B else
-        31 if self.colour is Colour.R else
-        33 if self.colour is Colour.G else
-        37 if self.colour is Colour.W else 32,
+                    31 if self.colour is Colour.R else
+                    33 if self.colour is Colour.G else
+                    37 if self.colour is Colour.W else 32,
                     name=self.repr_node_name(),
                     state=self.repr_node_state(),
                     data=self.repr_node_data())
@@ -474,8 +474,8 @@ def has_budget() -> bool:
     Control whether to terminate mcts or not
     :return: True if terminate
     """
-    return ROOT.sim_win < MAX_PATHS and CUR_ROUND < MAX_ROUNDS \
-           and (time.time() - TIME_START) < MAX_TIME and ROOT.score() > -inf
+    return not FOUND_BUG and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
+        and CUR_ROUND < MAX_ROUNDS and (time.time() - TIME_START) < MAX_TIME
 
 
 def mcts():
@@ -724,6 +724,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             del program
             return msg, ret
         except sp.TimeoutExpired:
+            LOGGER.error("Binary execution time out")
             exit(2)
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
@@ -923,9 +924,9 @@ if __name__ == '__main__':
 
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
-    TIME_COEFF  = args.time_penalty
+    TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs
-    SAVE_TESTCASES  = args.save_tests
+    SAVE_TESTCASES = args.save_tests
 
     if args.verbose:
         LOGGER.setLevel(logging.DEBUG)

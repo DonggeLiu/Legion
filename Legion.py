@@ -7,6 +7,7 @@ import random
 import struct
 import subprocess as sp
 import time
+import datetime
 from math import sqrt, log, ceil, inf
 from typing import Dict, List
 
@@ -865,8 +866,6 @@ def save_news_to_file(are_new):
 
 def save_tests_to_file(time_stamp, data):
     # if DIR_NAME not in os.listdir('tests'):
-    os.system("mkdir -p tests/{}".format(DIR_NAME))
-
     with open('tests/{}/{}_{}.xml'.format(
             DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
         input_file.write(
@@ -947,6 +946,26 @@ if __name__ == '__main__':
     binary_name = BINARY.split("/")[-1]
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
+
+    os.system("mkdir -p tests/{}".format(DIR_NAME))
+
+    if is_source and SAVE_TESTCASES:
+        with open("tests/{}/metadata.xml".format(DIR_NAME), "wt") as md:
+            md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
+            md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+            md.write('<test-metadata>\n')
+            md.write('<sourcecodelang>C</sourcecodelang>\n')
+            md.write('<producer>Legion</producer>\n')
+            md.write('<specification>CHECK( LTL(G ! call(__VERIFIER_error())) )</specification>\n')
+            md.write('<programfile>{}</programfile>\n'.format(args.file))
+            res = sp.run(["sha256sum", args.file], stdout=sp.PIPE)
+            out = res.stdout.decode('utf-8')
+            sha256sum = out[:64]
+            md.write('<programhash>{}</programhash>\n'.format(sha256sum))
+            md.write('<entryfunction>main</entryfunction>\n')
+            md.write('<architecture>32bit</architecture>\n')
+            md.write('<creationtime>{}</creationtime>\n'.format(datetime.datetime.now()))
+            md.write('</test-metadata>\n')
 
     SEEDS = args.seeds
 

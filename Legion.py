@@ -867,12 +867,12 @@ def save_tests_to_file(time_stamp, data):
     # if DIR_NAME not in os.listdir('tests'):
     os.system("mkdir -p tests/{}".format(DIR_NAME))
 
-    with open('tests/{}/{}_{}'.format(
+    with open('tests/{}/{}_{}.xml'.format(
             DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
         input_file.write(
-            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
-            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         input_file.write('<testcase>\n')
         input_file.write(data)
         input_file.write('</testcase>\n')

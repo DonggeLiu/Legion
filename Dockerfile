@@ -21,5 +21,5 @@ RUN pip install -e /root/claripy
 RUN pip install -e /root/cle
 RUN pip install -e /root/angr
 
-RUN mkdir -p /root/sv-benchmarks/c
-COPY sv-benchmarks/c /root/sv-benchmarks/c
+# RUN mkdir -p /root/sv-benchmarks/c
+# COPY sv-benchmarks/c /root/sv-benchmarks/c

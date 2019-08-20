@@ -1,4 +1,6 @@
-.PHONY: clean all
+.PHONY: clean all install
+
+PREFIX = /usr/local
 
 SO = libegion.so
 A  = libegion.a
@@ -46,3 +48,22 @@ $(A):  $(O)
 
 as:
 	ln -s trace-as as
+
+install: $(SO) $(A) trace-as trace-cc
+	install -m755 -t $(PREFIX)/bin trace-as
+	install -m755 -t $(PREFIX)/bin trace-cc
+	install -m755 -t $(PREFIX)/lib $(SO)
+	install -m644 -t $(PREFIX)/lib $(A)
+	mkdir -p $(PREFIX)/bin/trace
+	ln -sf $(PREFIX)/bin/trace-as $(PREFIX)/bin/trace/as
+
+uninstall:
+	rm $(PREFIX)/bin/trace-as
+	rm $(PREFIX)/bin/trace-cc
+	rm $(PREFIX)/lib/$(SO)
+	rm $(PREFIX)/lib/$(A)
+	rm $(PREFIX)/bin/trace/as
+	rmdir $(PREFIX)/bin/trace
+
+
+

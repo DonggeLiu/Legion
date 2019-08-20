@@ -9,12 +9,13 @@ if __name__ == "__main__":
     env = os.environ
     use64 = True
 
-    print(args)
-
     path = os.path.realpath(args[0])
     path = os.path.dirname(path)
-    trace_as_bin = "{}/{}".format(path,'as')
-    assert os.path.isfile(trace_as_bin)
+    path = path+'/trace'
+    if not os.path.isfile(path+'/as'):
+        print('assembler not found',file=sys.stderr)
+        print('path: '+path+'/as',file=sys.stderr)
+        sys.exit(1)
 
     if 'TRACE_CC' in env:
         cc_bin = env['TRACE_CC']
@@ -40,14 +41,12 @@ if __name__ == "__main__":
 
     # -B adds a directory to the compiler's $PATH
     cmd.append('-B')
-    cmd.append(path)
+    cmd.append(path+'/trace')
 
     cmd.append('-L')
     cmd.append(path)
 
     cmd.append('-legion')
-
-    print(cmd)
 
     code = subprocess.call(cmd)
     sys.exit(code)

@@ -1,0 +1,53 @@
+#!/usr/bin/python
+
+import sys
+import os
+import subprocess
+
+if __name__ == "__main__":
+    args = sys.argv
+    env = os.environ
+    use64 = True
+
+    print(args)
+
+    path = os.path.realpath(args[0])
+    path = os.path.dirname(path)
+    trace_as_bin = "{}/{}".format(path,'as')
+    assert os.path.isfile(trace_as_bin)
+
+    if 'TRACE_CC' in env:
+        cc_bin = env['TRACE_CC']
+    else:
+        cc_bin = 'cc'
+
+    skip = False
+    cmd = []
+    cmd.append(cc_bin)
+
+    for arg in args[1:]:
+        if arg == '-B':
+            skip = True
+        if arg == '-integrated-as':
+            pass
+        if arg == '-pipe':
+            pass
+        if arg == '-m32':
+            use64 = False
+        if not skip:
+            cmd.append(arg)
+        skip = False
+
+    # -B adds a directory to the compiler's $PATH
+    cmd.append('-B')
+    cmd.append(path)
+
+    cmd.append('-L')
+    cmd.append(path)
+
+    cmd.append('-legion')
+
+    print(cmd)
+
+    code = subprocess.call(cmd)
+    sys.exit(code)

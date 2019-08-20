@@ -1,0 +1,64 @@
+#!/usr/bin/python
+
+import sys
+import os
+import subprocess
+
+import tracejump
+
+if __name__ == "__main__":
+    args = sys.argv
+    env = os.environ
+    use64 = True
+    doit = False
+
+    print(args)
+
+    # determine location for temporary files
+    if 'TMPDIR' in env:
+        tmp = env['TMPDIR']
+    elif 'TEMP' in env:
+        tmp = env['TEMP']
+    elif 'TMP' in env:
+        tmp = env['TMP']
+    else:
+        tmp = '/tmp'
+
+    # determine which assembler to use next
+    if 'TRACE_AS' in env:
+        as_bin = env['TRACE_AS']
+    else:
+        as_bin = 'as'
+
+    cmd = []
+    cmd.append(as_bin)
+
+    # loop through all arguments, except last one (file name)
+    for arg in args[1:-1]:
+        if arg == '--64':
+            use64 = True
+        elif arg == '--32':
+            use64 = False
+        cmd.append(arg)
+
+    obj = args[-1]
+    if obj == '-version':
+        cmd.append(obj)
+    elif len(args) > 1:
+        instr = "{}/traced-{}".format(tmp,os.path.basename(obj))
+        cmd.append(instr)
+        doit = True
+
+    # instrument the assembly file
+    if doit:
+        tracejump.instrument(obj,instr)
+
+    print(cmd)
+
+    # run the actual assembler program
+    assert use64
+    code = subprocess.call(cmd)
+
+    # cleanup
+    os.remove(instr)
+    sys.exit(code)

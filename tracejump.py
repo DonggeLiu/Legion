@@ -52,7 +52,7 @@ def trace_jump(output):
     output.append('\tadd $128,%rsp\n')
 
 
-def collect_jump_targets():
+def collect_jump_targets(asm_file):
     entry_label = False
     compare_set = False
     file = []
@@ -107,14 +107,16 @@ def instrument_jump_targets(intermediate):
 
     return file
 
-
-if __name__ == "__main__" and len(sys.argv) > 2:
-    asm_file = open(sys.argv[1], 'r')
-    ins_file = open(sys.argv[2], 'w')
-
-    inter = collect_jump_targets()
+def instrument(asm,ins):
+    asm_file = open(asm, 'rt')
+    ins_file = open(ins, 'wt')
+    inter = collect_jump_targets(asm_file)
     final = instrument_jump_targets(intermediate=inter)
     ins_file.writelines(final)
 
+if __name__ == "__main__" and len(sys.argv) > 2:
+    asm = sys.argv[1]
+    ins = sys.argv[2]
+    instrument(asm,ins)
     print('SetJump   {} lines'.format(NUM_SET))
     print('TraceJump {} lines'.format(NUM_TRACED))

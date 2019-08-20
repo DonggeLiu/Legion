@@ -1,3 +1,4 @@
+import cProfile as profile
 import argparse
 import enum
 import logging
@@ -332,17 +333,16 @@ class TreeNode:
         #   1. addr is not a child of self
         #   2. addr is a phantom child
 
-        is_new = addr not in self.children or self.children[addr].phantom
+        child = self.children.get(addr)
 
-        # Case 1: Add addr as a child of self
-        if is_new and addr not in self.children:
-            self.add_child(key=addr, new_child=TreeNode(addr=addr, parent=self))
-
-        # Case 2: set phantom back to False
-        if self.children[addr].phantom:
-            self.children[addr].phantom = False
-
-        return is_new
+        if child == None:
+            child = TreeNode(addr=addr, parent=self)
+            self.add_child(key=addr, new_child=child)
+            return (True, child)
+        else:
+            is_phantom = child.phantom
+            child.phantom = False
+            return (is_phantom, child)
 
     def print_path(self) -> List[str]:
         """
@@ -772,8 +772,9 @@ def integrate_path(trace: List[int]) -> bool:
 
     node, is_new = ROOT, False
     for addr in trace[1:]:
-        is_new = node.match_child(addr=addr) or is_new
-        node = node.children[addr]
+        new_child, child = node.match_child(addr=addr)
+        is_new = is_new or new_child
+        node = child
     return is_new
 
 
@@ -909,9 +910,9 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
-    parser.add_argument('--save-inputs', type=bool, default=SAVE_TESTINPUTS,
+    parser.add_argument('--save-inputs', action="store_true", default=SAVE_TESTINPUTS,
                         help='Save inputs as binary files')
-    parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES,
+    parser.add_argument('--save-tests', action="store_true", default=SAVE_TESTCASES,
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
@@ -969,5 +970,6 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
+    # profile.run('run()')
     run()
     ROOT.pp()

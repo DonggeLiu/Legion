@@ -696,7 +696,7 @@ def simulation(node: TreeNode, input_strs: List[str] = None) -> List[List[int]]:
     """
     mutants = [bytes("".join(mutant), 'utf-8') for mutant in
                input_strs] if input_strs else node.mutate()
-    return [binary_execute(mutant) for mutant in mutants]
+    return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
 
 
 def binary_execute(input_bytes: bytes) -> List[int]:

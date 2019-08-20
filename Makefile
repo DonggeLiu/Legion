@@ -46,8 +46,11 @@ $(SO): $(LO)
 $(A):  $(O)
 	$(AR) $(ARFLAGS) $@ $^
 
-as:
-	ln -s trace-as as
+trace:
+	mkdir $@
+
+trace/as: trace
+	ln -s ../trace-as trace/as
 
 install: $(SO) $(A) trace-as trace-cc
 	install -m755 -t $(PREFIX)/bin trace-as

@@ -854,7 +854,7 @@ def save_news_to_file(are_new):
                     contributes to a new path
     """
     global MSGS, INPUTS, TIMES
-    debug_assertion(len(are_new) == len(MSGS) == len(INPUTS) == len(TIMES))
+    # debug_assertion(len(are_new) == len(MSGS) == len(INPUTS) == len(TIMES))
     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
         return
     for i in range(len(are_new)):
@@ -910,9 +910,9 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
-    parser.add_argument('--save-inputs', action="store_true", default=SAVE_TESTINPUTS,
+    parser.add_argument('--save-inputs', action="store_true",
                         help='Save inputs as binary files')
-    parser.add_argument('--save-tests', action="store_true", default=SAVE_TESTCASES,
+    parser.add_argument('--save-tests', action="store_true",
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
@@ -938,9 +938,11 @@ if __name__ == '__main__':
     if is_source:
         source = args.file
         stem = source[:-2]
-        BINARY = stem + '.instr'
+        BINARY = stem+'.instr'
         LOGGER.info('Building {}'.format(BINARY))
         os.system("make {}".format(BINARY))
+        # print("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        # os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
     else:
         BINARY = args.file
 
@@ -948,9 +950,8 @@ if __name__ == '__main__':
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
-    os.system("mkdir -p tests/{}".format(DIR_NAME))
-
     if is_source and SAVE_TESTCASES:
+        os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
             md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')

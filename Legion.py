@@ -1,3 +1,4 @@
+import cProfile as profile
 import argparse
 import enum
 import logging
@@ -8,8 +9,9 @@ import signal
 import struct
 import subprocess as sp
 import time
+import datetime
 from math import sqrt, log, ceil, inf
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from angr import Project
 from angr.sim_state import SimState as State
@@ -26,7 +28,7 @@ MAX_BYTES = 100  # Max bytes per input
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MAX_TIME = 900
+MAX_TIME = 20
 FOUND_BUG = False  # type: bool
 
 # Statistics
@@ -320,7 +322,7 @@ class TreeNode:
         debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
         self.children[key] = new_child
 
-    def match_child(self, addr: int) -> bool:
+    def match_child(self, addr: int) -> Tuple[bool, 'TreeNode']:
         """
         Check if the addr matches to an existing child:
             if not, it corresponds to a new path, add the addr as a child
@@ -329,20 +331,19 @@ class TreeNode:
         """
         # check if the addr corresponds to a new path:
         # Note: There are two cases for addr to be new:
-        #   1. addr is not a child of self
-        #   2. addr is a phantom child
+        #   1. addr is a phantom child
+        #   2. addr is not a child of self
 
-        is_new = addr not in self.children or self.children[addr].phantom
+        child = self.children.get(addr)
 
-        # Case 1: Add addr as a child of self
-        if is_new and addr not in self.children:
-            self.add_child(key=addr, new_child=TreeNode(addr=addr, parent=self))
+        if child:
+            is_phantom = child.phantom
+            child.phantom = False
+            return is_phantom, child
 
-        # Case 2: set phantom back to False
-        if self.children[addr].phantom:
-            self.children[addr].phantom = False
-
-        return is_new
+        child = TreeNode(addr=addr, parent=self)
+        self.add_child(key=addr, new_child=child)
+        return True, child
 
     def print_path(self) -> List[str]:
         """
@@ -417,7 +418,6 @@ ROOT = TreeNode()
 def run() -> None:
     """
     The main function
-    :return:
     """
     initialisation()
     ROOT.pp()
@@ -693,7 +693,7 @@ def simulation(node: TreeNode, input_strs: List[str] = None) -> List[List[int]]:
     """
     mutants = [bytes("".join(mutant), 'utf-8') for mutant in
                input_strs] if input_strs else node.mutate()
-    return [binary_execute(mutant) for mutant in mutants]
+    return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
 
 
 def binary_execute(input_bytes: bytes) -> List[int]:
@@ -769,8 +769,9 @@ def integrate_path(trace: List[int]) -> bool:
 
     node, is_new = ROOT, False
     for addr in trace[1:]:
-        is_new = node.match_child(addr=addr) or is_new
-        node = node.children[addr]
+        new_child, child = node.match_child(addr=addr)
+        is_new = is_new or new_child
+        node = child
     return is_new
 
 
@@ -868,14 +869,12 @@ def save_news_to_file(are_new):
 
 def save_tests_to_file(time_stamp, data):
     # if DIR_NAME not in os.listdir('tests'):
-    os.system("mkdir -p tests/{}".format(DIR_NAME))
-
-    with open('tests/{}/{}_{}'.format(
+    with open('tests/{}/{}_{}.xml'.format(
             DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
         input_file.write(
-            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
+            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
-            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         input_file.write('<testcase>\n')
         input_file.write(data)
         input_file.write('</testcase>\n')
@@ -898,8 +897,18 @@ def debug_assertion(assertion: bool) -> None:
 
 
 def handle_timeout() -> None:
-    LOGGER.info("{} seconds time out!".format(MAX_TIME))
-    exit(0)
+    def raise_timeout(signum, frame):
+        LOGGER.info("{} seconds time out!".format(MAX_TIME))
+        raise TimeoutError
+
+    # Register a function to raise a TimeoutError on the signal
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after MAX_TIME
+    signal.alarm(MAX_TIME)
+    try:
+        run()
+    except TimeoutError:
+        pass
 
 
 if __name__ == '__main__':
@@ -918,9 +927,9 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
-    parser.add_argument('--save-inputs', type=bool, default=SAVE_TESTINPUTS,
+    parser.add_argument('--save-inputs', action="store_true", default=SAVE_TESTINPUTS,
                         help='Save inputs as binary files')
-    parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES,
+    parser.add_argument('--save-tests', action="store_true", default=SAVE_TESTCASES,
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
@@ -956,10 +965,29 @@ if __name__ == '__main__':
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
+    os.system("mkdir -p tests/{}".format(DIR_NAME))
+
+    if is_source and SAVE_TESTCASES:
+        with open("tests/{}/metadata.xml".format(DIR_NAME), "wt") as md:
+            md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
+            md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+            md.write('<test-metadata>\n')
+            md.write('<sourcecodelang>C</sourcecodelang>\n')
+            md.write('<producer>Legion</producer>\n')
+            md.write('<specification>CHECK( LTL(G ! call(__VERIFIER_error())) )</specification>\n')
+            md.write('<programfile>{}</programfile>\n'.format(args.file))
+            res = sp.run(["sha256sum", args.file], stdout=sp.PIPE)
+            out = res.stdout.decode('utf-8')
+            sha256sum = out[:64]
+            md.write('<programhash>{}</programhash>\n'.format(sha256sum))
+            md.write('<entryfunction>main</entryfunction>\n')
+            md.write('<architecture>32bit</architecture>\n')
+            md.write('<creationtime>{}</creationtime>\n'.format(datetime.datetime.now()))
+            md.write('</test-metadata>\n')
+
     SEEDS = args.seeds
 
-#    signal.signal(signal.SIGALRM, handle_timeout())
-#    signal.alarm(MAX_TIME)
-
-    run()
+    profile.run('handle_timeout()', sort='cumtime')
+    # run()
+    pdb.set_trace()
     ROOT.pp()

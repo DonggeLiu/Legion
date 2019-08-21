@@ -1,0 +1,52 @@
+#!/usr/bin/python
+
+import sys
+import os
+import subprocess
+
+if __name__ == "__main__":
+    args = sys.argv
+    env = os.environ
+    use64 = True
+
+    path = os.path.realpath(args[0])
+    path = os.path.dirname(path)
+    path = path+'/trace'
+    if not os.path.isfile(path+'/as'):
+        print('assembler not found',file=sys.stderr)
+        print('path: '+path+'/as',file=sys.stderr)
+        sys.exit(1)
+
+    if 'TRACE_CC' in env:
+        cc_bin = env['TRACE_CC']
+    else:
+        cc_bin = 'cc'
+
+    skip = False
+    cmd = []
+    cmd.append(cc_bin)
+
+    for arg in args[1:]:
+        if arg == '-B':
+            skip = True
+        if arg == '-integrated-as':
+            pass
+        if arg == '-pipe':
+            pass
+        if arg == '-m32':
+            use64 = False
+        if not skip:
+            cmd.append(arg)
+        skip = False
+
+    # -B adds a directory to the compiler's $PATH
+    cmd.append('-B')
+    cmd.append(path+'/trace')
+
+    cmd.append('-L')
+    cmd.append(path)
+
+    cmd.append('-legion')
+
+    code = subprocess.call(cmd)
+    sys.exit(code)

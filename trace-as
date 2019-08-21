@@ -1,29 +1,10 @@
-#!/usr/bin/env python
-
-# See AFL: afl-as.c
-# http://lcamtuf.coredump.cx/afl/technical_details.txt
+#!/usr/bin/python
 
 import sys
-
-# import pdb
-
-
-# registers used by __trace_jump
-# rax, rdi, rsi, rdx
-
-# registers used by write
-# rcx, r11
-
-
-NUM_SET = 0
-NUM_TRACED = 0
-JUMP_TARGETS = set()
-
+import os
+import subprocess
 
 def set_jump(output):
-    global NUM_SET
-    NUM_SET += 1
-
     output.append('\tsub $128,%rsp\n')
     output.append('\tpush %rax\n')
     output.append('\tcall\t__trace_jump_set\n')
@@ -32,9 +13,6 @@ def set_jump(output):
 
 
 def trace_jump(output):
-    global NUM_TRACED
-    NUM_TRACED += 1
-
     output.append('\tsub $128,%rsp\n')
     output.append('\tpush %rax\n')
     output.append('\tpush %rdi\n')
@@ -107,7 +85,6 @@ def instrument_jump_targets(intermediate):
 
     return file
 
-
 def instrument(asm,ins):
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
@@ -116,9 +93,55 @@ def instrument(asm,ins):
     ins_file.writelines(final)
 
 
-if __name__ == "__main__" and len(sys.argv) > 2:
-    asm = sys.argv[1]
-    ins = sys.argv[2]
-    instrument(asm,ins)
-    print('SetJump   {} lines'.format(NUM_SET))
-    print('TraceJump {} lines'.format(NUM_TRACED))
+if __name__ == "__main__":
+    args = sys.argv
+    env = os.environ
+    use64 = True
+    doit = False
+
+    # determine location for temporary files
+    if 'TMPDIR' in env:
+        tmp = env['TMPDIR']
+    elif 'TEMP' in env:
+        tmp = env['TEMP']
+    elif 'TMP' in env:
+        tmp = env['TMP']
+    else:
+        tmp = '/tmp'
+
+    # determine which assembler to use next
+    if 'TRACE_AS' in env:
+        as_bin = env['TRACE_AS']
+    else:
+        as_bin = 'as'
+
+    cmd = []
+    cmd.append(as_bin)
+
+    # loop through all arguments, except last one (file name)
+    for arg in args[1:-1]:
+        if arg == '--64':
+            use64 = True
+        elif arg == '--32':
+            use64 = False
+        cmd.append(arg)
+
+    obj = args[-1]
+    if obj == '-version':
+        cmd.append(obj)
+    elif len(args) > 1:
+        instr = "{}/traced-{}".format(tmp,os.path.basename(obj))
+        cmd.append(instr)
+        doit = True
+
+    # instrument the assembly file
+    if doit:
+        instrument(obj,instr)
+
+    # run the actual assembler program
+    assert use64
+    code = subprocess.call(cmd)
+
+    # cleanup
+    os.remove(instr)
+    sys.exit(code)

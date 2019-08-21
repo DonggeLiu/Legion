@@ -733,12 +733,12 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     debug_assertion(bool(report))
 
     report_msg, return_code = report
-    output_msg = report_msg[0].decode('utf-8')
     error_msg = report_msg[1]
 
     if SAVE_TESTCASES or SAVE_TESTINPUTS:
         TIMES.append(time_stamp)
         if SAVE_TESTCASES:
+            output_msg = report_msg[0].decode('utf-8')
             MSGS.append(output_msg)
         if SAVE_TESTINPUTS:
             INPUTS.append(input_bytes)
@@ -852,9 +852,14 @@ def save_news_to_file(are_new):
                     contributes to a new path
     """
     global MSGS, INPUTS, TIMES
-    debug_assertion(len(are_new) == len(MSGS) == len(INPUTS) == len(TIMES))
     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
         return
+
+    if SAVE_TESTCASES:
+        debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
+    if SAVE_TESTINPUTS:
+        debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
+
     for i in range(len(are_new)):
         if are_new[i] and SAVE_TESTCASES:
             save_tests_to_file(TIMES[i], MSGS[i])

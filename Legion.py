@@ -4,12 +4,13 @@ import logging
 import os
 import pdb
 import random
+import signal
 import struct
 import subprocess as sp
 import time
 import datetime
 from math import sqrt, log, ceil, inf
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from angr import Project
 from angr.sim_state import SimState as State
@@ -26,7 +27,7 @@ MAX_BYTES = 100  # Max bytes per input
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MAX_TIME = 900
+MAX_TIME = 20
 FOUND_BUG = False  # type: bool
 
 # Statistics
@@ -320,7 +321,7 @@ class TreeNode:
         debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
         self.children[key] = new_child
 
-    def match_child(self, addr: int) -> bool:
+    def match_child(self, addr: int) -> Tuple[bool, 'TreeNode']:
         """
         Check if the addr matches to an existing child:
             if not, it corresponds to a new path, add the addr as a child
@@ -329,19 +330,19 @@ class TreeNode:
         """
         # check if the addr corresponds to a new path:
         # Note: There are two cases for addr to be new:
-        #   1. addr is not a child of self
-        #   2. addr is a phantom child
+        #   1. addr is a phantom child
+        #   2. addr is not a child of self
 
         child = self.children.get(addr)
 
-        if child == None:
-            child = TreeNode(addr=addr, parent=self)
-            self.add_child(key=addr, new_child=child)
-            return (True, child)
-        else:
+        if child:
             is_phantom = child.phantom
             child.phantom = False
-            return (is_phantom, child)
+            return is_phantom, child
+
+        child = TreeNode(addr=addr, parent=self)
+        self.add_child(key=addr, new_child=child)
+        return True, child
 
     def print_path(self) -> List[str]:
         """
@@ -416,7 +417,6 @@ ROOT = TreeNode()
 def run() -> None:
     """
     The main function
-    :return:
     """
     initialisation()
     ROOT.pp()
@@ -571,9 +571,6 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
             they correspond to the child nodes of the parent who
             have not been found by TraceJump
     """
-
-    # if not ('Simulation' in parent.children) ^ bool(target_states):
-    #     pdb.set_trace()
 
     # Case 1: parent is red, then execute parent's state to find states of sibs
     # Case 2: parent is black, use the states left to dye siblings
@@ -733,12 +730,12 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     debug_assertion(bool(report))
 
     report_msg, return_code = report
-    output_msg = report_msg[0].decode('utf-8')
     error_msg = report_msg[1]
 
     if SAVE_TESTCASES or SAVE_TESTINPUTS:
         TIMES.append(time_stamp)
         if SAVE_TESTCASES:
+            output_msg = report_msg[0].decode('utf-8')
             MSGS.append(output_msg)
         if SAVE_TESTINPUTS:
             INPUTS.append(input_bytes)
@@ -853,9 +850,14 @@ def save_news_to_file(are_new):
                     contributes to a new path
     """
     global MSGS, INPUTS, TIMES
-    # debug_assertion(len(are_new) == len(MSGS) == len(INPUTS) == len(TIMES))
     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
         return
+
+    if SAVE_TESTCASES:
+        debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
+    if SAVE_TESTINPUTS:
+        debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
+
     for i in range(len(are_new)):
         if are_new[i] and SAVE_TESTCASES:
             save_tests_to_file(TIMES[i], MSGS[i])
@@ -887,10 +889,25 @@ def save_input_to_file(time_stamp, input_bytes):
 
 
 def debug_assertion(assertion: bool) -> None:
-    if LOGGER.level <= logging.DEBUG and not assertion:
+    if LOGGER.level <= logging.INFO and not assertion:
         pdb.set_trace()
         return
     assert assertion
+
+
+def handle_timeout() -> None:
+    def raise_timeout():
+        LOGGER.info("{} seconds time out!".format(MAX_TIME))
+        raise TimeoutError
+
+    # Register a function to raise a TimeoutError on the signal
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after MAX_TIME
+    signal.alarm(MAX_TIME)
+    try:
+        run()
+    except TimeoutError:
+        pass
 
 
 if __name__ == '__main__':
@@ -976,6 +993,7 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    # profile.run('run()')
-    run()
+    cProfile.run('handle_timeout()', sort='cumtime')
+    # run()
+    pdb.set_trace()
     ROOT.pp()

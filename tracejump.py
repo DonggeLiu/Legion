@@ -107,12 +107,14 @@ def instrument_jump_targets(intermediate):
 
     return file
 
+
 def instrument(asm,ins):
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
     inter = collect_jump_targets(asm_file)
     final = instrument_jump_targets(intermediate=inter)
     ins_file.writelines(final)
+
 
 if __name__ == "__main__" and len(sys.argv) > 2:
     asm = sys.argv[1]

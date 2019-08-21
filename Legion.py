@@ -993,7 +993,5 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    cProfile.run('handle_timeout()', sort='cumtime')
-    # run()
-    pdb.set_trace()
+    run()
     ROOT.pp()

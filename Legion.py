@@ -572,9 +572,6 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
             have not been found by TraceJump
     """
 
-    # if not ('Simulation' in parent.children) ^ bool(target_states):
-    #     pdb.set_trace()
-
     # Case 1: parent is red, then execute parent's state to find states of sibs
     # Case 2: parent is black, use the states left to dye siblings
     # Either 1 or 2, not both

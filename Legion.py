@@ -1,4 +1,4 @@
-import cProfile as profile
+import cProfile
 import argparse
 import enum
 import logging
@@ -987,7 +987,7 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    profile.run('handle_timeout()', sort='cumtime')
+    cProfile.run('handle_timeout()', sort='cumtime')
     # run()
     pdb.set_trace()
     ROOT.pp()

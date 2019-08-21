@@ -4,6 +4,7 @@ import logging
 import os
 import pdb
 import random
+import signal
 import struct
 import subprocess as sp
 import time
@@ -896,6 +897,11 @@ def debug_assertion(assertion: bool) -> None:
     assert assertion
 
 
+def handle_timeout() -> None:
+    LOGGER.info("{} seconds time out!".format(MAX_TIME))
+    exit(0)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Legion')
     parser.add_argument('--min-samples', type=int, default=MIN_SAMPLES,
@@ -951,6 +957,9 @@ if __name__ == '__main__':
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
     SEEDS = args.seeds
+
+#    signal.signal(signal.SIGALRM, handle_timeout())
+#    signal.alarm(MAX_TIME)
 
     run()
     ROOT.pp()

@@ -897,7 +897,7 @@ def debug_assertion(assertion: bool) -> None:
 
 
 def handle_timeout() -> None:
-    def raise_timeout():
+    def raise_timeout(signum, frame):
         LOGGER.info("{} seconds time out!".format(MAX_TIME))
         raise TimeoutError
 

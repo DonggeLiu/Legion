@@ -1,4 +1,6 @@
 #!/bin/bash
 
-source python3.7/bin/activate
-python3.7 ./Legion.py $@
+unset PYTHONPATH
+export PATH="./local/bin:$PATH"
+env
+python3 ./Legion.py $@

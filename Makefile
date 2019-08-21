@@ -14,7 +14,7 @@ LO = $(O:.o=.lo)
 # for angr
 CFLAGS += -no-pie
 
-all: $(SO) $(A) as
+all: $(SO) $(A) trace/as
 
 clean:
 	rm -f $(SO) $(A) $(O) $(LO)
@@ -50,7 +50,7 @@ trace:
 	mkdir $@
 
 trace/as: trace
-	ln -s ../trace-as trace/as
+	ln trace-as trace/as
 
 install: $(SO) $(A) trace-as trace-cc
 	install -m755 -t $(PREFIX)/bin trace-as

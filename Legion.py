@@ -1,4 +1,3 @@
-import cProfile as profile
 import argparse
 import enum
 import logging
@@ -916,6 +915,8 @@ if __name__ == '__main__':
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
+    parser.add_argument("-o", default=None,
+                        help='Binary file output location when input is a C source')
     parser.add_argument("file",
                         help='Binary or source file')
     parser.add_argument("seeds", nargs='*',
@@ -938,11 +939,15 @@ if __name__ == '__main__':
     if is_source:
         source = args.file
         stem = source[:-2]
-        BINARY = stem+'.instr'
+        if args.o:
+            BINARY = args.o
+        else:
+            BINARY = stem
         LOGGER.info('Building {}'.format(BINARY))
-        os.system("make {}".format(BINARY))
-        # print("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
-        # os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        # os.system("make {}".format(BINARY))
+        print("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        os.system("file {}".format(BINARY))
     else:
         BINARY = args.file
 

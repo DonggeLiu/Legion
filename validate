@@ -1,0 +1,4 @@
+#!/bin/sh
+
+make zips
+/home/ernst/workspace/cpachecker/scripts/benchmark.py --read-only-dir / --cloud --cloudMaster localhost tbf.xml

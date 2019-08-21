@@ -192,6 +192,8 @@ class TreeNode:
         Select the child of the highest uct score, break tie uniformly
         :return: a tree node
         """
+
+        LOGGER.info("Selecting from children: {}".format(self.children))
         # TODO: more elegant method, if time permitted
         max_score, candidates = -inf, []  # type: float, List[TreeNode]
         for child in self.children.values():
@@ -204,7 +206,7 @@ class TreeNode:
                 candidates = [child]
 
         # TODO: choose one from candidates uniformly
-        return candidates[int(random.uniform(0, len(candidates) - 1))]
+        return random.choice(candidates)
 
     def is_root(self) -> bool:
         """
@@ -275,7 +277,7 @@ class TreeNode:
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
-            self.samples = self.state.solver.iterate(e=target)
+            self.samples = self.state.solver.batch_iterate(target)
 
         results = []
         while len(results) < MAX_SAMPLES:

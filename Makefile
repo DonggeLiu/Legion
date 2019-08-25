@@ -14,7 +14,7 @@ LO = $(O:.o=.lo)
 # for angr
 CFLAGS += -no-pie
 
-all: $(SO) $(A) as
+all: $(SO) $(A) trace/as
 
 clean:
 	rm -f $(SO) $(A) $(O) $(LO)
@@ -46,8 +46,11 @@ $(SO): $(LO)
 $(A):  $(O)
 	$(AR) $(ARFLAGS) $@ $^
 
-as:
-	ln -s trace-as as
+trace:
+	mkdir $@
+
+trace/as: trace
+	ln trace-as trace/as
 
 install: $(SO) $(A) trace-as trace-cc
 	install -m755 -t $(PREFIX)/bin trace-as
@@ -65,5 +68,13 @@ uninstall:
 	rm $(PREFIX)/bin/trace/as
 	rmdir $(PREFIX)/bin/trace
 
+LOGS = $(wildcard test/results/legion.*.logfiles/*.files)
+ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 
+.PHONY: zips
+
+%/test-suite.zip: %/Principes
+	zip $@ $^ -r
+
+zips: $(ZIPS)
 

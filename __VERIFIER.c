@@ -7,6 +7,41 @@ void __VERIFIER_error() {
     exit(100);
 }
 
+_Bool __VERIFIER_nondet_bool() {
+    _Bool x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"bool\">%d</input>\n", x);
+    return x;
+}
+
+char __VERIFIER_nondet_char() {
+    char x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"char\">%d</input>\n", x);
+    return x;
+}
+
+unsigned char __VERIFIER_nondet_uchar() {
+    unsigned char x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"unsigned char\">%d</input>\n", x);
+    return x;
+}
+
+short __VERIFIER_nondet_short() {
+    short x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"short\">%d</input>\n", x);
+    return x;
+}
+
+unsigned short __VERIFIER_nondet_ushort() {
+    unsigned short x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"unsigned short\">%d</input>\n", x);
+    return x;
+}
+
 int __VERIFIER_nondet_int() {
     int x = 0;
     read(0, &x, sizeof(x));
@@ -14,10 +49,10 @@ int __VERIFIER_nondet_int() {
     return x;
 }
 
-short __VERIFIER_nondet_short() {
-    short x = 0;
+unsigned __VERIFIER_nondet_unsigned() {
+    unsigned x = 0;
     read(0, &x, sizeof(x));
-    printf("  <input type=\"short\">%hd</input>\n", x);
+    printf("  <input type=\"unsigned\">%d</input>\n", x);
     return x;
 }
 
@@ -35,10 +70,10 @@ float __VERIFIER_nondet_float() {
     return x;
 }
 
-char __VERIFIER_nondet_char() {
-    char x = 0;
+float __VERIFIER_nondet_double() {
+    double x = 0.0;
     read(0, &x, sizeof(x));
-    printf("  <input type=\"char\">%hhd</input>\n", x);
+    printf("  <input type=\"double\">%f</input>\n", x);
     return x;
 }
 

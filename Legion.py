@@ -1,4 +1,3 @@
-import cProfile
 import argparse
 import enum
 import logging
@@ -193,6 +192,8 @@ class TreeNode:
         Select the child of the highest uct score, break tie uniformly
         :return: a tree node
         """
+
+        LOGGER.info("Selecting from children: {}".format(self.children))
         # TODO: more elegant method, if time permitted
         max_score, candidates = -inf, []  # type: float, List[TreeNode]
         for child in self.children.values():
@@ -205,7 +206,7 @@ class TreeNode:
                 candidates = [child]
 
         # TODO: choose one from candidates uniformly
-        return candidates[int(random.uniform(0, len(candidates) - 1))]
+        return random.choice(candidates)
 
     def is_root(self) -> bool:
         """
@@ -276,7 +277,7 @@ class TreeNode:
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
-            self.samples = self.state.solver.iterate(e=target)
+            self.samples = self.state.solver.batch_iterate(target)
 
         results = []
         while len(results) < MAX_SAMPLES:
@@ -927,12 +928,14 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
-    parser.add_argument('--save-inputs', action="store_true", default=SAVE_TESTINPUTS,
+    parser.add_argument('--save-inputs', action="store_true",
                         help='Save inputs as binary files')
-    parser.add_argument('--save-tests', action="store_true", default=SAVE_TESTCASES,
+    parser.add_argument('--save-tests', action="store_true",
                         help='Save inputs as TEST-COMP xml files')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
+    parser.add_argument("-o", default=None,
+                        help='Binary file output location when input is a C source')
     parser.add_argument("file",
                         help='Binary or source file')
     parser.add_argument("seeds", nargs='*',
@@ -955,9 +958,15 @@ if __name__ == '__main__':
     if is_source:
         source = args.file
         stem = source[:-2]
-        BINARY = stem + '.instr'
+        if args.o:
+            BINARY = args.o
+        else:
+            BINARY = stem
         LOGGER.info('Building {}'.format(BINARY))
-        os.system("make {}".format(BINARY))
+        # os.system("make {}".format(BINARY))
+        print("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        os.system("file {}".format(BINARY))
     else:
         BINARY = args.file
 
@@ -965,9 +974,8 @@ if __name__ == '__main__':
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
 
-    os.system("mkdir -p tests/{}".format(DIR_NAME))
-
     if is_source and SAVE_TESTCASES:
+        os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
             md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
@@ -987,7 +995,5 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    cProfile.run('handle_timeout()', sort='cumtime')
-    # run()
-    pdb.set_trace()
+    run()
     ROOT.pp()

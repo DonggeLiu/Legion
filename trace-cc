@@ -13,8 +13,8 @@ if __name__ == "__main__":
     path = os.path.dirname(path)
     path = path+'/trace'
     if not os.path.isfile(path+'/as'):
-        print('assembler not found',file=sys.stderr)
-        print('path: '+path+'/as',file=sys.stderr)
+        print('assembler not found')
+        print('path: '+path+'/as')
         sys.exit(1)
 
     if 'TRACE_CC' in env:
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # -B adds a directory to the compiler's $PATH
     cmd.append('-B')
-    cmd.append(path+'/trace')
+    cmd.append(path)
 
     cmd.append('-L')
     cmd.append(path)

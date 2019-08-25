@@ -4,6 +4,8 @@ import sys
 import os
 import subprocess
 
+JUMP_TARGETS = set()
+
 def set_jump(output):
     output.append('\tsub $128,%rsp\n')
     output.append('\tpush %rax\n')

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+unset PYTHONPATH
+export PATH="./local/bin:$PATH"
+env
+python3 ./Legion.py $@

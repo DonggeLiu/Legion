@@ -476,7 +476,7 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return not FOUND_BUG and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
-        and CUR_ROUND < MAX_ROUNDS and (time.time() - TIME_START) < MAX_TIME
+        and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():

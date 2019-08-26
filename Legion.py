@@ -902,6 +902,7 @@ def run_with_timeout() -> None:
     A wrapper for run(), break run() when MAX_TIME is reached
     """
     def raise_timeout(signum, frame):
+        LOGGER.debug("Signum: {};\nFrame: {};".format(signum, frame))
         LOGGER.info("{} seconds time out!".format(MAX_TIME))
         raise TimeoutError
 

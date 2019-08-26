@@ -27,7 +27,7 @@ MAX_BYTES = 100  # Max bytes per input
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
-MAX_TIME = 20
+MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 
 # Statistics
@@ -40,7 +40,7 @@ BINARY = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
-SAVE_TESTINPUTS = True
+SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
 
 INPUTS = []  # type: List
@@ -897,11 +897,15 @@ def debug_assertion(assertion: bool) -> None:
     assert assertion
 
 
-def handle_timeout() -> None:
+def run_with_timeout() -> None:
+    """
+    A wrapper for run(), break run() when MAX_TIME is reached
+    """
     def raise_timeout(signum, frame):
         LOGGER.info("{} seconds time out!".format(MAX_TIME))
         raise TimeoutError
 
+    assert MAX_TIME
     # Register a function to raise a TimeoutError on the signal
     signal.signal(signal.SIGALRM, raise_timeout)
     # Schedule the signal to be sent after MAX_TIME
@@ -910,6 +914,17 @@ def handle_timeout() -> None:
         run()
     except TimeoutError:
         pass
+
+
+def main() -> None:
+    """
+    MAX_TIME == 0: Unlimited time budget
+    MAX_TIME >  0: Time budget is MAX_TIME
+    """
+    if MAX_TIME:
+        run_with_timeout()
+    else:
+        run()
 
 
 if __name__ == '__main__':
@@ -963,10 +978,12 @@ if __name__ == '__main__':
         else:
             BINARY = stem
         LOGGER.info('Building {}'.format(BINARY))
-        # os.system("make {}".format(BINARY))
-        print("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
-        os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
-        os.system("file {}".format(BINARY))
+        # print("./trace-cc -static -L. -legion -o {} {}".format(BINARY, source))
+        sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o",
+                BINARY, source])
+        # os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+        sp.run(["file", BINARY])
+        # os.system("file {}".format(BINARY))
     else:
         BINARY = args.file
 
@@ -995,5 +1012,8 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    run()
+    main()
+    # cProfile.run('main()', sort='cumtime')
+    pdb.set_trace()
+
     ROOT.pp()

@@ -211,8 +211,7 @@ class TreeNode:
                 max_score = cur_score
                 candidates = [child]
 
-        # TODO: choose one from candidates uniformly
-        return random.choice(candidates)
+        return random.choice(candidates) if candidates else None
 
     def is_root(self) -> bool:
         """

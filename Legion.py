@@ -165,13 +165,19 @@ class TreeNode:
         """
 
         if self.colour is Colour.W:
+            # White node might have an unrevealed sibling
+            #   which can only be found by symex it
             return
 
         if not all([c.fully_explored for c in self.children.values() if
                     c.colour is not Colour.G]):
+            # If not all children all fully explored, don't mark it
+            #    exclude simulation child here.
             return
 
         if not self.sel_try:
+            # If a node has not been executed before,
+            #     it could be a newly added phantom child
             return
 
         LOGGER.info("Fully explored {}".format(self))
@@ -520,10 +526,11 @@ def selection() -> TreeNode:
     node, states_left = ROOT, []
     while node.colour is not Colour.G:
 
-        # If the nod is already a red leaf, mark it as fully explored
+        # If the node is already a red leaf, mark it as fully explored
         # Note: Must check this before dying,
-        #  otherwise a phantom red node added when dying its sibling will be wrongly marked as fully explored
-        if node.is_leaf() and node.colour is Colour.R:
+        #  otherwise the phantom red nodes which are added when
+        #  dying their sibling will be wrongly marked as fully explored
+        if node.is_leaf():
             node.mark_fully_explored()
 
         # If the node is white, dye it
@@ -540,7 +547,7 @@ def selection() -> TreeNode:
                 node.fully_explored = True
 
         # If the node's score is the minimum, return ROOT to restart
-        if node.score() == -inf:
+        if node.fully_explored:
             return ROOT
 
         node = tree_policy(node=node)
@@ -582,7 +589,7 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     if parent.colour is Colour.R:
         debug_assertion(not target_states)
         parent_state = parent.children['Simulation'].state
-        target_states = compute_to_diverge(state=parent_state)
+        target_states = symex_to_diverge(state=parent_state)
 
         # NOTE: Empty target states implies
         #  the symbolic execution has reached the end of program
@@ -600,7 +607,7 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     return target_states
 
 
-def compute_to_diverge(state: State):
+def symex_to_diverge(state: State):
     """
     Symbolically execute to the immediate next diverging states and return its children (must be more than one)
     :param state: the state which is in the line to execute through
@@ -747,7 +754,9 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
-    return unpack(error_msg)
+    trace = unpack(error_msg)
+    LOGGER.info([hex(addr) for addr in trace])
+    return trace
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:

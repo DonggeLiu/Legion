@@ -692,16 +692,17 @@ def add_children(parent: TreeNode, states: List[State]) -> None:
         LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
-def simulation(node: TreeNode, input_strs: List[str] = None) -> List[List[int]]:
+def simulation(node: TreeNode = None) -> List[List[int]]:
     """
     Generate mutants (i.e. inputs that tend to preserve the path to the node)
     Execute the instrumented binary with mutants to collect the execution traces
     :param node: the node to fuzz
-    :param input_strs: a predefined list of input_strs to be executed
     :return: the execution traces
     """
-    mutants = [bytes("".join(mutant), 'utf-8') for mutant in
-               input_strs] if input_strs else node.mutate()
+    # node is None if this is initialisation, during which should use SEEDS
+    # Otherwise, mutate() the node
+    mutants = node.mutate() if node else \
+        [bytes("".join(mutant), 'utf-8') for mutant in SEEDS]
     return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
 
 

@@ -550,6 +550,8 @@ def selection() -> TreeNode:
             return ROOT
 
         node = tree_policy(node=node)
+        # the node selected by tree policy should not be None
+        debug_assertion(node)
         LOGGER.info("Select: {}".format(node))
 
     debug_assertion(not states_left)

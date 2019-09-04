@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # See AFL: afl-as.c
 # http://lcamtuf.coredump.cx/afl/technical_details.txt

@@ -282,7 +282,7 @@ class TreeNode:
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
-            self.samples = self.state.solver.batch_iterate(target)
+            self.samples = self.state.solver.iterate(target)
 
         results = []
         while len(results) < MAX_SAMPLES:

@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import pdb
 import struct
 import subprocess as sp
 from typing import Dict, List
@@ -92,4 +93,5 @@ if __name__ == '__main__':
     else:
         BINARY = args.file
 
-    print([binary_execute(val) for val in explore()])
+    vals = [val for val in explore()]
+    print([binary_execute(bytes([val])) for val in vals])

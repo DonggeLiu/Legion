@@ -23,7 +23,7 @@ if __name__ == "__main__":
         cc_bin = 'cc'
 
     skip = False
-    cmd = []
+    cmd = list()
     cmd.append(cc_bin)
 
     for arg in args[1:]:

@@ -135,6 +135,7 @@ venv/
 coverage_plotter.py
 ProgramUnderTest
 Results
+trace
 #Baselines
 
 

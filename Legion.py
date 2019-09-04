@@ -449,27 +449,27 @@ def initialisation():
                     in the previous line of the node to dye,
                     which does not exist for root
         """
-        root = TreeNode()
-        root.dye(colour=Colour.R,
-                 state=project.factory.entry_state(stdin=SimFileStream))
+
+        # Assert all traces start with the same address (i.e. main())
+        firsts = [trace for trace in zip(*traces)][0]
+
+        main_addr = firsts[0]
+        assert all(x == main_addr for x in firsts)
+
+        # Jump to the state of main_addr
+        project = init_angr()
+        main_state = project.factory.blank_state(addr=main_addr,
+                                                 stdin=SimFileStream)
+        root = TreeNode(addr=main_addr)
+        root.dye(colour=Colour.R, state=main_state)
         return root
 
-    def init_seeds():
-        """
-        Inset \n between every element
-        """
-        global SEEDS
-        tmp = []
-        for seed in SEEDS:
-            tmp.extend([seed, '\n'])
-        SEEDS = tmp
-
     global ROOT
-    project = init_angr()
+
+    traces = simulation(node=None)
+
     ROOT = init_root()
-    init_seeds()
-    traces = simulation(node=ROOT, input_strs=SEEDS)
-    ROOT.addr = traces[0][0]
+
     are_new = expansion(traces=traces)
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)

@@ -1,10 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import sys
 import os
 import subprocess
 
 JUMP_TARGETS = set()
+
 
 def set_jump(output):
     output.append('\tsub $128,%rsp\n')
@@ -87,7 +88,8 @@ def instrument_jump_targets(intermediate):
 
     return file
 
-def instrument(asm,ins):
+
+def instrument(asm, ins):
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
     inter = collect_jump_targets(asm_file)
@@ -117,7 +119,7 @@ if __name__ == "__main__":
     else:
         as_bin = 'as'
 
-    cmd = []
+    cmd = list()
     cmd.append(as_bin)
 
     # loop through all arguments, except last one (file name)
@@ -129,16 +131,18 @@ if __name__ == "__main__":
         cmd.append(arg)
 
     obj = args[-1]
+    instr = None
     if obj == '-version':
         cmd.append(obj)
     elif len(args) > 1:
-        instr = "{}/traced-{}".format(tmp,os.path.basename(obj))
+        instr = "{}/traced-{}".format(tmp, os.path.basename(obj))
         cmd.append(instr)
         doit = True
 
     # instrument the assembly file
     if doit:
-        instrument(obj,instr)
+        assert instr
+        instrument(obj, instr)
 
     # run the actual assembler program
     assert use64

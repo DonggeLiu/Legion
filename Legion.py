@@ -165,13 +165,19 @@ class TreeNode:
         """
 
         if self.colour is Colour.W:
+            # White node might have an unrevealed sibling
+            #   which can only be found by symex it
             return
 
         if not all([c.fully_explored for c in self.children.values() if
                     c.colour is not Colour.G]):
+            # If not all children all fully explored, don't mark it
+            #    exclude simulation child here.
             return
 
         if not self.sel_try:
+            # If a node has not been executed before,
+            #     it could be a newly added phantom child
             return
 
         LOGGER.info("Fully explored {}".format(self))
@@ -205,8 +211,7 @@ class TreeNode:
                 max_score = cur_score
                 candidates = [child]
 
-        # TODO: choose one from candidates uniformly
-        return random.choice(candidates)
+        return random.choice(candidates) if candidates else None
 
     def is_root(self) -> bool:
         """
@@ -277,7 +282,7 @@ class TreeNode:
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:
-            self.samples = self.state.solver.batch_iterate(target)
+            self.samples = self.state.solver.iterate(target)
 
         results = []
         while len(results) < MAX_SAMPLES:
@@ -444,27 +449,27 @@ def initialisation():
                     in the previous line of the node to dye,
                     which does not exist for root
         """
-        root = TreeNode()
-        root.dye(colour=Colour.R,
-                 state=project.factory.entry_state(stdin=SimFileStream))
+
+        # Assert all traces start with the same address (i.e. main())
+        firsts = [trace for trace in zip(*traces)][0]
+
+        main_addr = firsts[0]
+        assert all(x == main_addr for x in firsts)
+
+        # Jump to the state of main_addr
+        project = init_angr()
+        main_state = project.factory.blank_state(addr=main_addr,
+                                                 stdin=SimFileStream)
+        root = TreeNode(addr=main_addr)
+        root.dye(colour=Colour.R, state=main_state)
         return root
 
-    def init_seeds():
-        """
-        Inset \n between every element
-        """
-        global SEEDS
-        tmp = []
-        for seed in SEEDS:
-            tmp.extend([seed, '\n'])
-        SEEDS = tmp
-
     global ROOT
-    project = init_angr()
+
+    traces = simulation(node=None)
+
     ROOT = init_root()
-    init_seeds()
-    traces = simulation(node=ROOT, input_strs=SEEDS)
-    ROOT.addr = traces[0][0]
+
     are_new = expansion(traces=traces)
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
@@ -520,10 +525,11 @@ def selection() -> TreeNode:
     node, states_left = ROOT, []
     while node.colour is not Colour.G:
 
-        # If the nod is already a red leaf, mark it as fully explored
+        # If the node is already a red leaf, mark it as fully explored
         # Note: Must check this before dying,
-        #  otherwise a phantom red node added when dying its sibling will be wrongly marked as fully explored
-        if node.is_leaf() and node.colour is Colour.R:
+        #  otherwise the phantom red nodes which are added when
+        #  dying their sibling will be wrongly marked as fully explored
+        if node.is_leaf():
             node.mark_fully_explored()
 
         # If the node is white, dye it
@@ -540,10 +546,12 @@ def selection() -> TreeNode:
                 node.fully_explored = True
 
         # If the node's score is the minimum, return ROOT to restart
-        if node.score() == -inf:
+        if node.fully_explored:
             return ROOT
 
         node = tree_policy(node=node)
+        # the node selected by tree policy should not be None
+        debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
 
     debug_assertion(not states_left)
@@ -582,7 +590,7 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     if parent.colour is Colour.R:
         debug_assertion(not target_states)
         parent_state = parent.children['Simulation'].state
-        target_states = compute_to_diverge(state=parent_state)
+        target_states = symex_to_diverge(state=parent_state)
 
         # NOTE: Empty target states implies
         #  the symbolic execution has reached the end of program
@@ -600,7 +608,7 @@ def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
     return target_states
 
 
-def compute_to_diverge(state: State):
+def symex_to_diverge(state: State):
     """
     Symbolically execute to the immediate next diverging states and return its children (must be more than one)
     :param state: the state which is in the line to execute through
@@ -684,16 +692,17 @@ def add_children(parent: TreeNode, states: List[State]) -> None:
         LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
-def simulation(node: TreeNode, input_strs: List[str] = None) -> List[List[int]]:
+def simulation(node: TreeNode = None) -> List[List[int]]:
     """
     Generate mutants (i.e. inputs that tend to preserve the path to the node)
     Execute the instrumented binary with mutants to collect the execution traces
     :param node: the node to fuzz
-    :param input_strs: a predefined list of input_strs to be executed
     :return: the execution traces
     """
-    mutants = [bytes("".join(mutant), 'utf-8') for mutant in
-               input_strs] if input_strs else node.mutate()
+    # node is None if this is initialisation, during which should use SEEDS
+    # Otherwise, mutate() the node
+    mutants = node.mutate() if node else \
+        [bytes("".join(mutant), 'utf-8') for mutant in SEEDS]
     return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
 
 
@@ -747,7 +756,9 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         print("\n*******************"
               "\n***** EUREKA! *****"
               "\n*******************\n")
-    return unpack(error_msg)
+    trace = unpack(error_msg)
+    LOGGER.info([hex(addr) for addr in trace])
+    return trace
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:

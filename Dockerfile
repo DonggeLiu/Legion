@@ -1,4 +1,4 @@
-FROM python:3.7
+FROM ubuntu18.04
 
 RUN apt-get update
 RUN apt-get install apt-utils -y

@@ -18,6 +18,7 @@ all: $(SO) $(A) trace/as
 
 clean:
 	rm -f $(SO) $(A) $(O) $(LO)
+	rm -rf trace/
 
 %.s: %.i
 	$(CC) -S -g -o $@ $^

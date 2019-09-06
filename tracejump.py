@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # See AFL: afl-as.c
 # http://lcamtuf.coredump.cx/afl/technical_details.txt
@@ -108,7 +108,7 @@ def instrument_jump_targets(intermediate):
     return file
 
 
-def instrument(asm,ins):
+def instrument():
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
     inter = collect_jump_targets(asm_file)
@@ -119,6 +119,6 @@ def instrument(asm,ins):
 if __name__ == "__main__" and len(sys.argv) > 2:
     asm = sys.argv[1]
     ins = sys.argv[2]
-    instrument(asm,ins)
+    instrument()
     print('SetJump   {} lines'.format(NUM_SET))
     print('TraceJump {} lines'.format(NUM_TRACED))

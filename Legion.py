@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+
 import argparse
+import datetime
 import enum
 import logging
 import os
@@ -8,7 +11,6 @@ import signal
 import struct
 import subprocess as sp
 import time
-import datetime
 from math import sqrt, log, ceil, inf
 from typing import Dict, List, Tuple
 

@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+
 import argparse
+import datetime
 import enum
 import logging
 import os
@@ -8,7 +11,6 @@ import signal
 import struct
 import subprocess as sp
 import time
-import datetime
 from math import sqrt, log, ceil, inf
 from typing import Dict, List, Tuple
 
@@ -699,10 +701,14 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     :param node: the node to fuzz
     :return: the execution traces
     """
-    # node is None if this is initialisation, during which should use SEEDS
-    # Otherwise, mutate() the node
+    # node is None if this is initialisation, during which should:
+    #   use SEEDS if SEEDS is available or use random fuzzing if not
+    # otherwise, mutate() the node
+
     mutants = node.mutate() if node else \
-        [bytes("".join(mutant), 'utf-8') for mutant in SEEDS]
+        [bytes("".join(mutant), 'utf-8') for mutant in SEEDS] if SEEDS else \
+        TreeNode.random_fuzzing()
+
     return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
 
 
@@ -1026,6 +1032,6 @@ if __name__ == '__main__':
 
     main()
     # cProfile.run('main()', sort='cumtime')
-    pdb.set_trace()
+#    pdb.set_trace()
 
     ROOT.pp()

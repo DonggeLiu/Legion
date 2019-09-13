@@ -788,6 +788,14 @@ def integrate_path(trace: List[int]) -> bool:
         new_child, child = node.match_child(addr=addr)
         is_new = is_new or new_child
         node = child
+
+    # Note: If the node happens to be an unvisited red leaf,
+    #   then it means this node is from a new path that the previous lines
+    #   will miss out.
+    #   This happens when the node is a newly added phantom.
+    is_new = is_new or not node.sim_try
+    node.sim_try = node.sim_try if node.sim_try else 1
+
     return is_new
 
 

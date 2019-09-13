@@ -719,8 +719,6 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     :return: the execution trace in a list
     """
 
-    time_stamp = time.time() - TIME_START
-
     def unpack(output):
         debug_assertion((len(output) % 8 == 0))
         # NOTE: changed addr[0] to addr
@@ -750,7 +748,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     error_msg = report_msg[1]
 
     if SAVE_TESTCASES or SAVE_TESTINPUTS:
-        TIMES.append(time_stamp)
+        TIMES.append(time.clock())
         if SAVE_TESTCASES:
             output_msg = report_msg[0].decode('utf-8')
             MSGS.append(output_msg)

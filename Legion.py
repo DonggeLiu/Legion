@@ -888,7 +888,7 @@ def save_news_to_file(are_new):
 def save_tests_to_file(time_stamp, data):
     # if DIR_NAME not in os.listdir('tests'):
     with open('tests/{}/{}_{}.xml'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
+            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt+') as input_file:
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
@@ -903,7 +903,7 @@ def save_input_to_file(time_stamp, input_bytes):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
     with open('inputs/{}/{}_{}'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
+            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb+') as input_file:
         input_file.write(input_bytes)
 
 
@@ -1011,7 +1011,7 @@ if __name__ == '__main__':
 
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
-        with open("tests/{}/metadata.xml".format(DIR_NAME), "wt") as md:
+        with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
             md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
             md.write('<test-metadata>\n')

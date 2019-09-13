@@ -1003,8 +1003,11 @@ if __name__ == '__main__':
             BINARY = stem
         LOGGER.info('Building {}'.format(BINARY))
         # print("./trace-cc -static -L. -legion -o {} {}".format(BINARY, source))
-        sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o",
-                BINARY, source])
+        sp.run(["cp", source, "./program.c"])
+        BINARY = "./program.instr"
+        sp.run(["make", BINARY])
+        # sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o",
+        #         BINARY, source])
         # os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
         sp.run(["file", BINARY])
         # os.system("file {}".format(BINARY))

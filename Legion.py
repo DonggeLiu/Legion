@@ -975,6 +975,10 @@ if __name__ == '__main__':
                         help='Increase output verbosity')
     parser.add_argument("-o", default=None,
                         help='Binary file output location when input is a C source')
+    parser.add_argument("--cc", default="cc",
+                        help='C compiler to use together with --compile svcomp')
+    parser.add_argument("--compile", default="make",
+                        help='How to compile C input files')
     parser.add_argument("file",
                         help='Binary or source file')
     parser.add_argument("seeds", nargs='*',
@@ -997,20 +1001,35 @@ if __name__ == '__main__':
     if is_source:
         source = args.file
         stem = source[:-2]
-        if args.o:
+
+        if args.compile == "make":
+            if args.o:
+                LOGGER.warning("--compile make overrides -o BINARY")
+            BINARY = stem + ".instr"
+            LOGGER.info('Making {}'.format(BINARY))
+            sp.run(["make", "-B", BINARY])
+        elif args.compile == "svcomp":
+            if not args.o:
+                LOGGER.error("--compile svcomp requires -o BINARY")
+                sys.exit(2)
             BINARY = args.o
+            asm = BINARY + ".s"
+            ins = BINARY + ".instr.s"
+            sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
+            sp.run(["./tracejump.py", asm, ins])
+            sp.run([args.cc, "-no-pie", "-o", BINARY, "__VERIFIER.c", "__trace_jump.s", ins])
+        elif args.compile == "trace-cc":
+            if args.o:
+                BINARY = args.o
+            else:
+                BINARY = stem
+            LOGGER.info('Compiling {} with trace-cc'.format(BINARY))
+            sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o", BINARY, source])
         else:
-            BINARY = stem
-        LOGGER.info('Building {}'.format(BINARY))
-        # print("./trace-cc -static -L. -legion -o {} {}".format(BINARY, source))
-        sp.run(["cp", source, "./program.c"])
-        BINARY = "./program.instr"
-        sp.run(["make", BINARY])
-        # sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o",
-        #         BINARY, source])
-        # os.system("./trace-cc -static -L. -legion -o {} {}".format(BINARY,source))
+            LOGGER.error("Invalid compilation mode: {}".format(args.compile))
+            sys.exit(2)
+
         sp.run(["file", BINARY])
-        # os.system("file {}".format(BINARY))
     else:
         BINARY = args.file
 

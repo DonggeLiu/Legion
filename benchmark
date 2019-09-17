@@ -1,4 +1,5 @@
 #!/bin/sh
 
+rm test/results -r
 # /home/ernst/workspace/cpachecker/scripts/benchmark.py --read-only-dir / -t ReachSafety-Arrays --cloud --cloudMaster localhost legion.xml
 /home/ernst/workspace/cpachecker/scripts/benchmark.py --read-only-dir / --cloud --cloudMaster localhost legion.xml

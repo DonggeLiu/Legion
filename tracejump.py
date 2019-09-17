@@ -108,7 +108,7 @@ def instrument_jump_targets(intermediate):
     return file
 
 
-def instrument():
+def instrument(asm, ins):
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
     inter = collect_jump_targets(asm_file)
@@ -119,6 +119,6 @@ def instrument():
 if __name__ == "__main__" and len(sys.argv) > 2:
     asm = sys.argv[1]
     ins = sys.argv[2]
-    instrument()
+    instrument(asm, ins)
     print('SetJump   {} lines'.format(NUM_SET))
     print('TraceJump {} lines'.format(NUM_TRACED))

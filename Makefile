@@ -74,7 +74,7 @@ ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 
 .PHONY: zips
 
-%/test-suite.zip: %/Principes
+%/test-suite.zip: %/Legion
 	zip $@ $^ -r
 
 zips: $(ZIPS)

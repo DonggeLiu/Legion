@@ -2,7 +2,7 @@
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
 <benchmark tool="benchmark.tools.legion" displayName="Legion" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="1245" cpuCores="8"/>
+  <require cpuModel="1245" />
 
   <option name="--save-tests"/>
   <option name="--time-penalty">0</option>

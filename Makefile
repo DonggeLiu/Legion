@@ -79,3 +79,5 @@ ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 
 zips: $(ZIPS)
 
+package.zip: legion-sv Legion.py __VERIFIER.c __trace_jump.s tracejump.py benchmark validate legion.xml
+	zip -r $@ $^ lib

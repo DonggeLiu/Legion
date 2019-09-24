@@ -2,7 +2,7 @@
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
 <benchmark tool="tbf_testsuite_validator" displayName="TBF Test-Suite Validator" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="Intel" cpuCores="2"/>
+  <require cpuModel="Intel Core i5" cpuCores="2"/>
 
   <resultfiles>**test-suite/*</resultfiles>
 

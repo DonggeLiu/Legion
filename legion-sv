@@ -1,10 +1,4 @@
 #!/bin/bash
 
 export PYTHONPATH=lib
-# export PATH="./local/bin:$PATH"
-env
-apt list python3-lib2to3
-apt list python3-lib3to2
-apt list python3-setuptools
-apt list python3-distutils
 python3 ./Legion.py $@

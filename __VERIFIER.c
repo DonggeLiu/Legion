@@ -42,6 +42,20 @@ unsigned short __VERIFIER_nondet_ushort() {
     return x;
 }
 
+unsigned long __VERIFIER_nondet_unsigned_long() {
+    unsigned long x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"unsigned long\">%d</input>\n", x);
+    return x;
+}
+
+long __VERIFIER_nondet_long() {
+    long x = 0;
+    read(0, &x, sizeof(x));
+    printf("  <input type=\"long\">%d</input>\n", x);
+    return x;
+}
+
 unsigned int __VERIFIER_nondet_uint() {
     unsigned int x = 0;
     read(0, &x, sizeof(x));

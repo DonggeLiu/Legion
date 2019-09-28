@@ -31,6 +31,7 @@ MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
+COVERAGE_ONLY = False
 
 # Statistics
 CUR_ROUND = 0
@@ -483,7 +484,8 @@ def has_budget() -> bool:
     Control whether to terminate mcts or not
     :return: True if terminate
     """
-    return not FOUND_BUG and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
+    return (COVERAGE_ONLY or not FOUND_BUG) \
+        and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
         and CUR_ROUND < MAX_ROUNDS
 
 
@@ -967,6 +969,8 @@ if __name__ == '__main__':
     #                     help='Specify compiler binary')
     # parser.add_argument('--as',
     #                     help='Specify assembler binary')
+    parser.add_argument('--coverage-only', action="store_true",
+                        help="Do not terminate when capturing a bug")
     parser.add_argument('--save-inputs', action="store_true",
                         help='Save inputs as binary files')
     parser.add_argument('--save-tests', action="store_true",
@@ -987,6 +991,7 @@ if __name__ == '__main__':
 
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
+    COVERAGE_ONLY = args.coverage_only
     TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests

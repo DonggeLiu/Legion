@@ -202,14 +202,14 @@ class TreeNode:
             #     return
             return
 
-        LOGGER.info("Fully explored {}".format(self))
+        LOGGER.info("Mark fully explored {}".format(self))
         self.fully_explored = True
 
         # if self.colour is Colour.G:
         #     self.parent.fully_explored = True
 
         if self.colour is Colour.R:
-            LOGGER.info("Fully explored {}".format(self.children['Simulation']))
+            LOGGER.info("Red parent Fully explored {}".format(self.children['Simulation']))
             self.children['Simulation'].fully_explored = True
 
         if self.parent:
@@ -331,7 +331,12 @@ class TreeNode:
                 #       even if not, the next constraint solving will take long
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
+
+                # Note: If the state of the simulation node is unsatisfiable
+                #   then this will occur in the first time the node is selected
+                LOGGER.info("Exhausted {}".format(self))
                 LOGGER.info("Fully explored {}".format(self))
+                self.fully_explored = True
                 self.mark_fully_explored()
                 break
         return results

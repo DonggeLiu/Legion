@@ -106,6 +106,17 @@ class TreeNode:
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
 
+    def sim_state(self) -> State or None:
+        """
+        SimStates of red nodes are stored in their simualtion child
+        SimStates of white nodes are None
+        SimStates of black/gold nodes are stored in them
+        :return: the symbolic state of the node
+        """
+        if self.colour is Colour.R:
+            return self.children['Simulation'].state
+        return self.state
+
     def score(self) -> float:
 
         def time_penalisation() -> float:

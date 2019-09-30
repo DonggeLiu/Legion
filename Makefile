@@ -69,7 +69,7 @@ uninstall:
 	rm $(PREFIX)/bin/trace/as
 	rmdir $(PREFIX)/bin/trace
 
-LOGS = $(wildcard test/results/legion.*.logfiles/*.files)
+LOGS = $(wildcard test/results/legion.*.files/*)
 ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 
 .PHONY: zips
@@ -78,6 +78,7 @@ ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 	zip $@ $^ -r
 
 zips: $(ZIPS)
+	echo $(ZIPS)
 
 package.zip: legion-sv Legion.py __VERIFIER.c __trace_jump.s tracejump.py benchmark validate legion.xml
 	zip -r $@ $^ lib

@@ -530,25 +530,24 @@ def selection() -> TreeNode:
     :return: nodes along the selection path
     """
 
-    def dye_node(target: TreeNode, states: List[State]) -> List[State]:
-        """
-        Since the target is white, dye it and its siblings
-        :param target: the node to dye
-        :param states: the states to dye the target and its siblings
-        :return: the states left after dying (i.e. because the node is black)
-        """
-        states = dye_siblings(parent=target.parent, target_states=states)
-        # NOTE: if the node is dyed to red,
-        #  it means all states left must belong to its siblings
-        if target.colour is Colour.R:
-            add_children(parent=target.parent, states=states)
-            states = []
-        return states
+    # def dye_node(target: TreeNode) -> List[State]:
+    #     """
+    #     Since the target is white, dye it and its siblings
+    #     :param target: the node to dye
+    #     :return: the states left after dying (i.e. because the node is black)
+    #     """
+    #     # states = dye_siblings(child=target)
+    #     #
+    #     # if target.colour is Colour.R:
+    #     #     # Add the states left as phantom child of the target's parent
+    #     #     add_children(parent=target.parent, states=states)
+    #     #     # NOTE: if the node is dyed to red,
+    #     #     #  it means all states left must belong to its siblings
+    #     #     states = []
+    #     # return states
 
-    node, states_left = ROOT, []
+    node = ROOT
     while node.colour is not Colour.G:
-
-        # If the node is already a red leaf, mark it as fully explored
         # Note: Must check this before dying,
         #  otherwise the phantom red nodes which are added when
         #  dying their sibling will be wrongly marked as fully explored
@@ -557,16 +556,24 @@ def selection() -> TreeNode:
 
         # If the node is white, dye it
         if node.colour is Colour.W:
-            states_left = dye_node(target=node, states=states_left)
+            dye_siblings(child=node)
 
-            # IF the node is dyed to black and there is no states left,
-            # it implies the previous parent state does not have any diverging
-            # descendants found by `compute_to_diverging()`, hence the rest of the
-            # tree must be fully explored, and there is no difference in fuzzing
-            # any of them
-            if node.colour is Colour.B and not states_left:
-                LOGGER.info("Fully explored {}".format(node))
-                node.fully_explored = True
+            # # IF the node is dyed to black and there is no states left,
+            # # it implies the previous parent state does not have any diverging
+            # # descendants found by `compute_to_diverging()`, hence the rest of the
+            # # tree must be fully explored, and there is no difference in fuzzing
+            # # any of them
+            # if node.colour is Colour.B and not states_left:
+            #     LOGGER.info("Fully explored {}".format(node))
+            #     node.fully_explored = True
+
+        # if the node does not have any child,
+        # then it must be a leaf
+        if not node.children:
+            LOGGER.info("Leaf reached: {}".format(node))
+            LOGGER.info("Fully explored {}".format(node))
+            node.fully_explored = True
+            node.parent.mark_fully_explored()
 
         # If the node's score is the minimum, return ROOT to restart
         if node.fully_explored:
@@ -577,7 +584,6 @@ def selection() -> TreeNode:
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
 
-    debug_assertion(not states_left)
     debug_assertion(node.colour is Colour.G)
 
     return node
@@ -592,63 +598,105 @@ def tree_policy(node: TreeNode) -> TreeNode:
     return node.best_child()
 
 
-def dye_siblings(parent: TreeNode, target_states: List[State]) -> List[State]:
+def dye_siblings(child: TreeNode) -> None:
     """
     If a child of the parent is found white,
     then all children of the parent must also be white;
     This function dyes them all.
-    :param parent: the parent of the white child
-    :param target_states: previous left states
+    :param child: the node to match
     :return: a list of states that
             do not match with any of the existing children of the parent,
             they correspond to the child nodes of the parent who
             have not been found by TraceJump
     """
+    #
+    # # Case 1: parent is red, then execute parent's state to find states of sibs
+    # # Case 2: parent is black, use the states left to dye siblings
+    # # Either 1 or 2, not both
+    # debug_assertion((parent.colour is Colour.R) ^ bool(target_states))
 
-    # Case 1: parent is red, then execute parent's state to find states of sibs
-    # Case 2: parent is black, use the states left to dye siblings
-    # Either 1 or 2, not both
-    debug_assertion((parent.colour is Colour.R) ^ bool(target_states))
+    # if child.parent.colour is Colour.R:
+    #     debug_assertion(not target_states)
+    #     parent_state = parent.children['Simulation'].state
+    #     target_states = symex_to_match(state=parent_state, addr=child.addr)
+    #
+    #     # NOTE: Empty target states implies
+    #     #  the symbolic execution has reached the end of program
+    #     #  without seeing any divergence after the parent's state
+    #     #  hence the parent is fully explored
+    #     # Note: a single target state does not mean the parent is fully explored
+    #     #   It may be the case where the target is the only feasible child,
+    #     #   but the target has other diverging child states
+    #     if not target_states:
+    #         pdb.set_trace()
+    #         parent.fully_explored = True
 
-    if parent.colour is Colour.R:
-        debug_assertion(not target_states)
-        parent_state = parent.children['Simulation'].state
-        target_states = symex_to_diverge(state=parent_state)
+    sibling_states = symex_to_match(target=child)
 
-        # NOTE: Empty target states implies
-        #  the symbolic execution has reached the end of program
-        #  without seeing any divergence after the parent's state
-        #  hence the parent is fully explored
-        if not target_states:
-            parent.fully_explored = True
+    # Note: dye child according to the len of sibling_states:
+    #   1. len is 0, the child's parent must have been fully explored.
+    #   2. len is 1, the child should be dyed black, as it is the only feasible child
+    #   3. len >= 2, the child should be dyed red, add phantom if needed
 
-    for child_node in parent.children.values():
-        if child_node.colour is Colour.G:
-            continue
-        target_states = match_node_states(node=child_node, states=target_states)
-        debug_assertion(child_node.colour in [Colour.R, Colour.B])
+    if not sibling_states:
+        # No state is found, no way to explore deeper on this path
+        # Ideally, no diverging tree node should exist beneath the parent of the child.
+        # hence mark the child fully explored, and trace back to ancestors
+        LOGGER.info("No state found: {}".format(child))
+        # if hex(child.addr)[-4:] == '0731':
+        #     pdb.set_trace()
+        child.fully_explored = True
+        child.parent.mark_fully_explored()
 
-    return target_states
+    if len(sibling_states) == 1:
+        state = sibling_states.pop()
+        # This should only happen if the only state in sibling_states matches with the child
+        debug_assertion(child.addr == state.addr)
+        # No gold node for black nodes, hence no simulation will start from black ones
+        # No sibling node for black ndoes, hence they will never be compared with other nodes,
+        # except parent's simulation child.
+        child.dye(colour=Colour.B, state=state)
+
+    if len(sibling_states) > 1:
+        # For each state in siblings_states:
+        #   if it can match with an existing child, then dye the child red with the state
+        #   otherwise create a phantom child with the state
+        for state in sibling_states:
+            matched = match_node_states(
+                state=state,
+                children=[node for node in child.parent.children.values()
+                          if node.colour is not Colour.G])
+
+            if not matched:
+                add_phantom(parent=child.parent, state=state)
+
+        debug_assertion(all(sibling.colour is Colour.R
+                            for sibling in child.parent.children.values()
+                            if sibling.colour is not Colour.G))
+
+        # for child_node in child.parent.children.values():
+        #     if child_node.colour is Colour.G:
+        #         continue
+        #     sibling_states = match_node_states(node=child_node, state=sibling_states)
+        #     debug_assertion(child_node.colour is Colour.R)
 
 
-def symex_to_diverge(state: State):
+def symex_to_match(target: TreeNode) -> List[State]:
     """
-    Symbolically execute to the immediate next diverging states and return its children (must be more than one)
-    :param state: the state which is in the line to execute through
+    Symbolically execute from the parent of the target
+    to the immediate next state whose address matches withthe target (may have siblings)
+    :param target: the target to match against
     :return: a list of the immediate child states of the line,
         could be empty if the line is a leaf
+        could be one if the addr is the only feasible child
+        could be more if the addr has other feasible siblings
     """
-    child_states = symex(state=state)
+    child_states = symex(state=target.parent.sim_state())
 
-    # Terminate if there is a choice
-    while len(child_states) == 1:
-        # if len(child_states[0].solver.constraints) > len(state.solver.constraints):
-        #     # Note: There is at least one unsatisfiable state ignored by ANGR:
-        #     #  Because child_state's constraint is different from its parent,
-        #     #  but child state does not have any sibling.
-        #     #  We should ignore this when fuzzing input
-        #     #  cause it does not give us an alternative state to fuzz with
-        #     continue
+    while child_states and target.addr not in [state.addr for state in child_states]:
+        # If there are at least two child states,
+        # then the the target address should have matched with one of the states
+        debug_assertion(len(child_states) == 1)
         child_states = symex(state=child_states[0])
 
     if not child_states:
@@ -664,55 +712,56 @@ def symex(state: State) -> List[State]:
     :return: the resulting state(s) of symbolic execution
     """
     LOGGER.debug(state)
+    # Note: Need to keep all successors?
     return state.step().successors
 
 
-def match_node_states(node: TreeNode, states: List[State]) -> List[State]:
+def match_node_states(state: State, children: List[TreeNode]) -> bool:
     """
     If the node matches one of the states, then dye node to red
         and remove it from the list of states
     Else dye the node to black
-    :param node: the node to match with state
-    :param states: a list of states to match with the node
-    :return: a list of states that does not match with the node
+    :param state: a state to match with one of the children
+    :param children: a list of node to match with state
+    :return: the successfulness of matching
     """
-    if not states:
-        node.dye(colour=Colour.B)
-        # NOTE: Empty target states implies
-        #  the symbolic execution has reached the end of program
-        #  without seeing any divergence after the parent's state
-        #  hence the parent is fully explored
-        node.mark_fully_explored()
-        return states
-
-    for state in states:
+    # if not states:
+    #     node.dye(colour=Colour.B)
+    #     # NOTE: Empty target states implies
+    #     #  the symbolic execution has reached the end of program
+    #     #  without seeing any divergence after the parent's state
+    #     #  hence the parent is fully explored
+    #     node.mark_fully_explored()
+    #     return states
+    matched = False
+    for child in children:
         # try to match each state to the node
-        if node.addr == state.addr:
-            node.dye(colour=Colour.R, state=state)
-            states.remove(state)
+        if child.addr != state.addr:
+            continue
+        child.dye(colour=Colour.R, state=state)
+        matched = True
+        break
+    # if node.colour is Colour.W:
+    #     node.dye(colour=Colour.B)
 
-    if node.colour is Colour.W:
-        node.dye(colour=Colour.B)
-
-    return states
+    return matched
 
 
-def add_children(parent: TreeNode, states: List[State]) -> None:
+def add_phantom(parent: TreeNode, state: State) -> None:
     """
     Given all states that do not match with any of the parent's child nodes,
     it implies those nodes have not been discovered by TraceJump.
     The nodes must be there, we might as well add them directly
     :param parent: the parent to which the child nodes will be added
-    :param states: the states to which the child nodes correspond
+    :param state: the state of the phantom node
     :return:
     """
-    for state in states:
-        debug_assertion(state.addr not in parent.children)
-        parent.add_child(key=state.addr,
-                         new_child=TreeNode(addr=state.addr, parent=parent))
-        parent.children[state.addr].dye(colour=Colour.R, state=state)
-        parent.children[state.addr].phantom = True
-        LOGGER.info("Add Phantom {} to {}".format(state, parent))
+    debug_assertion(state.addr not in parent.children)
+    parent.add_child(key=state.addr,
+                     new_child=TreeNode(addr=state.addr, parent=parent))
+    parent.children[state.addr].dye(colour=Colour.R, state=state)
+    parent.children[state.addr].phantom = True
+    LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
 def simulation(node: TreeNode = None) -> List[List[int]]:

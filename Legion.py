@@ -76,7 +76,7 @@ class TreeNode:
     White  | True         | Undetermined | Undetermined
     Red    | True         | True         | False, stored in its simulation child
     Gold   | False        | False        | True, stores its parent's state
-    Black  | True         | no sibling   | False
+    Black  | True         | no sibling   | True if is intermediate, False if is leaf
     """
 
     def __init__(self, addr: int = -1, parent: 'TreeNode' = None,
@@ -254,7 +254,7 @@ class TreeNode:
         # Don't double dye a node
         debug_assertion(self.colour is Colour.W)
         # All colours should come with a state, except black
-        debug_assertion(bool(colour is Colour.B) ^ bool(state))
+        debug_assertion(bool(colour is Colour.B) or bool(state))
 
         self.colour = colour
         if colour is Colour.R:

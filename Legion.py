@@ -427,7 +427,7 @@ class TreeNode:
                     t=TIME_COEFF, at=self.accumulated_time, MS=MIN_SAMPLES)
 
     def repr_node_state(self) -> str:
-        return "{}".format(self.state) if self.state else "NoState"
+        return "{}".format(self.sim_state()) if self.sim_state() else "NoState"
 
     def __repr__(self) -> str:
         return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \

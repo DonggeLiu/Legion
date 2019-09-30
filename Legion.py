@@ -481,7 +481,7 @@ def initialisation():
         firsts = [trace for trace in zip(*traces)][0]
 
         main_addr = firsts[0]
-        assert all(x == main_addr for x in firsts)
+        debug_assertion(all(x == main_addr for x in firsts))
 
         # Jump to the state of main_addr
         project = init_angr()

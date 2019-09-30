@@ -189,9 +189,17 @@ class TreeNode:
             #    exclude simulation child here.
             return
 
-        if not self.sel_try:
-            # If a node has not been executed before,
-            #     it could be a newly added phantom child
+        if not self.sel_try and self.colour is Colour.R:
+            # # Note: If a node has not been executed before,
+            # #   it could be a newly added phantom child
+            # if self.colour not in [Colour.R, Colour.G]:
+            #     return
+            # # Note: If it is Red or Gold, do not mark fully explored if both:
+            # #   1. it is satisfiable
+            # #   2. app_fuzzing is exhausted
+            # sim_child = self if self.colour is Colour.G else self.children['Simulation']
+            # if sim_child.state.satisfiable and not sim_child.fully_explored:
+            #     return
             return
 
         LOGGER.info("Fully explored {}".format(self))

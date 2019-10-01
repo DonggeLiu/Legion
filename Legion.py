@@ -191,16 +191,14 @@ class TreeNode:
             return
 
         if not self.sel_try and self.colour is Colour.R:
-            # # Note: If a node has not been executed before,
-            # #   it could be a newly added phantom child
-            # if self.colour not in [Colour.R, Colour.G]:
-            #     return
-            # # Note: If it is Red or Gold, do not mark fully explored if both:
-            # #   1. it is satisfiable
-            # #   2. app_fuzzing is exhausted
-            # sim_child = self if self.colour is Colour.G else self.children['Simulation']
-            # if sim_child.state.satisfiable and not sim_child.fully_explored:
-            #     return
+            # This line makes sure that we will simulate on every phantom node
+            # at least once to discover the path beneath them:
+            #   1. Black nodes cannot be a phantom, cause phantoms must have
+            #       a sibling (phantoms are found when symex to their siblings).
+            #   2. Gold nodes do not have any sibling before the first
+            #       execution, it will be picked even if it is fully explored.
+            #   3. Red nodes should not be marked fully explored before
+            #       testing out at once, in case it is a phantom
             return
 
         LOGGER.info("Mark fully explored {}".format(self))

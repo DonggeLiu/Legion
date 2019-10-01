@@ -53,6 +53,19 @@ def trace_jump(output):
 
 
 def collect_jump_targets(asm_file):
+
+    # def prepare_for_jump(inst):
+    #     # TODO: An alternative way to solve the other TODO
+    #     if instruction[0] != "\t":
+    #         return False
+    #     if inst[1:4] == "cmp":
+    #         return True
+    #     if inst[1:5] == "test":
+    #         return True
+    #     if inst[1:4] == "xor":
+    #         return True
+    #     return False
+
     entry_label = False
     compare_set = False
     file = []
@@ -74,6 +87,10 @@ def collect_jump_targets(asm_file):
 
         # If the next instruction is a conditional jump
         # TraceJumpSet before the current one:
+        # TODO: Here it assumes the flag users (je, js, etc.) will always be
+        #   adjacent to the flag setters (cmp, test, etc.)
+        #   This is invalid under some optimisations (e.g. -O0, -O2, -O3)
+        #   But happen to work under -O1 for unknown reasons
         if (i + 1) < len(lines):
             next_instruction = lines[i + 1]
             if next_instruction.startswith("\t"):
@@ -108,7 +125,7 @@ def instrument_jump_targets(intermediate):
     return file
 
 
-def instrument(asm, ins):
+def instrument():
     asm_file = open(asm, 'rt')
     ins_file = open(ins, 'wt')
     inter = collect_jump_targets(asm_file)
@@ -119,6 +136,6 @@ def instrument(asm, ins):
 if __name__ == "__main__" and len(sys.argv) > 2:
     asm = sys.argv[1]
     ins = sys.argv[2]
-    instrument(asm, ins)
+    instrument()
     print('SetJump   {} lines'.format(NUM_SET))
     print('TraceJump {} lines'.format(NUM_TRACED))

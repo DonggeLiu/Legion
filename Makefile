@@ -21,10 +21,10 @@ clean:
 	rm -rf trace/
 
 %.s: %.i
-	$(CC) -S -g -o $@ $^
+	$(CC) -S -g -O1 -o $@ $^
 
 %.s: %.c
-	$(CC) -S -g -o $@ $^
+	$(CC) -S -g -O1 -o $@ $^
 
 %.instr.s: %.s
 	python3 tracejump.py $^ $@

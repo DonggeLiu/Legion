@@ -45,7 +45,7 @@ unsigned short __VERIFIER_nondet_ushort() {
 unsigned long __VERIFIER_nondet_unsigned_long() {
     unsigned long x = 0;
     read(0, &x, sizeof(x));
-    printf("  <input type=\"unsigned long\">%uld</input>\n", x);
+    printf("  <input type=\"unsigned long\">%lu</input>\n", x);
     return x;
 }
 

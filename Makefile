@@ -38,6 +38,9 @@ clean:
 %.instr: %.instr.o __trace_jump.o __VERIFIER.c
 	$(CC) -g -o $@ $^ -no-pie
 
+%.instr.obj: %.instr
+	objdump -d $^ > $@
+
 $(SO): CFLAGS  += -fPIC
 $(SO): LDFLAGS += -shared
 

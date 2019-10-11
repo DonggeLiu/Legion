@@ -2,6 +2,9 @@
 
 PREFIX = /usr/local
 
+# keep temporary files
+.SECONDARY:
+
 SO = libegion.so
 A  = libegion.a
 

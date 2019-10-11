@@ -1,49 +1,140 @@
+#!/usr/bin/env python3
+
 import argparse
-import enum
 import logging
 import os
 import pdb
-import random
-import signal
 import struct
 import subprocess as sp
-import time
-from math import sqrt, log, ceil, inf
-from typing import Dict, List
+from typing import List
 
 from angr import Project
-from angr.exploration_techniques import DFS, Explorer
-from angr.sim_state import SimState as State
+from angr.errors import SimProcedureError, SimMemoryAddressError, SimUnsatError
 from angr.storage.file import SimFileStream
-
 
 # Execution
 BINARY = None
 
 # Logging
 LOGGER = logging.getLogger("Legion")
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.ERROR)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
+logging.getLogger('angr').setLevel('ERROR')
 
-
-def symex():
-    project = Project(thing=BINARY, ignore_functions=['printf'])
-    simgr = project.factory.simgr(project.factory.entry_state())
-    # simgr.use_technique(tech=DFS)
-    simgr.explore()
-#    pdb.set_trace()
-    return simgr.deadended
-
-def solve(state):
-    return state.solver.eval(state.solver.constraints[0].args[0])
 
 def explore():
-    states = symex()
-    vals = [solve(state) for state in states]
+    project = Project(thing=BINARY, ignore_functions=['printf'])
+    entry = project.factory.entry_state(stdin=SimFileStream, stack_size=64)
+    # entry = project.state_full_init(stdin=SimFileStream)
+    symex_paths = my_symex(entry)
+    # symex_paths = symex(project, entry)
+
+    values = [solve_inputs(path[-1]) for path in symex_paths]
+    conex_results = [my_conex(value) for value in values]
+    for i in range(len(symex_paths)):
+        conex_path, return_code = conex_results[i]
+        print("INPUT value: {}; INPUT bytes: {}; RETURN code: {}"
+              .format(int.from_bytes(values[i], 'big', signed=True),
+                      values[i],
+                      return_code))
+        print("SymEx".rjust(9), "ConEx".ljust(9), "Constraints")
+        for node in symex_paths[i]:
+            constraints = node.solver.constraints
+            if conex_path and hex(node.addr) == conex_path[0]:
+                print(hex(node.addr).rjust(9),
+                      conex_path[0].ljust(9),
+                      constraints)
+                conex_path.pop(0)
+            else:
+                print(hex(node.addr).rjust(9), ''.rjust(9), constraints)
+        for addr in conex_path:
+            print("ConEx addr not in SymEx:", addr)
+        print()
 
 
+def my_symex(root):
+    def symex_step():
+        try:
+            successors = node.step().successors
+        except (SimProcedureError, SimMemoryAddressError, SimUnsatError) as e:
+            print(root, e)
+            successors = []
+            pdb.set_trace()
+        return successors
+
+    paths = [[root]]
+
+    for path in paths:
+        node = path[-1]
+        children = symex_step()
+        while children:
+            node = children.pop()
+            path.append(node)
+            for child in children:
+                paths.append(path + [child])
+            children = symex_step()
+
+    return paths
+
+
+def solve_inputs(leaf):
+    def solve(state):
+        target = state.posix.stdin.load(0, state.posix.stdin.size)
+        return state.solver.eval(target), (target.size() + 7) // 8
+
+    solution, byte_len = solve(state=leaf)
+    value = solution.to_bytes(byte_len, 'big')
+    return value
+
+
+def my_conex(value):
+    conex_path = concrete_execute(value)
+    return conex_path
+
+
+def concrete_execute(input_bytes: bytes) -> (List[str], int):
+    """
+    Execute the binary with an input in bytes
+    :param input_bytes: the input to feed the binary
+    :return: the execution trace in a list
+    """
+
+    def unpack(output):
+        return [addr for i in range(int(len(output) / 8))
+                for addr in struct.unpack_from('q', output, i * 8)]
+
+    def execute():
+        program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+                           stderr=sp.PIPE, close_fds=True)
+        try:
+            msg = program.communicate(input_bytes, timeout=30 * 60 * 60)
+            ret = program.returncode
+
+            program.kill()
+            del program
+            return msg, ret
+        except sp.TimeoutExpired:
+            LOGGER.error("Binary execution time out")
+            exit(2)
+
+    report = execute()
+    report_msg, return_code = report
+    error_msg = report_msg[1]
+    trace = unpack(error_msg)
+    return [hex(addr) for addr in trace], return_code
+
+
+def symex(project, entry):
+    """
+    ANGR's default exploration strategy, DFS according to doc
+    :return: the termination states
+    """
+    simgr = project.factory.simgr(entry)
+    # simgr.use_technique(tech=DFS)
+    simgr.explore()
+    return simgr.deadended
 
 # def save_news_to_file(are_new):
 #     """

@@ -9,7 +9,9 @@ import subprocess as sp
 from typing import List
 
 from angr import Project
+from angr.analyses.identifier.identify import Identifier
 from angr.errors import SimProcedureError, SimMemoryAddressError, SimUnsatError
+from angr.state_plugins import SimSystemPosix
 from angr.storage.file import SimFileStream
 
 # Execution
@@ -25,9 +27,18 @@ logging.getLogger('angr').setLevel('ERROR')
 
 
 def explore():
-    project = Project(thing=BINARY, ignore_functions=['printf'])
-    entry = project.factory.entry_state(stdin=SimFileStream, stack_size=64)
-    # entry = project.state_full_init(stdin=SimFileStream)
+    project = Project(thing=BINARY, ignore_functions=['printf', '__stack_chk_fail'])
+    entry1 = project.factory.entry_state(stdin=SimFileStream)
+
+    # entry = Identifier.make_symbolic_state(entry.project, entry.project.arch.default_symbolic_registers)
+    entry = Identifier.make_initial_state(project=project, stack_length=80)
+
+    last_addr = entry.project.loader.main_object.max_addr
+    actual_brk = (last_addr - last_addr % 0x1000 + 0x1000)
+    entry.register_plugin('posix',
+                          SimSystemPosix(stdin=SimFileStream(name='stdin', has_end=False),
+                                         brk=actual_brk))
+
     symex_paths = my_symex(entry)
     # symex_paths = symex(project, entry)
 

@@ -60,6 +60,7 @@ LOGGER.setLevel(logging.ERROR)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
+logging.getLogger('angr').setLevel('ERROR')
 
 
 # Colour of tree nodes
@@ -107,6 +108,17 @@ class TreeNode:
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
 
+    def child(self, name) -> 'TreeNode' or None:
+        """
+        Get the child whose hex(addr) matches with the name
+        :param name: the hex(addr) of the child
+        :return: the matching child
+        """
+        for child in self.children.values():
+            if hex(child.addr)[-len(name):] == name:
+                return child
+        return None
+
     def sim_state(self) -> State or None:
         """
         SimStates of red nodes are stored in their simualtion child
@@ -117,6 +129,13 @@ class TreeNode:
         if self.colour is Colour.R:
             return self.children['Simulation'].state
         return self.state
+
+    def constraints(self) -> List:
+        """
+        :return: the path constraints of the node/state
+        """
+        return self.sim_state().solver.constraints \
+            if self.sim_state() else "No SimState"
 
     def score(self) -> float:
 
@@ -459,9 +478,12 @@ def run() -> None:
 
 def initialisation():
     def init_angr():
-        return Project(thing=BINARY, ignore_functions=['printf',
-                                                       '__trace_jump',
-                                                       '__trace_jump_set'])
+        return Project(thing=BINARY,
+                       ignore_functions=['printf',
+                                         '__trace_jump',
+                                         '__trace_jump_set'
+                                         ],
+                       )
 
     def init_root() -> TreeNode:
         """
@@ -698,6 +720,30 @@ def symex_to_match(target: TreeNode) -> List[State]:
     child_states = symex(state=target.parent.sim_state())
 
     while child_states and target.addr not in [state.addr for state in child_states]:
+        # If there are at least two child states,
+        # then the the target address should have matched with one of the states
+        debug_assertion(len(child_states) == 1)
+        child_states = symex(state=child_states[0])
+
+    if not child_states:
+        LOGGER.info("Symbolic execution reached the end of the program")
+
+    return child_states
+
+
+def symex_to_addr(target: TreeNode, addr: int) -> List[State]:
+    """
+    Symbolically execute from the parent of the target
+    to the immediate next state whose address matches withthe target (may have siblings)
+    :param target: the target to match against
+    :return: a list of the immediate child states of the line,
+        could be empty if the line is a leaf
+        could be one if the addr is the only feasible child
+        could be more if the addr has other feasible siblings
+    """
+    child_states = symex(state=target.sim_state())
+
+    while child_states and addr not in [state.addr for state in child_states]:
         # If there are at least two child states,
         # then the the target address should have matched with one of the states
         debug_assertion(len(child_states) == 1)

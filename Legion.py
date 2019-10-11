@@ -1061,7 +1061,7 @@ def run_with_timeout() -> None:
         pass
 
 
-def main() -> None:
+def main() -> int:
     """
     MAX_TIME == 0: Unlimited time budget
     MAX_TIME >  0: Time budget is MAX_TIME
@@ -1070,6 +1070,7 @@ def main() -> None:
         run_with_timeout()
     else:
         run()
+    return ROOT.sim_win
 
 
 if __name__ == '__main__':
@@ -1183,6 +1184,7 @@ if __name__ == '__main__':
     SEEDS = args.seeds
 
     main()
+    print(main())
     # cProfile.run('main()', sort='cumtime')
 #    pdb.set_trace()
 

@@ -8,6 +8,9 @@ PREFIX = /usr/local
 SO = libegion.so
 A  = libegion.a
 
+# optimisation
+OFLAG ?= -O0
+
 # compiled without -fPIC
 O  = __VERIFIER.o __trace_jump.o
 
@@ -24,10 +27,10 @@ clean:
 	rm -rf trace/
 
 %.s: %.i
-	$(CC) -S -g -O1 -o $@ $^
+	$(CC) -S -g $(OFLAG) -o $@ $^
 
 %.s: %.c
-	$(CC) -S -g -O1 -o $@ $^
+	$(CC) -S -g $(OFLAG) -o $@ $^
 
 %.instr.s: %.s
 	python3 tracejump.py $^ $@

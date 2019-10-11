@@ -1142,7 +1142,7 @@ if __name__ == '__main__':
             ins = BINARY + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
-            sp.run([args.cc, "-no-pie", "-o", BINARY, "__VERIFIER.c", "__trace_jump.s", ins])
+            sp.run([args.cc, "-no-pie", "-O1", "-o", BINARY, "__VERIFIER.c", "__trace_jump.s", ins])
         elif args.compile == "trace-cc":
             if args.o:
                 BINARY = args.o

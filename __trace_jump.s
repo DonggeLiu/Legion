@@ -32,4 +32,4 @@ LBB2_2:
 	pop    %rbp
 	ret
 
-	.comm	_state,4,2              ## @state        
+	.comm	_state,4,2              ## @state

@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
+import datetime
 import logging
 import os
-import pdb
+import signal
 import struct
 import subprocess as sp
+import sys
+import time
 from typing import List
 
 from angr import Project
-from angr.analyses.identifier.identify import Identifier
 from angr.errors import SimProcedureError, SimMemoryAddressError, SimUnsatError
-from angr.state_plugins import SimSystemPosix
 from angr.storage.file import SimFileStream
 
-# Execution
 BINARY = None
+SAVE_TESTCASES = False
+SAVE_TESTINPUTS = False
+TIME_START = time.time()
+MAX_TIME = 9
 
 # Logging
 LOGGER = logging.getLogger("Legion")
@@ -28,75 +32,61 @@ logging.getLogger('angr').setLevel('ERROR')
 
 def explore():
     project = Project(thing=BINARY, ignore_functions=['printf', '__stack_chk_fail'])
-    entry1 = project.factory.entry_state(stdin=SimFileStream)
+    entry = project.factory.entry_state(stdin=SimFileStream)
+    symex_paths_gen = my_symex_rec(entry, [entry])
 
-    # entry = Identifier.make_symbolic_state(entry.project, entry.project.arch.default_symbolic_registers)
-    entry = Identifier.make_initial_state(project=project, stack_length=80)
+    while True:
+        try:
+            symex_path = next(symex_paths_gen)
+        except StopIteration:
+            break
 
-    last_addr = entry.project.loader.main_object.max_addr
-    actual_brk = (last_addr - last_addr % 0x1000 + 0x1000)
-    entry.register_plugin('posix',
-                          SimSystemPosix(stdin=SimFileStream(name='stdin', has_end=False),
-                                         brk=actual_brk))
+        value = solve_inputs(symex_path[-1])
+        conex_result = my_conex(value)
+        conex_path, return_code = conex_result
 
-    symex_paths = my_symex(entry)
-    # symex_paths = symex(project, entry)
-
-    values = [solve_inputs(path[-1]) for path in symex_paths]
-    conex_results = [my_conex(value) for value in values]
-    for i in range(len(symex_paths)):
-        conex_path, return_code = conex_results[i]
-        print("INPUT value: {}; INPUT bytes: {}; RETURN code: {}"
-              .format(int.from_bytes(values[i], 'big', signed=True),
-                      values[i],
-                      return_code))
-        print("SymEx".rjust(9), "ConEx".ljust(9), "Constraints")
-        for node in symex_paths[i]:
+        LOGGER.info("INPUT value: {}; INPUT bytes: {}; RETURN code: {}"
+                    .format(int.from_bytes(value, 'big', signed=True),
+                            value,
+                            return_code))
+        LOGGER.info("{} {} {}".format("SymEx".rjust(9), "ConEx".ljust(9),
+                                      "Constraints"))
+        for node in symex_path:
             constraints = node.solver.constraints
             if conex_path and hex(node.addr) == conex_path[0]:
-                print(hex(node.addr).rjust(9),
-                      conex_path[0].ljust(9),
-                      constraints)
+                LOGGER.info(hex(node.addr).rjust(9),
+                            conex_path[0].ljust(9),
+                            constraints)
                 conex_path.pop(0)
             else:
-                print(hex(node.addr).rjust(9), ''.rjust(9), constraints)
+                LOGGER.info("{} {} {}".format(
+                    hex(node.addr).rjust(9), ''.rjust(9), constraints))
         for addr in conex_path:
-            print("ConEx addr not in SymEx:", addr)
-        print()
+            LOGGER.info("ConEx addr not in SymEx:", addr)
+        LOGGER.info("\n")
 
 
-def my_symex(root):
-    def symex_step():
-        try:
-            successors = node.step().successors
-        except (SimProcedureError, SimMemoryAddressError, SimUnsatError) as e:
-            print(root, e)
-            successors = []
-            pdb.set_trace()
-        return successors
+def symex_step(node):
+    try:
+        successors = node.step().successors
+    except (SimProcedureError, SimMemoryAddressError, SimUnsatError):
+        successors = []
+    return successors
 
-    paths = [[root]]
 
-    for path in paths:
-        node = path[-1]
-        children = symex_step()
-        while children:
-            node = children.pop()
-            path.append(node)
-            for child in children:
-                paths.append(path + [child])
-            children = symex_step()
-
-    return paths
+def my_symex_rec(root, prefix):
+    children = symex_step(root)
+    if children:
+        for child in children:
+            for path in my_symex_rec(child, prefix + [child]):
+                yield path
+    else:
+        yield prefix
 
 
 def solve_inputs(leaf):
-    def solve(state):
-        target = state.posix.stdin.load(0, state.posix.stdin.size)
-        return state.solver.eval(target), (target.size() + 7) // 8
-
-    solution, byte_len = solve(state=leaf)
-    value = solution.to_bytes(byte_len, 'big')
+    target = leaf.posix.stdin.load(0, leaf.posix.stdin.size)
+    value = leaf.solver.eval(target, cast_to=bytes)
     return value
 
 
@@ -134,137 +124,118 @@ def concrete_execute(input_bytes: bytes) -> (List[str], int):
     report_msg, return_code = report
     error_msg = report_msg[1]
     trace = unpack(error_msg)
+
+    if SAVE_TESTCASES or SAVE_TESTINPUTS:
+        time_stamp = time.clock()
+        if SAVE_TESTCASES:
+            output_msg = report_msg[0].decode('utf-8')
+            save_tests_to_file(time_stamp, output_msg)
+        if SAVE_TESTINPUTS:
+            save_input_to_file(input_bytes, time_stamp)
+
     return [hex(addr) for addr in trace], return_code
 
 
-def symex(project, entry):
-    """
-    ANGR's default exploration strategy, DFS according to doc
-    :return: the termination states
-    """
-    simgr = project.factory.simgr(entry)
-    # simgr.use_technique(tech=DFS)
-    simgr.explore()
-    return simgr.deadended
+def save_input_to_file(time_stamp, input_bytes):
+    os.system("mkdir -p inputs/{}".format(DIR_NAME))
+    with open('inputs/{}/{}'.format(DIR_NAME, time_stamp), 'wb+') as input_file:
+        input_file.write(input_bytes)
 
-# def save_news_to_file(are_new):
-#     """
-#     Save data to file only if it is new
-#     :param are_new: a list to represent whether each datum
-#                     contributes to a new path
-#     """
-#     global MSGS, INPUTS, TIMES
-#     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
-#         return
-#
-#     if SAVE_TESTCASES:
-#         debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
-#     if SAVE_TESTINPUTS:
-#         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
-#
-#     for i in range(len(are_new)):
-#         if are_new[i] and SAVE_TESTCASES:
-#             save_tests_to_file(TIMES[i], MSGS[i])
-#         if are_new[i] and SAVE_TESTINPUTS:
-#             save_input_to_file(TIMES[i], INPUTS[i])
-#     MSGS, INPUTS, TIMES = [], [], []
-#
-#
-# def save_tests_to_file(time_stamp, data):
-#     # if DIR_NAME not in os.listdir('tests'):
-#     os.system("mkdir -p tests/{}".format(DIR_NAME))
-#
-#     with open('tests/{}/{}_{}'.format(
-#             DIR_NAME, time_stamp, SOLVING_COUNT), 'wt') as input_file:
-#         input_file.write(
-#             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
-#         input_file.write(
-#             '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">')
-#         input_file.write('<testcase>\n')
-#         input_file.write(data)
-#         input_file.write('</testcase>\n')
-#
-#
-# def save_input_to_file(time_stamp, input_bytes):
-#     # if DIR_NAME not in os.listdir('inputs'):
-#     os.system("mkdir -p inputs/{}".format(DIR_NAME))
-#
-#     with open('inputs/{}/{}_{}'.format(
-#             DIR_NAME, time_stamp, SOLVING_COUNT), 'wb') as input_file:
-#         input_file.write(input_bytes)
-#
-#
-# def debug_assertion(assertion: bool) -> None:
-#     if LOGGER.level <= logging.INFO and not assertion:
-#         pdb.set_trace()
-#         return
-#     assert assertion
-#
-#
-# def handle_timeout() -> None:
-#     LOGGER.info("{} seconds time out!".format(MAX_TIME))
-#     exit(0)
+
+def save_tests_to_file(time_stamp, data):
+    with open('tests/{}/{}.xml'.format(
+            DIR_NAME, time_stamp), 'wt+') as input_file:
+        input_file.write(
+            '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
+        input_file.write(
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
+        input_file.write('<testcase>\n')
+        input_file.write(data)
+        input_file.write('</testcase>\n')
+
+
+def run_with_timeout() -> None:
+    """
+    A wrapper for run(), break run() when MAX_TIME is reached
+    """
+
+    def raise_timeout(signum, frame):
+        LOGGER.debug("Signum: {};\nFrame: {};".format(signum, frame))
+        LOGGER.info("{} seconds time out!".format(MAX_TIME))
+        raise TimeoutError
+
+    assert MAX_TIME
+    # Register a function to raise a TimeoutError on the signal
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after MAX_TIME
+    signal.alarm(MAX_TIME)
+    try:
+        explore()
+    except TimeoutError:
+        pass
+
+
+def main():
+    """
+    MAX_TIME == 0: Unlimited time budget
+    MAX_TIME >  0: Time budget is MAX_TIME
+    """
+    if MAX_TIME:
+        run_with_timeout()
+    else:
+        explore()
 
 
 if __name__ == '__main__':
+    sys.setrecursionlimit(1000000)
     parser = argparse.ArgumentParser(description='Legion')
-    # parser.add_argument('--min-samples', type=int, default=MIN_SAMPLES,
-    #                     help='Minimum number of samples per iteration')
-    # parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
-    #                     help='Maximum number of samples per iteration')
-    # parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
-    #                     help='Penalty factor for constraints that take longer to solve')
-    # # parser.add_argument('--sv-comp', action="store_true",
-    # #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
-    # # parser.add_argument('--source', action="store_true",
-    # #                     help='Input file is C source code (implicit for *.c)')
-    # # parser.add_argument('--cc',
-    # #                     help='Specify compiler binary')
-    # # parser.add_argument('--as',
-    # #                     help='Specify assembler binary')
-    # parser.add_argument('--save-inputs', type=bool, default=SAVE_TESTINPUTS,
-    #                     help='Save inputs as binary files')
-    # parser.add_argument('--save-tests', type=bool, default=SAVE_TESTCASES,
-    #                     help='Save inputs as TEST-COMP xml files')
-    # parser.add_argument('-v', '--verbose', action="store_true",
-    #                     help='Increase output verbosity')
+    # parser.add_argument('--sv-comp', action="store_true",
+    #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
+    parser.add_argument('--save-inputs', action='store_true',
+                        help='Save inputs as binary files')
+    parser.add_argument('--save-tests', action='store_true',
+                        help='Save inputs as TEST-COMP xml files')
+    parser.add_argument('-v', '--verbose', action="store_true",
+                        help='Increase output verbosity')
     parser.add_argument("file",
                         help='Binary or source file')
-    # parser.add_argument("seeds", nargs='*',
-    #                     help='Optional input seeds')
     args = parser.parse_args()
 
-    # MIN_SAMPLES = args.min_samples
-    # MAX_SAMPLES = args.max_samples
-    # TIME_COEFF = args.time_penalty
-    # SAVE_TESTINPUTS = args.save_inputs
-    # SAVE_TESTCASES = args.save_tests
+    SAVE_TESTINPUTS = args.save_inputs
+    SAVE_TESTCASES = args.save_tests
+    LOGGER.setLevel(logging.DEBUG if args.verbose else logging.ERROR)
 
-    # if args.verbose:
-    #     #     LOGGER.setLevel(logging.DEBUG)
-
-    is_c = args.file[-2:] == '.c'
-    is_i = args.file[-2:] == '.i'
-    is_source = is_c or is_i
-
+    is_source = args.file[-2:] in ['.c', '.i']
     if is_source:
         source = args.file
-        stem = source[:-2]
-        BINARY = stem + '.instr'
+        BINARY = source[:-2]
         LOGGER.info('Building {}'.format(BINARY))
-        os.system("make {}".format(BINARY))
+        os.system("gcc -ggdb -o {} {}".format(BINARY, source))
     else:
         BINARY = args.file
 
-    # binary_name = BINARY.split("/")[-1]
-    # DIR_NAME = "{}_{}_{}_{}".format(
-    #     binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
-    #
-    # SEEDS = args.seeds
-    #
-    # signal.signal(signal.SIGALRM, handle_timeout())
-    # signal.alarm(MAX_TIME)
-    #
-    # run()
-    # ROOT.pp()
-    print(explore())
+    binary_name = BINARY.split("/")[-1]
+    DIR_NAME = "{}_{}".format(binary_name, TIME_START)
+    if is_source and SAVE_TESTCASES:
+        os.system("mkdir -p tests/{}".format(DIR_NAME))
+        with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
+            md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
+            md.write(
+                '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+            md.write('<test-metadata>\n')
+            md.write('<sourcecodelang>C</sourcecodelang>\n')
+            md.write('<producer>Legion</producer>\n')
+            md.write(
+                '<specification>CHECK( LTL(G ! call(__VERIFIER_error())) )</specification>\n')
+            md.write('<programfile>{}</programfile>\n'.format(args.file))
+            res = sp.run(["sha256sum", args.file], stdout=sp.PIPE)
+            out = res.stdout.decode('utf-8')
+            sha256sum = out[:64]
+            md.write('<programhash>{}</programhash>\n'.format(sha256sum))
+            md.write('<entryfunction>main</entryfunction>\n')
+            md.write('<architecture>32bit</architecture>\n')
+            md.write('<creationtime>{}</creationtime>\n'.format(
+                datetime.datetime.now()))
+            md.write('</test-metadata>\n')
+
+    main()

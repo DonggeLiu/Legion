@@ -212,7 +212,7 @@ if __name__ == '__main__':
         source = args.file
         BINARY = source[:-2]
         LOGGER.info('Building {}'.format(BINARY))
-        os.system("gcc -ggdb -o {} {}".format(BINARY, source))
+        os.system("gcc -ggdb -o {} {} __VERIFIER.c".format(BINARY, source))
     else:
         BINARY = args.file
 

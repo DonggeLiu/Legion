@@ -20,7 +20,7 @@ from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
 
 # Hyper-parameters
-MIN_SAMPLES = 5
+MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)

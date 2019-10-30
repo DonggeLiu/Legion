@@ -187,7 +187,10 @@ class TreeNode:
                 self.sim_try + 1))  # Hard-coded + 1 on the denominator
         uct_score = exploit + 2 * RHO * explore
 
-        return uct_score - TIME_COEFF * time_penalisation()
+        score = uct_score - TIME_COEFF * time_penalisation() \
+            if TIME_COEFF else uct_score
+
+        return score
 
     def mark_fully_explored(self):
         """

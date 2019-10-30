@@ -529,9 +529,9 @@ def has_budget() -> bool:
     Control whether to terminate mcts or not
     :return: True if terminate
     """
-    return (COVERAGE_ONLY or not FOUND_BUG) \
-        and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
-        and CUR_ROUND < MAX_ROUNDS
+    return not FOUND_BUG \
+           and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
+           and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():
@@ -877,10 +877,10 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             INPUTS.append(input_bytes)
 
     if return_code == BUG_RET:
-        FOUND_BUG = True
-        print("\n*******************"
-              "\n***** EUREKA! *****"
-              "\n*******************\n")
+        FOUND_BUG = not COVERAGE_ONLY
+        LOGGER.info("\n*******************"
+                    "\n***** EUREKA! *****"
+                    "\n*******************\n")
     trace = unpack(error_msg)
     LOGGER.info([hex(addr) for addr in trace])
     return trace

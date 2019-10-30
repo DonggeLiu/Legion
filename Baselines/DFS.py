@@ -35,12 +35,13 @@ def explore():
     entry = project.factory.entry_state(stdin=SimFileStream)
     symex_paths_gen = my_symex_rec(entry, [entry])
 
+    path_count = 0
     while True:
         try:
             symex_path = next(symex_paths_gen)
         except StopIteration:
             break
-
+        path_count += 1
         value = solve_inputs(symex_path[-1])
         conex_result = my_conex(value)
         conex_path, return_code = conex_result
@@ -64,6 +65,7 @@ def explore():
         for addr in conex_path:
             LOGGER.info("ConEx addr not in SymEx:", addr)
         LOGGER.info("\n")
+    return path_count
 
 
 def symex_step(node):
@@ -238,4 +240,4 @@ if __name__ == '__main__':
                 datetime.datetime.now()))
             md.write('</test-metadata>\n')
 
-    main()
+    print(main())

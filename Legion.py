@@ -1184,7 +1184,6 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    main()
     print(main())
     # cProfile.run('main()', sort='cumtime')
 #    pdb.set_trace()

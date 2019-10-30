@@ -444,13 +444,15 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.sim_try)
         :return:
         """
-        return "{uct:.2f} = {simw}/{selt} " \
-               "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
-               "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
-            .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try,
-                    r=RHO, pselt=self.parent.sel_try if self.parent else inf,
-                    simt=self.sim_try,
-                    t=TIME_COEFF, at=self.accumulated_time, MS=MIN_SAMPLES)
+        return "{uct:.2f} = {simw}/{selt}" \
+            .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try)
+        # return "{uct:.2f} = {simw}/{selt} " \
+        #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
+        #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
+        #     .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try,
+        #             r=RHO, pselt=self.parent.sel_try if self.parent else inf,
+        #             simt=self.sim_try,
+        #             t=TIME_COEFF, at=self.accumulated_time, MS=MIN_SAMPLES)
 
     def repr_node_state(self) -> str:
         return "{}".format(self.sim_state()) if self.sim_state() else "NoState"

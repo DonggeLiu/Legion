@@ -19,7 +19,7 @@ BINARY = None
 SAVE_TESTCASES = False
 SAVE_TESTINPUTS = False
 TIME_START = time.time()
-MAX_TIME = 9
+MAX_TIME = 0
 
 # Logging
 LOGGER = logging.getLogger("Legion")
@@ -156,7 +156,7 @@ def save_tests_to_file(time_stamp, data):
         input_file.write('</testcase>\n')
 
 
-def run_with_timeout() -> None:
+def run_with_timeout() -> int:
     """
     A wrapper for run(), break run() when MAX_TIME is reached
     """
@@ -172,20 +172,20 @@ def run_with_timeout() -> None:
     # Schedule the signal to be sent after MAX_TIME
     signal.alarm(MAX_TIME)
     try:
-        explore()
+        return explore()
     except TimeoutError:
         pass
 
 
-def main():
+def main() -> int:
     """
     MAX_TIME == 0: Unlimited time budget
     MAX_TIME >  0: Time budget is MAX_TIME
     """
     if MAX_TIME:
-        run_with_timeout()
+        return run_with_timeout()
     else:
-        explore()
+        return explore()
 
 
 if __name__ == '__main__':

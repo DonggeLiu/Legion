@@ -1080,6 +1080,8 @@ def main() -> int:
 
 
 if __name__ == '__main__':
+    sys.setrecursionlimit(1000000)
+
     parser = argparse.ArgumentParser(description='Legion')
     parser.add_argument('--min-samples', type=int, default=MIN_SAMPLES,
                         help='Minimum number of samples per iteration')

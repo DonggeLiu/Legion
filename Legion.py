@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import cProfile
 import datetime
 import enum
 import logging
@@ -1189,8 +1190,11 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    print(main())
-    # cProfile.run('main()', sort='cumtime')
+    if args.verbose:
+        cProfile.run('main()', sort='cumtime')
+    else:
+        print(main())
+
 #    pdb.set_trace()
 
     ROOT.pp()

@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
-<benchmark tool="legion" displayName="Legion" timelimit="15 min" memlimit="15 GB" cpuCores="8">
+<benchmark tool="legion" displayName="Legion" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="8" />
+  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
   <option name="--save-tests"/>
   <option name="--time-penalty">0</option>

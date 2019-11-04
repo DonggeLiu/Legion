@@ -28,7 +28,7 @@ from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
 
 # Hyper-parameters
-MIN_SAMPLES = 5
+MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
@@ -195,7 +195,10 @@ class TreeNode:
                 self.sim_try + 1))  # Hard-coded + 1 on the denominator
         uct_score = exploit + 2 * RHO * explore
 
-        return uct_score - TIME_COEFF * time_penalisation()
+        score = uct_score - TIME_COEFF * time_penalisation() \
+            if TIME_COEFF else uct_score
+
+        return score
 
     def mark_fully_explored(self):
         """
@@ -449,13 +452,15 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.sim_try)
         :return:
         """
-        return "{uct:.2f} = {simw}/{selt} " \
-               "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
-               "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
-            .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try,
-                    r=RHO, pselt=self.parent.sel_try if self.parent else inf,
-                    simt=self.sim_try,
-                    t=TIME_COEFF, at=self.accumulated_time, MS=MIN_SAMPLES)
+        return "{uct:.2f} = {simw}/{selt}" \
+            .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try)
+        # return "{uct:.2f} = {simw}/{selt} " \
+        #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
+        #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
+        #     .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try,
+        #             r=RHO, pselt=self.parent.sel_try if self.parent else inf,
+        #             simt=self.sim_try,
+        #             t=TIME_COEFF, at=self.accumulated_time, MS=MIN_SAMPLES)
 
     def repr_node_state(self) -> str:
         return "{}".format(self.sim_state()) if self.sim_state() else "NoState"
@@ -537,9 +542,9 @@ def has_budget() -> bool:
     Control whether to terminate mcts or not
     :return: True if terminate
     """
-    return (COVERAGE_ONLY or not FOUND_BUG) \
-        and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
-        and CUR_ROUND < MAX_ROUNDS
+    return not FOUND_BUG \
+           and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
+           and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():
@@ -885,10 +890,10 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             INPUTS.append(input_bytes)
 
     if return_code == BUG_RET:
-        FOUND_BUG = True
-        print("\n*******************"
-              "\n***** EUREKA! *****"
-              "\n*******************\n")
+        FOUND_BUG = not COVERAGE_ONLY
+        LOGGER.info("\n*******************"
+                    "\n***** EUREKA! *****"
+                    "\n*******************\n")
     trace = unpack(error_msg)
     LOGGER.info([hex(addr) for addr in trace])
     return trace
@@ -1150,7 +1155,8 @@ if __name__ == '__main__':
             ins = BINARY + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
-            sp.run([args.cc, "-no-pie", "-O1", "-o", BINARY, "__VERIFIER.c", "__trace_jump.s", ins])
+            sp.run([args.cc, "-no-pie", "-O0", "-o", BINARY, "__VERIFIER.c",
+                    "__trace_jump.s", ins])
         elif args.compile == "trace-cc":
             if args.o:
                 BINARY = args.o
@@ -1191,7 +1197,6 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    main()
     print(main())
     # cProfile.run('main()', sort='cumtime')
 #    pdb.set_trace()

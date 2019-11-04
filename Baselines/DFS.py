@@ -19,7 +19,7 @@ BINARY = None
 SAVE_TESTCASES = False
 SAVE_TESTINPUTS = False
 TIME_START = time.time()
-MAX_TIME = 9
+MAX_TIME = 0
 
 # Logging
 LOGGER = logging.getLogger("Legion")
@@ -35,12 +35,13 @@ def explore():
     entry = project.factory.entry_state(stdin=SimFileStream)
     symex_paths_gen = my_symex_rec(entry, [entry])
 
+    path_count = 0
     while True:
         try:
             symex_path = next(symex_paths_gen)
         except StopIteration:
             break
-
+        path_count += 1
         value = solve_inputs(symex_path[-1])
         conex_result = my_conex(value)
         conex_path, return_code = conex_result
@@ -64,6 +65,7 @@ def explore():
         for addr in conex_path:
             LOGGER.info("ConEx addr not in SymEx:", addr)
         LOGGER.info("\n")
+    return path_count
 
 
 def symex_step(node):
@@ -154,7 +156,7 @@ def save_tests_to_file(time_stamp, data):
         input_file.write('</testcase>\n')
 
 
-def run_with_timeout() -> None:
+def run_with_timeout() -> int:
     """
     A wrapper for run(), break run() when MAX_TIME is reached
     """
@@ -170,20 +172,20 @@ def run_with_timeout() -> None:
     # Schedule the signal to be sent after MAX_TIME
     signal.alarm(MAX_TIME)
     try:
-        explore()
+        return explore()
     except TimeoutError:
         pass
 
 
-def main():
+def main() -> int:
     """
     MAX_TIME == 0: Unlimited time budget
     MAX_TIME >  0: Time budget is MAX_TIME
     """
     if MAX_TIME:
-        run_with_timeout()
+        return run_with_timeout()
     else:
-        explore()
+        return explore()
 
 
 if __name__ == '__main__':
@@ -210,7 +212,7 @@ if __name__ == '__main__':
         source = args.file
         BINARY = source[:-2]
         LOGGER.info('Building {}'.format(BINARY))
-        os.system("gcc -ggdb -o {} {}".format(BINARY, source))
+        os.system("gcc -ggdb -o {} {} __VERIFIER.c".format(BINARY, source))
     else:
         BINARY = args.file
 
@@ -238,4 +240,4 @@ if __name__ == '__main__':
                 datetime.datetime.now()))
             md.write('</test-metadata>\n')
 
-    main()
+    print(main())

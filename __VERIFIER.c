@@ -98,10 +98,6 @@ float __VERIFIER_nondet_double() {
     return x;
 }
 
-void __VERIFIER_assume(int b) {
-    if (!b)
-        abort();
-}
 
 // int __VERIFIER_nondet_const_char_pointer() {
 

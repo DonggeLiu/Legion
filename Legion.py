@@ -1194,6 +1194,7 @@ if __name__ == '__main__':
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
             sp.run([args.cc, "-no-pie", "-O0", "-o", BINARY, "__VERIFIER.c",
+                    "__VERIFIER_assume.s",
                     "__trace_jump.s", ins])
         elif args.compile == "trace-cc":
             if args.o:

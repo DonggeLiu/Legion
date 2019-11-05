@@ -611,7 +611,8 @@ def selection() -> TreeNode:
         # Note: Must check this before dying,
         #  otherwise the phantom red nodes which are added when
         #  dying their sibling will be wrongly marked as fully explored
-        if node.is_leaf():
+        if node.is_leaf() and node.colour is Colour.B:
+            # NOTE: a red/white leaf may have unknown siblings
             node.mark_fully_explored()
 
         # If the node is white, dye it

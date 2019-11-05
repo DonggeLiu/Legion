@@ -221,7 +221,8 @@ class TreeNode:
             #    exclude simulation child here.
             return
 
-        if not self.sel_try and self.colour is Colour.R:
+        # if not self.sel_try and self.colour is Colour.R:
+        if self.phantom:
             # This line makes sure that we will simulate on every phantom node
             # at least once to discover the path beneath them:
             #   1. Black nodes cannot be a phantom, cause phantoms must have
@@ -331,6 +332,10 @@ class TreeNode:
             """
             return (target.size() + 7) // 8
 
+        # Note: Once we fuzz a simulation child,
+        #   its parent is no longer a phantom
+        #   This is important as we do not mark phantom fully explored
+        self.parent.phantom = False
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
 
         if not self.samples:

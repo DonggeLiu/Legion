@@ -342,6 +342,7 @@ class TreeNode:
                 results.append(result)
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
+                #   Assumption: No input implies no path
                 #  Case 1: break in the outside while:
                 #       Not more input available from constraint solving
                 #       Implies no more undiscovered path in its subtree
@@ -359,7 +360,15 @@ class TreeNode:
                 LOGGER.info("Exhausted {}".format(self))
                 LOGGER.info("Fully explored {}".format(self))
                 self.fully_explored = True
-                self.mark_fully_explored()
+                # NOTE: In some case, no input can be found from the simul child
+                #   even if its red parent is considered as feasible, weird.
+                #   In this case, parent.sel_try is 0, which prevents it to
+                #   be marked as fully explored with
+                #   self.parent.mark_fully_explored()
+                block_sibs = [c for c in self.parent.children.values()
+                              if c.colour is not Colour.G]
+                if not block_sibs:
+                    self.parent.fully_explored = True
                 break
         return results
 

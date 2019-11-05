@@ -355,7 +355,6 @@ class TreeNode:
                 results.append(result)
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
-                #   Assumption: No input implies no path
                 #  Case 1: break in the outside while:
                 #       Not more input available from constraint solving
                 #       Implies no more undiscovered path in its subtree
@@ -378,10 +377,17 @@ class TreeNode:
                 #   In this case, parent.sel_try is 0, which prevents it to
                 #   be marked as fully explored with
                 #   self.parent.mark_fully_explored()
-                block_sibs = [c for c in self.parent.children.values()
-                              if c.colour is not Colour.G]
-                if not block_sibs:
-                    self.parent.fully_explored = True
+                # block_sibs = [c for c in self.parent.children.values()
+                #               if c.colour is not Colour.G]
+                # if not block_sibs:
+                #     self.parent.fully_explored = True
+                # Note: Should not mark parent fully explored
+                #   as 1) there may be a path although no input was found
+                #      2) this exception occurs when NO ENOUGH inputs were found
+                #         which does not imply no input was found
+                #         here there could be a child to be selected in the
+                #         next iteration
+                # self.parent.mark_fully_explored()
                 break
         return results
 

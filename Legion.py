@@ -2,7 +2,7 @@
 
 import sys
 
-VERSION="0.1-testcomp2020"
+VERSION = "0.1-testcomp2020"
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == '--version':
@@ -215,8 +215,8 @@ class TreeNode:
             #   which can only be found by symex it
             return
 
-        if not all([c.fully_explored for c in self.children.values() if
-                    c.colour is not Colour.G]):
+        if not all([c.fully_explored for c in self.children.values()
+                    if c.colour is not Colour.G]):
             # If not all children all fully explored, don't mark it
             #    exclude simulation child here.
             return

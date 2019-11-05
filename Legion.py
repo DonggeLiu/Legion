@@ -785,9 +785,11 @@ def symex(state: State) -> List[State]:
     :param state: the state to execute from
     :return: the resulting state(s) of symbolic execution
     """
-    LOGGER.debug(state)
     # Note: Need to keep all successors?
-    return state.step().successors
+    LOGGER.debug("computing successors for {}".format(state))
+    successors = state.step().successors
+    LOGGER.debug("Successors are: {}".format(successors))
+    return successors
 
 
 def match_node_states(state: State, children: List[TreeNode]) -> bool:
@@ -885,6 +887,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
 
+    LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
@@ -1095,6 +1098,7 @@ def main() -> int:
         run_with_timeout()
     else:
         run()
+    ROOT.pp()
     return ROOT.sim_win
 
 
@@ -1217,5 +1221,3 @@ if __name__ == '__main__':
         print(main())
 
 #    pdb.set_trace()
-
-    ROOT.pp()

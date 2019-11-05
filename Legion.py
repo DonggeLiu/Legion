@@ -621,6 +621,14 @@ def selection() -> TreeNode:
             return ROOT
 
         node = tree_policy(node=node)
+
+        if node.fully_explored:
+            # NOTE: If, for some reason, the node selected if fully explored
+            #   then we ASSUME its parent is fully explored
+            #   but not correctly marked as fully explored
+            #   return ROOT to re-launch selection stage
+            node.parent.fully_explored = True
+            return ROOT
         # the node selected by tree policy should not be None
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))

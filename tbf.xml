@@ -2,7 +2,7 @@
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
 <benchmark tool="tbf_testsuite_validator" displayName="TBF Test-Suite Validator" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="Intel Core i5" cpuCores="2"/>
+  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
   <resultfiles>**test-suite/*</resultfiles>
 
@@ -17,14 +17,14 @@
 
   <rundefinition name="test-comp19_prop-coverage-error-call">
     <option name="--stop-after-found-violation" />
-    <requiredfiles>test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion.2019-11-05_1206.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.2019-11-05_1206.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
   </rundefinition>
 
   <rundefinition name="test-comp19_prop-coverage-branches">
-    <requiredfiles>test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion.2019-11-05_1206.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.2019-11-05_1206.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
 
@@ -58,4 +58,5 @@
   </tasks>
 
 </benchmark>
+
 

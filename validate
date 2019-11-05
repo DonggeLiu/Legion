@@ -1,4 +1,5 @@
 #!/bin/sh
 
 make zips
+sed "s/RUNDATE/$1/g" tbf-template.xml > tbf.xml
 /home/ernst/workspace/cpachecker/scripts/benchmark.py --read-only-dir / --cloud --cloudMaster localhost tbf.xml

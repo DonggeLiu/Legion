@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+import sys
+
+VERSION="0.1-testcomp2020"
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == '--version':
+        print(VERSION)
+        sys.exit(0)
+
 import argparse
 import cProfile
 import datetime
@@ -11,7 +20,6 @@ import random
 import signal
 import struct
 import subprocess as sp
-import sys
 import time
 from math import sqrt, log, ceil, inf
 from typing import Dict, List, Tuple

@@ -17,19 +17,16 @@
 
   <rundefinition name="test-comp19_prop-coverage-error-call">
     <option name="--stop-after-found-violation" />
-
-    <requiredfiles>test/results/legion.2019-10-07_0927.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion.2019-10-07_0927.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
   </rundefinition>
 
-<!--2019-09-17_1019
   <rundefinition name="test-comp19_prop-coverage-branches">
-    <requiredfiles>test/results/legion.2019-08-21_1207.logfiles/${rundefinition_name}.${taskdef_name}.files/test-suite.zip</requiredfiles>
-    <option name="-test-suite">test/results/legion.2019-08-21_1207.logfiles/${rundefinition_name}.${taskdef_name}.yml.files/test-suite.zip</option>
+    <requiredfiles>test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.2019-11-04_1649.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
--->
 
 
   <tasks name="ReachSafety-Arrays">

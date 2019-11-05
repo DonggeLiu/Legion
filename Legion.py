@@ -1134,9 +1134,9 @@ if __name__ == '__main__':
                         help='C compiler to use together with --compile svcomp')
     parser.add_argument("--compile", default="make",
                         help='How to compile C input files')
-    parser.add_argument("file",
+    parser.add_argument("--file",
                         help='Binary or source file')
-    parser.add_argument("seeds", nargs='*',
+    parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
     args = parser.parse_args()
 

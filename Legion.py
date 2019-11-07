@@ -39,6 +39,7 @@ MAX_BYTES = 100  # Max bytes per input
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
+CORE = 1
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 COVERAGE_ONLY = False
@@ -887,11 +888,28 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     #   use SEEDS if SEEDS is available or use random fuzzing if not
     # otherwise, mutate() the node
 
+    global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
         [bytes("".join(mutant), 'utf-8') for mutant in SEEDS] if SEEDS else \
-        TreeNode.random_fuzzing()
+            [b'\x0a']
+    # TreeNode.random_fuzzing()
 
-    return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
+    assert CORE > 0
+    if CORE == 1:
+        return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
+    else:
+        from multiprocessing import Pool
+        pool = Pool(processes=CORE)
+        results = pool.map(binary_execute_parallel, mutants)
+        traces = []
+        for result in results:
+            trace, curr_time, curr_msg, curr_input, curr_found_bug = result
+            traces.append(trace)
+            TIMES.append(curr_time)
+            MSGS.append(curr_msg)
+            INPUTS.append(curr_input)
+            FOUND_BUG = FOUND_BUG or curr_found_bug
+        return traces
 
 
 def binary_execute(input_bytes: bytes) -> List[int]:
@@ -946,6 +964,60 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     trace = unpack(error_msg)
     LOGGER.info([hex(addr) for addr in trace])
     return trace
+
+
+def binary_execute_parallel(input_bytes: bytes):
+    """
+    Execute the binary with an input in bytes
+    :param input_bytes: the input to feed the binary
+    :return: the execution trace in a list
+    """
+
+    def unpack(output):
+        debug_assertion((len(output) % 8 == 0))
+        # NOTE: changed addr[0] to addr
+        return [addr for i in range(int(len(output) / 8))
+                for addr in struct.unpack_from('q', output, i * 8)]
+
+    def execute():
+        program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+                           stderr=sp.PIPE, close_fds=True)
+        try:
+            msg = program.communicate(input_bytes, timeout=30 * 60 * 60)
+            ret = program.returncode
+
+            program.kill()
+            del program
+            return msg, ret
+        except sp.TimeoutExpired:
+            LOGGER.error("Binary execution time out")
+            exit(2)
+
+    LOGGER.info("Simulating...")
+    report = execute()
+    debug_assertion(bool(report))
+
+    report_msg, return_code = report
+    error_msg = report_msg[1]
+
+    curr_time = curr_msg = curr_input = curr_found_bug = None
+
+    if SAVE_TESTCASES or SAVE_TESTINPUTS:
+        curr_time = time.clock()
+        if SAVE_TESTCASES:
+            output_msg = report_msg[0].decode('utf-8')
+            curr_msg = output_msg
+        if SAVE_TESTINPUTS:
+            curr_input = input_bytes
+
+    if return_code == BUG_RET:
+        curr_found_bug = not COVERAGE_ONLY
+        LOGGER.info("\n*******************"
+                    "\n***** EUREKA! *****"
+                    "\n*******************\n")
+    trace = unpack(error_msg)
+    LOGGER.info([hex(addr) for addr in trace])
+    return trace, curr_time, curr_msg, curr_input, curr_found_bug
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1148,6 +1220,8 @@ if __name__ == '__main__':
                         help='Maximum number of samples per iteration')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
+    parser.add_argument("--core", type=int, default=CORE,
+                        help='Number of cores available')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
     # parser.add_argument('--source', action="store_true",
@@ -1182,6 +1256,7 @@ if __name__ == '__main__':
 
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
+    CORE = args.core
     COVERAGE_ONLY = args.coverage_only
     TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs

@@ -1031,7 +1031,7 @@ def propagate_execution_traces(traces: List[List[int]],
 
         # NOTE: mark the last node as fully explored
         #   as fuzzing it will not give any new path
-        #   this assumes no trace can be a sub-trace of others
+        #   this assumes no trace can be a prefix of another
         #   (i.e. no [1,2,3] and [1,2,3,4]
         # node.mark_fully_explored()
 

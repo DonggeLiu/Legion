@@ -647,6 +647,17 @@ def selection() -> TreeNode:
 
         node = tree_policy(node=node)
 
+        if node.is_leaf() and node.colour is Colour.R:
+            # Note: There is no point fuzzing a red leaf,
+            #   as it will not have any child
+            #   (assuming no trace is a prefix of another)
+            #   Mark the red leaf fully explored and check its parent
+            #   restart the selection from ROOT
+            LOGGER.info("Leaf reached after tree policy: {}".format(node))
+            LOGGER.info("Fully explored {}".format(node))
+            node.fully_explored = True
+            node.parent.mark_fully_explored()
+
         if node.fully_explored:
             # NOTE: If, for some reason, the node selected if fully explored
             #   then we ASSUME its parent is fully explored

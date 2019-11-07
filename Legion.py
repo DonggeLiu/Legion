@@ -397,11 +397,11 @@ class TreeNode:
     @staticmethod
     def random_fuzzing() -> List[bytes]:
         def random_bytes():
-            input_bytes = b''
-            for _ in range(MAX_BYTES):
-                input_bytes += os.urandom(1)
-            return input_bytes
-
+            # input_bytes = b''
+            # for _ in range(MAX_BYTES):
+            #     input_bytes +=
+            LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
+            return os.urandom(MAX_BYTES)
         return [random_bytes() for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:

@@ -193,7 +193,7 @@ class TreeNode:
         # sim_try should not be 0 if sel_try is not
         # since the first input must preserve the path
         explore = sqrt(2 * log(self.parent.sel_try) / (
-                self.sim_try + 1))  # Hard-coded + 1 on the denominator
+            self.sel_try))  # Hard-coded + 1 on the denominator
         uct_score = exploit + 2 * RHO * explore
 
         score = uct_score - TIME_COEFF * time_penalisation() \

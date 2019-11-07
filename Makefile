@@ -3,7 +3,7 @@
 PREFIX = /usr/local
 
 # keep temporary files
-.SECONDARY:
+# .SECONDARY:
 
 SO = libegion.so
 A  = libegion.a

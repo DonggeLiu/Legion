@@ -275,11 +275,14 @@ class TreeNode:
 
     def is_leaf(self) -> bool:
         """
-        If the node has no other child than simulation node, then it is a leaf
+        If the node has no other child than simulation node,
+         and it is not a phantom. then it is a leaf
         :return: whether the node is a leaf
         """
-        return not self.children or all(
-            [child.colour == Colour.G for child in self.children.values()])
+        no_child_or_only_gold = not self.children \
+                                or all([child.colour == Colour.G
+                                        for child in self.children.values()])
+        return not self.phantom and no_child_or_only_gold
 
     def dye(self, colour: Colour,
             state: State = None, samples: iter = None) -> None:

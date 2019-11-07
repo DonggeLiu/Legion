@@ -635,10 +635,8 @@ def selection() -> TreeNode:
             #     LOGGER.info("Fully explored {}".format(node))
             #     node.fully_explored = True
 
-        # if the node does not have any child,
-        # then it must be a leaf
-        if not node.children:
-            LOGGER.info("Leaf reached: {}".format(node))
+        if node.is_leaf():
+            LOGGER.info("Leaf reached before tree policy: {}".format(node))
             LOGGER.info("Fully explored {}".format(node))
             node.fully_explored = True
             node.parent.mark_fully_explored()

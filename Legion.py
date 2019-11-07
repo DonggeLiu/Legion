@@ -476,9 +476,13 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.sim_try)
         :return:
         """
-        return "{uct:.2f} = {simw}/{selt}" \
-            .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try)
-        # return "{uct:.2f} = {simw}/{selt} " \
+        return "{uct:.2f} = {simw}/{selt} + sqrt(log({pselt})/{selt}" \
+            .format(uct=self.score(),
+                    simw=self.sim_win,
+                    selt=self.sel_try,
+                    pselt=self.parent.sel_try if self.parent else None,
+                    simt=self.sim_try)
+        # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
         #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
         #     .format(uct=self.score(), simw=self.sim_win, selt=self.sel_try,

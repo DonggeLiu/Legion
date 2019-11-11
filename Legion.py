@@ -240,7 +240,7 @@ class TreeNode:
         # if self.colour is Colour.G:
         #     self.parent.fully_explored = True
 
-        if self.colour is Colour.R:
+        if self.colour is Colour.R and self is not ROOT:
             LOGGER.info("Red parent Fully explored {}".format(self.children['Simulation']))
             self.children['Simulation'].fully_explored = True
 
@@ -572,8 +572,12 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return not FOUND_BUG \
-           and ROOT.sim_win < MAX_PATHS and ROOT.score() > -inf \
-           and CUR_ROUND < MAX_ROUNDS
+        and ROOT.sim_win < MAX_PATHS \
+        and CUR_ROUND < MAX_ROUNDS
+        # Do not terminate when the ROOT is fully explored,
+        # switch to random fuzzing instead
+        # and ROOT.score() > -inf \
+
 
 
 def mcts():
@@ -643,7 +647,7 @@ def selection() -> TreeNode:
             node.parent.mark_fully_explored()
 
         # If the node's score is the minimum, return ROOT to restart
-        if node.fully_explored:
+        if node.fully_explored and node is not ROOT:
             return ROOT
 
         node = tree_policy(node=node)

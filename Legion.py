@@ -1183,7 +1183,7 @@ def debug_assertion(assertion: bool) -> None:
     if LOGGER.level <= logging.INFO and not assertion:
         pdb.set_trace()
         return
-    assert assertion
+    # assert assertion
 
 
 def run_with_timeout() -> None:

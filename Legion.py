@@ -644,7 +644,12 @@ def selection() -> TreeNode:
             LOGGER.info("Leaf reached before tree policy: {}".format(node))
             LOGGER.info("Fully explored {}".format(node))
             node.fully_explored = True
-            node.parent.mark_fully_explored()
+            if node.parent:
+                # NOTE: the if condition above makes sure there is parent to set
+                #   the check is trivial in most cases
+                #   but handles the case when the ROOT is a leaf
+                #   e.g. the program crashes right after entry because of allocating too much memory
+                node.parent.mark_fully_explored()
 
         # If the node's score is the minimum, return ROOT to restart
         if node.fully_explored and node is not ROOT:

@@ -344,6 +344,10 @@ class TreeNode:
 
         if not self.samples:
             self.samples = self.state.solver.iterate(target)
+            # Note: self.samples might not be an iterator in some cases
+            #   e.g. when solving for the wrong thing
+            #   which happened before when the constraint is solving for the
+            #   number of args
 
         results = []
         while len(results) < MAX_SAMPLES:
@@ -548,6 +552,14 @@ def initialisation():
 
         # Jump to the state of main_addr
         project = init_angr()
+
+        # Noted: Tested angr on symbolic argc, failed
+        # main_state = project.factory.entry_state(
+        #     addr=main_addr,
+        #     stdin=SimFileStream,
+        #     argc=claripy.BVS('argc', 100*8)
+        # )
+
         main_state = project.factory.blank_state(addr=main_addr,
                                                  stdin=SimFileStream)
         root = TreeNode(addr=main_addr)

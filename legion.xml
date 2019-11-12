@@ -6,6 +6,8 @@
 
   <option name="--save-tests"/>
   <option name="--time-penalty">0</option>
+  <option name="--random-seed">0</option>
+  <option name="--symex-timeout">2</option>
   <option name="-o">./binary</option>
   <option name="--compile">svcomp</option>
 

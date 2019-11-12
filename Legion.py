@@ -1294,10 +1294,10 @@ if __name__ == '__main__':
                         help='How to compile C input files')
     parser.add_argument("file",
                         help='Binary or source file')
-    parser.add_argument("-64", action="store_true",
-                        help='consume the redundant -64 flag')
-    parser.add_argument("-32", action="store_true",
-                        help='consume the redundant -32 flag')
+    parser.add_argument("-64", dest="m64", action="store_true",
+                        help='Compile with -m64 (override platform default)')
+    parser.add_argument("-32", dest="m32", action="store_true",
+                        help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
     args = parser.parse_args()
@@ -1325,6 +1325,10 @@ if __name__ == '__main__':
     if is_source:
         source = args.file
         stem = source[:-2]
+
+        if args.m32 and args.m64:
+            LOGGER.error("-32 is incompatible with -64")
+            sys.exit(2)
 
         if args.compile == "make":
             if args.o:

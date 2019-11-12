@@ -1116,7 +1116,8 @@ def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
     :return:
     """
     while node:
-        node.sel_try += len(are_new)
+        # In case no/insufficient input found on that path
+        node.sel_try += max(len(are_new), MIN_SAMPLES)
         # node.sim_win += sum(are_new)
         node = node.parent
 
@@ -1160,6 +1161,8 @@ def propagate_execution_traces(traces: List[List[int]],
         node.sim_try += 1
         if 'Simulation' in node.children:
             node.children['Simulation'].sim_try += 1
+            # Reward simulation ndoe for find as well
+            node.children['Simulation'].sim_win += new
 
     debug_assertion(len(traces) == len(are_new))
     for i in range(len(traces)):

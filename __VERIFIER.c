@@ -91,7 +91,7 @@ float __VERIFIER_nondet_float() {
     return x;
 }
 
-float __VERIFIER_nondet_double() {
+double __VERIFIER_nondet_double() {
     double x = 0.0;
     read(0, &x, sizeof(x));
     printf("  <input type=\"double\">%f</input>\n", x);

@@ -667,7 +667,6 @@ def selection() -> TreeNode:
             LOGGER.info(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
-            pdb.set_trace()
             break
 
         if node.is_leaf():

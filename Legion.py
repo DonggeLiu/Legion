@@ -33,7 +33,7 @@ MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
-
+RAN_SEED = None
 MAX_BYTES = 100  # Max bytes per input
 
 # Budget
@@ -1231,6 +1231,8 @@ if __name__ == '__main__':
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument("--core", type=int, default=CORE,
                         help='Number of cores available')
+    parser.add_argument("--random-seed", type=int, default=RAN_SEED,
+                        help='The seed for randomness')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
     # parser.add_argument('--source', action="store_true",
@@ -1266,10 +1268,14 @@ if __name__ == '__main__':
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
     CORE = args.core
+    RAN_SEED = args.random_seed
     COVERAGE_ONLY = args.coverage_only
     TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
+
+    if RAN_SEED is not None:
+        random.seed(RAN_SEED)
 
     if args.verbose:
         LOGGER.setLevel(logging.DEBUG)

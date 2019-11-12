@@ -34,6 +34,7 @@ MAX_SAMPLES = 100
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 RAN_SEED = None
+SYMEX_TIMEOUT = 0  # in secs
 MAX_BYTES = 100  # Max bytes per input
 
 # Budget
@@ -630,8 +631,16 @@ def selection() -> TreeNode:
     #     #     states = []
     #     # return states
 
+    def reach_symex_timeout() -> bool:
+        LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
+        return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
+
+    symex_time = 0
+    last_red = ROOT
     node = ROOT
     while node.colour is not Colour.G:
+        if node.colour is Colour.R:
+            last_red = node
         # Note: Must check this before dying,
         #  otherwise the phantom red nodes which are added when
         #  dying their sibling will be wrongly marked as fully explored
@@ -641,7 +650,9 @@ def selection() -> TreeNode:
 
         # If the node is white, dye it
         if node.colour is Colour.W:
+            start_time = time.time()
             dye_siblings(child=node)
+            symex_time += time.time() - start_time
 
             # # IF the node is dyed to black and there is no states left,
             # # it implies the previous parent state does not have any diverging
@@ -651,6 +662,13 @@ def selection() -> TreeNode:
             # if node.colour is Colour.B and not states_left:
             #     LOGGER.info("Fully explored {}".format(node))
             #     node.fully_explored = True
+
+        if reach_symex_timeout():
+            LOGGER.info(
+                "Symex timeout, choose the simulation child of the last red {}".format(last_red))
+            node = last_red.children['Simulation']
+            pdb.set_trace()
+            break
 
         if node.is_leaf():
             LOGGER.info("Leaf reached before tree policy: {}".format(node))
@@ -1247,6 +1265,8 @@ if __name__ == '__main__':
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
                         help='The seed for randomness')
+    parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
+                        help='The time limit for symbolic execution')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
     # parser.add_argument('--source', action="store_true",
@@ -1283,6 +1303,7 @@ if __name__ == '__main__':
     MAX_SAMPLES = args.max_samples
     CORE = args.core
     RAN_SEED = args.random_seed
+    SYMEX_TIMEOUT = args.symex_timeout
     COVERAGE_ONLY = args.coverage_only
     TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs

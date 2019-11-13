@@ -1259,7 +1259,7 @@ def save_input_to_file(time_stamp, input_bytes):
 
 def debug_assertion(assertion: bool) -> None:
     if LOGGER.level <= logging.INFO and not assertion:
-        pdb.set_trace()
+        # pdb.set_trace()
         return
     # assert assertion
 

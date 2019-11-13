@@ -44,6 +44,7 @@ CORE = 1
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 COVERAGE_ONLY = False
+PERSISTENT = False
 
 # Statistics
 CUR_ROUND = 0
@@ -526,6 +527,10 @@ class TreeNode:
 ROOT = TreeNode()
 
 
+def consider_tree_fully_explored() -> bool:
+    return ROOT.is_fully_explored() and not PERSISTENT
+
+
 def run() -> None:
     """
     The main function
@@ -598,12 +603,9 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return not FOUND_BUG \
-        and ROOT.sim_win < MAX_PATHS \
-        and CUR_ROUND < MAX_ROUNDS
-        # Do not terminate when the ROOT is fully explored,
-        # switch to random fuzzing instead
-        # and ROOT.score() > -inf \
-
+           and not consider_tree_fully_explored() \
+           and ROOT.sim_win < MAX_PATHS \
+           and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():
@@ -1296,6 +1298,9 @@ if __name__ == '__main__':
     #                     help='Specify assembler binary')
     parser.add_argument('--coverage-only', action="store_true",
                         help="Do not terminate when capturing a bug")
+    parser.add_argument('--persistent', action="store_true",
+                        help="Keep fuzzing even if it thinks "
+                             "the tree is fully explored")
     parser.add_argument('--save-inputs', action="store_true",
                         help='Save inputs as binary files')
     parser.add_argument('--save-tests', action="store_true",
@@ -1324,6 +1329,7 @@ if __name__ == '__main__':
     RAN_SEED = args.random_seed
     SYMEX_TIMEOUT = args.symex_timeout
     COVERAGE_ONLY = args.coverage_only
+    PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests

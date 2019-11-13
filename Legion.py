@@ -20,6 +20,7 @@ from types import GeneratorType
 from angr import Project
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
+from z3.z3types import Z3Exception
 
 VERSION = "0.1-testcomp2020"
 
@@ -673,7 +674,13 @@ def selection() -> TreeNode:
         # If the node is white, dye it
         if node.colour is Colour.W:
             start_time = time.time()
-            dye_siblings(child=node)
+            try:
+                dye_siblings(child=node)  # Upon an exception, mark this node fully explored
+            except Z3Exception:
+                LOGGER.info("Z3 exception occurred in symex, any type casting in program")
+                node.fully_explored = True
+                node.exhausted = True
+                node.parent.mark_fully_explored()
             symex_time += time.time() - start_time
 
             # # IF the node is dyed to black and there is no states left,
@@ -724,6 +731,9 @@ def selection() -> TreeNode:
             #   then we ASSUME its parent is fully explored
             #   but not correctly marked as fully explored
             #   return ROOT to re-launch selection stage
+            # pdb.set_trace()
+            if ROOT.fully_explored and node.parent:
+                node.parent.exhausted = True
             node.parent.mark_fully_explored()
             return ROOT
         # the node selected by tree policy should not be None

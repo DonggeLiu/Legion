@@ -1001,8 +1001,8 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     debug_assertion(bool(report))
 
     report_msg, return_code = report
-    LOGGER.info("report message: {}".format(report_msg))
-    LOGGER.info("return code: {}".format(return_code))
+    # LOGGER.info("report message: {}".format(report_msg))
+    # LOGGER.info("return code: {}".format(return_code))
     error_msg = report_msg[1]
 
     if SAVE_TESTCASES or SAVE_TESTINPUTS:

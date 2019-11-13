@@ -1,0 +1,21 @@
+#!/bin/sh
+
+../../../workspace/cpachecker/scripts/table-generator.py \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Arrays.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-BitVectors.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-ControlFlow.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-ECA.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Floats.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Heap.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Loops.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Recursive.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Sequentialized.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Arrays.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-BitVectors.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-ControlFlow.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-ECA.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Floats.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Heap.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Loops.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Recursive.xml.bz2" \
+    "test/results/tbf.$1.results.test-comp19_prop-coverage-error-call.ReachSafety-Sequentialized.xml.bz2"

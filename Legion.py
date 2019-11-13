@@ -1007,7 +1007,9 @@ def binary_execute(input_bytes: bytes) -> List[int]:
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
     trace = unpack(error_msg)
-    LOGGER.info([hex(addr) for addr in trace])
+    trace_log = [hex(addr) if type(addr) is int else addr for addr in (
+        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])]
+    LOGGER.info(trace_log)
     return trace
 
 

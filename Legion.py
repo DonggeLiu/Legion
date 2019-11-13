@@ -148,6 +148,21 @@ class TreeNode:
         return self.sim_state().solver.constraints \
             if self.sim_state() else "No SimState"
 
+    def exploit_score(self) -> float:
+        # Evaluate to maximum value if not tried before
+        if not self.sel_try:
+            return inf
+        return self.sim_win / self.sel_try
+
+    def explore_score(self) -> float:
+        # Evaluate to maximum value if is root
+        if self.is_root():
+            return inf
+        # Evaluate to maximum value if not tried before
+        if not self.sel_try:
+            return inf
+        return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+
     def score(self) -> float:
 
         def time_penalisation() -> float:
@@ -182,21 +197,7 @@ class TreeNode:
         if self.fully_explored:
             return -inf
 
-        # Evaluate to maximum value if not tried before
-        if not self.sel_try:
-            return inf
-
-        # Evaluate to maximum value if is root
-        if self.is_root():
-            return inf
-
-        # Otherwise, follow UCT
-        exploit = self.sim_win / self.sel_try
-        # sim_try should not be 0 if sel_try is not
-        # since the first input must preserve the path
-        explore = sqrt(2 * log(self.parent.sel_try) / (
-            self.sel_try))  # Hard-coded + 1 on the denominator
-        uct_score = exploit + 2 * RHO * explore
+        uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
 
         score = uct_score - TIME_COEFF * time_penalisation() \
             if TIME_COEFF else uct_score
@@ -479,11 +480,14 @@ class TreeNode:
     def repr_node_data(self) -> str:
         """
         UCT = sim_win / sel_try
-            + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.sim_try)
+            + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
-        return "{uct:.2f} = {simw}/{selt} + sqrt(log({pselt})/{selt}" \
+        return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
+               "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
             .format(uct=self.score(),
+                    explore=self.exploit_score(),
+                    exploit=self.explore_score(),
                     simw=self.sim_win,
                     selt=self.sel_try,
                     pselt=self.parent.sel_try if self.parent else None,

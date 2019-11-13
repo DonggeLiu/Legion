@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-
-VERSION = "0.1-testcomp2020"
-
-if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == '--version':
-        print(VERSION)
-        sys.exit(0)
-
 import argparse
 import cProfile
 import datetime
@@ -27,6 +19,14 @@ from typing import Dict, List, Tuple
 from angr import Project
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
+
+VERSION = "0.1-testcomp2020"
+
+if __name__ == '__main__':
+    if len(sys.argv) == 2 and sys.argv[1] == '--version':
+        print(VERSION)
+        sys.exit(0)
+
 
 # Hyper-parameters
 MIN_SAMPLES = 3

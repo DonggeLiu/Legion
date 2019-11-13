@@ -194,7 +194,7 @@ class TreeNode:
         #     return -inf
 
         # Evaluate to minimum value if fully explored
-        if self.fully_explored:
+        if self.is_fully_explored():
             return -inf
 
         uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
@@ -203,6 +203,12 @@ class TreeNode:
             if TIME_COEFF else uct_score
 
         return score
+
+    def is_fully_explored(self):
+        if ROOT.fully_explored:
+            return (self.is_leaf() and self.colour is not Colour.G) \
+                   or self.exhausted
+        return self.fully_explored
 
     def mark_fully_explored(self):
         """
@@ -218,7 +224,7 @@ class TreeNode:
             #   which can only be found by symex it
             return
 
-        if not all([c.fully_explored for c in self.children.values()
+        if not all([c.is_fully_explored() for c in self.children.values()
                     if c.colour is not Colour.G]):
             # If not all children all fully explored, don't mark it
             #    exclude simulation child here.
@@ -240,7 +246,7 @@ class TreeNode:
         self.fully_explored = True
 
         # if self.colour is Colour.G:
-        #     self.parent.fully_explored = True
+        #     self.parent.is_fully_explored() = True
 
         if self.colour is Colour.R and self is not ROOT:
             LOGGER.info("Red parent Fully explored {}".format(self.children['Simulation']))
@@ -390,7 +396,7 @@ class TreeNode:
                 # block_sibs = [c for c in self.parent.children.values()
                 #               if c.colour is not Colour.G]
                 # if not block_sibs:
-                #     self.parent.fully_explored = True
+                #     self.parent.is_fully_explored() = True
                 # Note: Should not mark parent fully explored
                 #   as 1) there may be a path although no input was found
                 #      2) this exception occurs when NO ENOUGH inputs were found
@@ -665,7 +671,7 @@ def selection() -> TreeNode:
             # # any of them
             # if node.colour is Colour.B and not states_left:
             #     LOGGER.info("Fully explored {}".format(node))
-            #     node.fully_explored = True
+            #     node.is_fully_explored() = True
 
         if reach_symex_timeout():
             LOGGER.info(
@@ -686,7 +692,7 @@ def selection() -> TreeNode:
                 node.parent.mark_fully_explored()
 
         # If the node's score is the minimum, return ROOT to restart
-        if node.fully_explored and node is not ROOT:
+        if node.is_fully_explored() and node is not ROOT:
             return ROOT
 
         node = tree_policy(node=node)
@@ -702,7 +708,7 @@ def selection() -> TreeNode:
             node.fully_explored = True
             node.parent.mark_fully_explored()
 
-        if node.fully_explored:
+        if node.is_fully_explored():
             # NOTE: If, for some reason, the node selected if fully explored
             #   then we ASSUME its parent is fully explored
             #   but not correctly marked as fully explored
@@ -758,7 +764,7 @@ def dye_siblings(child: TreeNode) -> None:
     #     #   but the target has other diverging child states
     #     if not target_states:
     #         pdb.set_trace()
-    #         parent.fully_explored = True
+    #         parent.is_fully_explored() = True
 
     sibling_states = symex_to_match(target=child)
 

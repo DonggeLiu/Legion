@@ -1134,7 +1134,7 @@ def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
     """
     # Reward the simulation node selected for findings as well
     node.sim_win += sum(are_new)
-    node.sel_try += max(len(are_new), MIN_SAMPLES)
+    # node.sel_try += max(len(are_new), MIN_SAMPLES)
     while node:
         # In case no/insufficient input found on that path
         node.sel_try += max(len(are_new), MIN_SAMPLES)

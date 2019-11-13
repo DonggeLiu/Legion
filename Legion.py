@@ -815,6 +815,11 @@ def dye_siblings(child: TreeNode) -> None:
                             for sibling in child.parent.children.values()
                             if sibling.colour is not Colour.G))
 
+        # # A way to save mem
+        # if child.parent.colour is Colour.B:
+        #     debug_assertion(bool(child.parent.state))
+        #     child.parent.state = None
+
         # for child_node in child.parent.children.values():
         #     if child_node.colour is Colour.G:
         #         continue

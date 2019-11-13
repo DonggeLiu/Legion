@@ -15,6 +15,7 @@ import subprocess as sp
 import time
 from math import sqrt, log, ceil, inf
 from typing import Dict, List, Tuple
+from types import GeneratorType
 
 from angr import Project
 from angr.sim_state import SimState as State
@@ -207,9 +208,10 @@ class TreeNode:
         return score
 
     def is_fully_explored(self):
-        if ROOT.fully_explored:
-            return (self.is_leaf() and self.colour is not Colour.G) \
-                   or self.exhausted
+        if PERSISTENT:
+            if ROOT.fully_explored and self is not ROOT:
+                return (self.is_leaf() and self.colour is not Colour.G) \
+                       or self.exhausted
         return self.fully_explored
 
     def mark_fully_explored(self):
@@ -351,15 +353,19 @@ class TreeNode:
         #   This is important as we do not mark phantom fully explored
         self.parent.phantom = False
         target = self.state.posix.stdin.load(0, self.state.posix.stdin.size)
+        results = []
 
         if not self.samples:
             self.samples = self.state.solver.iterate(target)
-            # Note: self.samples might not be an iterator in some cases
-            #   e.g. when solving for the wrong thing
-            #   which happened before when the constraint is solving for the
-            #   number of args
+            if type(self.samples) is not GeneratorType:
+                # Note: self.samples might not be an iterator in some cases
+                #   e.g. when solving for the wrong thing
+                #   which happened before when the constraint is solving for the
+                #   number of args
+                self.exhausted = True
+                self.fully_explored = True
+                return results
 
-        results = []
         while len(results) < MAX_SAMPLES:
             try:
                 val = next(self.samples)

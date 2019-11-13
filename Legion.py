@@ -418,6 +418,7 @@ class TreeNode:
             # for _ in range(MAX_BYTES):
             #     input_bytes +=
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
+            # Or return end of file char?
             return os.urandom(MAX_BYTES)
         return [random_bytes() for _ in range(MIN_SAMPLES)]
 

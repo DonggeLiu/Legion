@@ -118,6 +118,7 @@ class TreeNode:
         self.accumulated_time = 0
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
+        self.exhausted = False
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -388,6 +389,8 @@ class TreeNode:
                 LOGGER.info("Exhausted {}".format(self))
                 LOGGER.info("Fully explored {}".format(self))
                 self.fully_explored = True
+                self.exhausted = True
+                self.parent.exhausted = True
                 # NOTE: In some case, no input can be found from the simul child
                 #   even if its red parent is considered as feasible, weird.
                 #   In this case, parent.sel_try is 0, which prevents it to

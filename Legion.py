@@ -967,7 +967,10 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
         [bytes("".join(mutant), 'utf-8')
-         for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
+         for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing() + [b'\x1a']
+         # for mutant in SEEDS] if SEEDS else [b'\x1a']
+         # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
+
     # Set the inital input to be a EoF char?
 
     assert CORE > 0

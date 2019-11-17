@@ -1016,7 +1016,9 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             return msg, ret
         except sp.TimeoutExpired:
             LOGGER.error("Binary execution time out")
-            exit(2)
+            # stderr contains partial trace, not sure how to extract it
+            # return program.stderr.readlines(), program.returncode
+            # exit(2)
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
 
@@ -1027,11 +1029,12 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     report_msg, return_code = report
     # LOGGER.info("report message: {}".format(report_msg))
     # LOGGER.info("return code: {}".format(return_code))
-    error_msg = report_msg[1]
+    error_msg = report_msg[1] if return_code is not None else report_msg[0]
 
     if SAVE_TESTCASES or SAVE_TESTINPUTS:
         TIMES.append(time.clock())
-        if SAVE_TESTCASES:
+        # In case of timeout, binary execution cannot collect stdout
+        if SAVE_TESTCASES and return_code is not None:
             output_msg = report_msg[0].decode('utf-8')
             MSGS.append(output_msg)
         if SAVE_TESTINPUTS:
@@ -1074,6 +1077,7 @@ def binary_execute_parallel(input_bytes: bytes):
             return msg, ret
         except sp.TimeoutExpired:
             LOGGER.error("Binary execution time out")
+            # pdb.set_trace()
             exit(2)
 
     LOGGER.info("Simulating...")

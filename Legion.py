@@ -1048,7 +1048,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
 
     error_msg = report_msg[1] if complete_conex else None
 
-    if SAVE_TESTCASES or SAVE_TESTINPUTS and complete_conex:
+    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
         TIMES.append(time.clock())
         # In case of timeout, binary execution cannot collect stdout
         if SAVE_TESTCASES:

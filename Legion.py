@@ -37,6 +37,7 @@ TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
+CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 100  # Max bytes per input
 
 # Budget
@@ -1009,7 +1010,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
                            stderr=sp.PIPE, close_fds=True)
         try:
-            msg = program.communicate(input_bytes, timeout=30 * 60 * 60)
+            msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = program.returncode
 
             program.kill()
@@ -1328,6 +1329,8 @@ if __name__ == '__main__':
                         help='The seed for randomness')
     parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
                         help='The time limit for symbolic execution')
+    parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
+                        help='The time limit for concrete binary execution')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
     # parser.add_argument('--source', action="store_true",
@@ -1371,6 +1374,7 @@ if __name__ == '__main__':
     CORE = args.core
     RAN_SEED = args.random_seed
     SYMEX_TIMEOUT = args.symex_timeout
+    CONEX_TIMEOUT = args.conex_timeout
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty

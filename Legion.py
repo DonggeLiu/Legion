@@ -1029,7 +1029,9 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     bin_end = time.time()
 
     if COLLECT_STATISTICS:
-        with open("./test/times/{}".format(args.file.split("/")[-1]), "a") as file:
+        conex_statistics_file = "./test/times/{}".format(
+            args.file.split("/")[-1][:-1]+'conex')
+        with open(conex_statistics_file, "a") as file:
             file.write("{}\n".format(bin_end-bin_start))
 
     debug_assertion(bool(report))

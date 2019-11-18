@@ -1018,9 +1018,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             return msg, ret
         except sp.TimeoutExpired:
             LOGGER.error("Binary execution time out")
-            # stderr contains partial trace, not sure how to extract it
-            # return program.stderr.readlines(), program.returncode
-            # exit(2)
+            return None, None
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
 
@@ -1039,12 +1037,16 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     report_msg, return_code = report
     # LOGGER.info("report message: {}".format(report_msg))
     # LOGGER.info("return code: {}".format(return_code))
-    error_msg = report_msg[1] if return_code is not None else report_msg[0]
+    complete_conex = report_msg is not None and return_code is not None
+    if complete_conex:
+        LOGGER.info("Binary execution completed")
 
-    if SAVE_TESTCASES or SAVE_TESTINPUTS:
+    error_msg = report_msg[1] if complete_conex else None
+
+    if SAVE_TESTCASES or SAVE_TESTINPUTS and complete_conex:
         TIMES.append(time.clock())
         # In case of timeout, binary execution cannot collect stdout
-        if SAVE_TESTCASES and return_code is not None:
+        if SAVE_TESTCASES:
             output_msg = report_msg[0].decode('utf-8')
             MSGS.append(output_msg)
         if SAVE_TESTINPUTS:
@@ -1055,11 +1057,12 @@ def binary_execute(input_bytes: bytes) -> List[int]:
         LOGGER.info("\n*******************"
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
-    trace = unpack(error_msg)
+    trace = unpack(error_msg) if complete_conex else None
     trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])]
+        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
+        if complete_conex else []
     LOGGER.info(trace_log)
-    return trace
+    return trace if trace else [ROOT.addr]
 
 
 def binary_execute_parallel(input_bytes: bytes):
@@ -1244,9 +1247,9 @@ def save_news_to_file(are_new):
         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
 
     for i in range(len(are_new)):
-        if are_new[i] and SAVE_TESTCASES:
+        if are_new[i] and SAVE_TESTCASES and i < len(MSGS):
             save_tests_to_file(TIMES[i], MSGS[i])
-        if are_new[i] and SAVE_TESTINPUTS:
+        if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
             save_input_to_file(TIMES[i], INPUTS[i])
     MSGS, INPUTS, TIMES = [], [], []
 

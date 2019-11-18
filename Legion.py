@@ -340,7 +340,15 @@ class TreeNode:
         global SOLVING_COUNT
         SOLVING_COUNT += 1
         if self.state and self.state.solver.constraints:
-            return self.app_fuzzing()
+            solving_start = time.time()
+            results = self.app_fuzzing()
+            solving_end = time.time()
+
+            if COLLECT_STATISTICS:
+                conex_statistics_file = "./statistics/{}/solver.txt".format(PROGRAM_NAME)
+                with open(conex_statistics_file, "a") as file:
+                    file.write("{}\n".format(solving_end-solving_start))
+            return results
         return self.random_fuzzing()
 
     def app_fuzzing(self) -> List[bytes]:
@@ -744,6 +752,11 @@ def selection() -> TreeNode:
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
 
+    if COLLECT_STATISTICS:
+        conex_statistics_file = "./statistics/{}/symex.txt".format(PROGRAM_NAME)
+        with open(conex_statistics_file, "a") as file:
+            file.write("{}\n".format(symex_time))
+
     debug_assertion(node.colour is Colour.G)
 
     return node
@@ -1032,8 +1045,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     bin_end = time.time()
 
     if COLLECT_STATISTICS:
-        conex_statistics_file = "./test/times/{}".format(
-            args.file.split("/")[-1][:-1]+'conex')
+        conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
         with open(conex_statistics_file, "a") as file:
             file.write("{}\n".format(bin_end-bin_start))
 
@@ -1444,7 +1456,10 @@ if __name__ == '__main__':
     binary_name = BINARY.split("/")[-1]
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
+    PROGRAM_NAME = args.file.split("/")[-1]
+    if COLLECT_STATISTICS:
 
+        os.system("mkdir -p statistics/{}".format(PROGRAM_NAME))
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:

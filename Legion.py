@@ -577,8 +577,9 @@ def initialisation():
         # Assert all traces start with the same address (i.e. main())
         firsts = [trace for trace in zip(*traces)][0]
 
+        # Note: Relies on the first trace being correct at all times.
         main_addr = firsts[0]
-        debug_assertion(all(x == main_addr for x in firsts))
+        # debug_assertion(all(x == main_addr for x in firsts))
 
         # Jump to the state of main_addr
         project = init_angr()
@@ -969,7 +970,9 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
         [bytes("".join(mutant), 'utf-8')
-         for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing() + [b'\x0a']
+         # Note: Need to make sure the first binary execution must complete successfully
+         #  Otherwise (e.g. timeout) the root address will be wrong
+         for mutant in SEEDS] if SEEDS else ([b'\x0a'] + TreeNode.random_fuzzing())
          # for mutant in SEEDS] if SEEDS else [b'\x0a']
          # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 

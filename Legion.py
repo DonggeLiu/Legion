@@ -52,6 +52,7 @@ PERSISTENT = False
 CUR_ROUND = 0
 TIME_START = time.time()
 SOLVING_COUNT = 0
+COLLECT_STATISTICS = False
 
 # Execution
 BINARY = None
@@ -1023,7 +1024,15 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     global FOUND_BUG, MSGS, INPUTS, TIMES
 
     LOGGER.info("Simulating...")
+    LOGGER.info(input_bytes)
+    bin_start = time.time()
     report = execute()
+    bin_end = time.time()
+
+    if COLLECT_STATISTICS:
+        with open("./test/times/{}".format(args.file.split("/")[-1]), "a") as file:
+            file.write("{}\n".format(bin_end-bin_start))
+
     debug_assertion(bool(report))
 
     report_msg, return_code = report
@@ -1332,6 +1341,9 @@ if __name__ == '__main__':
     parser.add_argument('--persistent', action="store_true",
                         help="Keep fuzzing even if it thinks "
                              "the tree is fully explored")
+    parser.add_argument('--collect-statistics', action="store_true",
+                        help="Collect the performance statistics, "
+                             "e.g. conex time")
     parser.add_argument('--save-inputs', action="store_true",
                         help='Save inputs as binary files')
     parser.add_argument('--save-tests', action="store_true",
@@ -1362,6 +1374,7 @@ if __name__ == '__main__':
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty
+    COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
 

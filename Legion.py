@@ -38,7 +38,7 @@ RHO = 1 / sqrt(2)
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
-MAX_BYTES = 100  # Max bytes per input
+MAX_BYTES = 100000000  # Max bytes per input
 
 # Budget
 MAX_PATHS = float('inf')
@@ -62,6 +62,7 @@ SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
+DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
 MSGS = []  # type: List
@@ -97,7 +98,7 @@ class TreeNode:
     Black  | True         | no sibling   | True if is intermediate, False if is leaf
     """
 
-    def __init__(self, addr: int = -1, parent: 'TreeNode' = None,
+    def __init__(self, addr: int = DEFAULT_ADDR, parent: 'TreeNode' = None,
                  colour: Colour = Colour.W,
                  state: State = None, samples: iter = None):
         # identifier
@@ -340,7 +341,15 @@ class TreeNode:
         global SOLVING_COUNT
         SOLVING_COUNT += 1
         if self.state and self.state.solver.constraints:
-            return self.app_fuzzing()
+            solving_start = time.time()
+            results = self.app_fuzzing()
+            solving_end = time.time()
+
+            if COLLECT_STATISTICS:
+                conex_statistics_file = "./statistics/{}/solver.txt".format(PROGRAM_NAME)
+                with open(conex_statistics_file, "a") as file:
+                    file.write("{}\n".format(solving_end-solving_start))
+            return results
         return self.random_fuzzing()
 
     def app_fuzzing(self) -> List[bytes]:
@@ -577,21 +586,29 @@ def initialisation():
         # Assert all traces start with the same address (i.e. main())
         firsts = [trace for trace in zip(*traces)][0]
 
-        main_addr = firsts[0]
-        debug_assertion(all(x == main_addr for x in firsts))
+        # Note: Relies on the first trace being correct at all times.
+        main_addr = -1
+        for first in firsts:
+            if first == DEFAULT_ADDR:
+                # Having the DEFAULT_ADDR means binary execution did not find a meaningful address
+                continue
+            main_addr = first
+        # debug_assertion(main_addr != DEFAULT_ADDR)
+        if main_addr != DEFAULT_ADDR:
+            # NOTE: a meaningful address for root has been found
+            # Jump to the state of main_addr
+            project = init_angr()
 
-        # Jump to the state of main_addr
-        project = init_angr()
-
-        # Noted: Tested angr on symbolic argc, failed
-        # main_state = project.factory.entry_state(
-        #     addr=main_addr,
-        #     stdin=SimFileStream,
-        #     argc=claripy.BVS('argc', 100*8)
-        # )
-
-        main_state = project.factory.blank_state(addr=main_addr,
-                                                 stdin=SimFileStream)
+            # Noted: Tested angr on symbolic argc, failed
+            # main_state = project.factory.entry_state(
+            #     addr=main_addr,
+            #     stdin=SimFileStream,
+            #     argc=claripy.BVS('argc', 100*8)
+            # )
+            main_state = project.factory.blank_state(addr=main_addr,
+                                                     stdin=SimFileStream)
+        else:
+            main_state = None
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
         return root
@@ -742,6 +759,11 @@ def selection() -> TreeNode:
         # the node selected by tree policy should not be None
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
+
+    if COLLECT_STATISTICS:
+        conex_statistics_file = "./statistics/{}/symex.txt".format(PROGRAM_NAME)
+        with open(conex_statistics_file, "a") as file:
+            file.write("{}\n".format(symex_time))
 
     debug_assertion(node.colour is Colour.G)
 
@@ -969,7 +991,9 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
         [bytes("".join(mutant), 'utf-8')
-         for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing() + [b'\x0a']
+         # Note: Need to make sure the first binary execution must complete successfully
+         #  Otherwise (e.g. timeout) the root address will be wrong
+         for mutant in SEEDS] if SEEDS else ([b'\x00'*MAX_BYTES] + [b'\x01'*MAX_BYTES] + TreeNode.random_fuzzing())
          # for mutant in SEEDS] if SEEDS else [b'\x0a']
          # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 
@@ -1029,7 +1053,8 @@ def binary_execute(input_bytes: bytes) -> List[int]:
     bin_end = time.time()
 
     if COLLECT_STATISTICS:
-        with open("./test/times/{}".format(args.file.split("/")[-1]), "a") as file:
+        conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
+        with open(conex_statistics_file, "a") as file:
             file.write("{}\n".format(bin_end-bin_start))
 
     debug_assertion(bool(report))
@@ -1043,7 +1068,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
 
     error_msg = report_msg[1] if complete_conex else None
 
-    if SAVE_TESTCASES or SAVE_TESTINPUTS and complete_conex:
+    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
         TIMES.append(time.clock())
         # In case of timeout, binary execution cannot collect stdout
         if SAVE_TESTCASES:
@@ -1439,7 +1464,10 @@ if __name__ == '__main__':
     binary_name = BINARY.split("/")[-1]
     DIR_NAME = "{}_{}_{}_{}".format(
         binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
+    PROGRAM_NAME = args.file.split("/")[-1]
+    if COLLECT_STATISTICS:
 
+        os.system("mkdir -p statistics/{}".format(PROGRAM_NAME))
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:

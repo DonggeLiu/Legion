@@ -139,6 +139,65 @@ Results
 trace
 #Baselines
 
+# temps
+**/*.swp
+
+# Tests
+Test/**/*[!c]
+# !*/ANGRTests/test_2.c
+# !*/Test/ANGTest/*.c
 
 ## MacOS
 **/.DS_Store
+Legion-status.py
+Test/ANGRTests/test_2
+Test/ANGRTests/test_2.c
+Test/ANGRTests/test_2.instr
+Test/ANGRTests/test_2.instr.s
+Test/ANGRTests/test_2.s
+Test/ANGRTests/test_2NM
+Test/ANGRTests/test_2NM.c
+Test/ANGRTests/test_N
+Test/ANGRTests/test_N.instr
+Test/ANGRTests/test_N.instr.s
+Test/ANGRTests/test_N.s
+Test/ANGRTests/test_NI
+Test/ANGRTests/test_NI.c
+Test/ANGRTests/test_NI.instr
+Test/ANGRTests/test_NI.instr.s
+Test/ANGRTests/test_NI.s
+Test/ANGRTests/test_NM
+Test/ANGRTests/test_NM.c
+Test/ANGRTests/test_NMO
+Test/ANGRTests/test_NMO.c
+Test/ANGRTests/test_NMO.instr
+Test/ANGRTests/test_NMO.instr.s
+Test/ANGRTests/test_NMO.s
+Test/ANGRTests/test_assume_trap.c
+Test/ANGRTests/test_assume_trap.instr
+Test/ANGRTests/test_assume_typeerror.c
+Test/TraceJumpTests/test_2.c
+Test/TraceJumpTests/test_2.instr
+Test/TraceJumpTests/test_2.instr.s
+Test/TraceJumpTests/test_2.s
+Test/TraceJumpTests/test_N
+Test/TraceJumpTests/test_N.instr
+Test/TraceJumpTests/test_N.instr.s
+Test/TraceJumpTests/test_N.s
+Test/TraceJumpTests/test_assume.c
+Test/TraceJumpTests/test_assume.instr
+Test/TraceJumpTests/test_goto.c
+Test/TraceJumpTests/test_goto.instr
+Test/TraceJumpTests/test_if.instr
+Test/TraceJumpTests/test_if.instr.s
+Test/TraceJumpTests/test_if.s
+Test/TraceJumpTests/test_while.instr
+Test/TraceJumpTests/test_while.instr.s
+Test/TraceJumpTests/test_while.s
+__VERIFIER.s
+__VERIFIER_assume.s
+binary
+binary.instr.s
+binary.s
+past-scoes.ods
+statistics/

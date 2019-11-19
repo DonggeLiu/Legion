@@ -5,6 +5,7 @@
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1" />
 
   <option name="--save-tests"/>
+  <option name="--persistent"/>
   <option name="--time-penalty">0</option>
   <option name="--random-seed">0</option>
   <option name="--symex-timeout">2</option>
@@ -50,5 +51,24 @@
     <includesfile>../sv-benchmarks/c/ReachSafety-Sequentialized.set</includesfile>
   </tasks>
 
+  <tasks name="SoftwareSystems-BusyBox-MemSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="SoftwareSystems-DeviceDriversLinux64-ReachSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-DeviceDriversLinux64-ReachSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="SoftwareSystems-SQLite-MemSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-SQLite-MemSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="Termination-MainHeap">
+    <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
+    <option name="-64"/>
+  </tasks>
 </benchmark>
 

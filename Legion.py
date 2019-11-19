@@ -587,26 +587,28 @@ def initialisation():
         firsts = [trace for trace in zip(*traces)][0]
 
         # Note: Relies on the first trace being correct at all times.
+        main_addr = -1
         for first in firsts:
             if first == DEFAULT_ADDR:
                 # Having the DEFAULT_ADDR means binary execution did not find a meaningful address
                 continue
             main_addr = first
-        debug_assertion(main_addr != DEFAULT_ADDR)
-        # debug_assertion(all(x == main_addr for x in firsts))
+        # debug_assertion(main_addr != DEFAULT_ADDR)
+        if main_addr != DEFAULT_ADDR:
+            # NOTE: a meaningful address for root has been found
+            # Jump to the state of main_addr
+            project = init_angr()
 
-        # Jump to the state of main_addr
-        project = init_angr()
-
-        # Noted: Tested angr on symbolic argc, failed
-        # main_state = project.factory.entry_state(
-        #     addr=main_addr,
-        #     stdin=SimFileStream,
-        #     argc=claripy.BVS('argc', 100*8)
-        # )
-
-        main_state = project.factory.blank_state(addr=main_addr,
-                                                 stdin=SimFileStream)
+            # Noted: Tested angr on symbolic argc, failed
+            # main_state = project.factory.entry_state(
+            #     addr=main_addr,
+            #     stdin=SimFileStream,
+            #     argc=claripy.BVS('argc', 100*8)
+            # )
+            main_state = project.factory.blank_state(addr=main_addr,
+                                                     stdin=SimFileStream)
+        else:
+            main_state = None
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
         return root

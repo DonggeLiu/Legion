@@ -20,7 +20,7 @@ for test in os.listdir("./TraceJumpTests/"):
         continue
     print("Testing {}:".format(test), end=" ")
     output = sp.run(
-        args=["./Legion.py", "./Test/TraceJumpTests/{}".format(test)],
+        args=["./Legion.py", "./Testing/TraceJumpTests/{}".format(test)],
         cwd="../",
         stdout=sp.PIPE
     ).stdout

@@ -608,7 +608,10 @@ def initialisation():
             main_state = project.factory.blank_state(addr=main_addr,
                                                      stdin=SimFileStream)
         else:
+            # Switch to random fuzzing
             main_state = None
+            sp.run([args.cc, "-no-pie", "-O0", "-o", BINARY, "__VERIFIER.c", "__VERIFIER_assume.c", source])
+
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
         return root

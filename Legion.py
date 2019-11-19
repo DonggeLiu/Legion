@@ -38,7 +38,7 @@ RHO = 1 / sqrt(2)
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
-MAX_BYTES = 100  # Max bytes per input
+MAX_BYTES = 100000000  # Max bytes per input
 
 # Budget
 MAX_PATHS = float('inf')

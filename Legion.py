@@ -1283,7 +1283,7 @@ def save_news_to_file(are_new):
         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
 
     for i in range(len(are_new)):
-        if are_new[i] and SAVE_TESTCASES and i < len(MSGS):
+        if SAVE_TESTCASES and i < len(MSGS):
             save_tests_to_file(TIMES[i], MSGS[i])
         if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
             save_input_to_file(TIMES[i], INPUTS[i])

@@ -1046,6 +1046,7 @@ def binary_execute(input_bytes: bytes) -> List[int]:
             return msg, ret
         except sp.TimeoutExpired:
             LOGGER.error("Binary execution time out")
+            # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
             return None, None
 
     global FOUND_BUG, MSGS, INPUTS, TIMES

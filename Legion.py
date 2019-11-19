@@ -62,6 +62,7 @@ SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
+DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
 MSGS = []  # type: List
@@ -97,7 +98,7 @@ class TreeNode:
     Black  | True         | no sibling   | True if is intermediate, False if is leaf
     """
 
-    def __init__(self, addr: int = -1, parent: 'TreeNode' = None,
+    def __init__(self, addr: int = DEFAULT_ADDR, parent: 'TreeNode' = None,
                  colour: Colour = Colour.W,
                  state: State = None, samples: iter = None):
         # identifier

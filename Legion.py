@@ -1013,9 +1013,10 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
         for result in results:
             trace, curr_time, curr_msg, curr_input, curr_found_bug = result
             traces.append(trace)
-            TIMES.append(curr_time)
-            MSGS.append(curr_msg)
-            INPUTS.append(curr_input)
+            if curr_time is not None:
+                TIMES.append(curr_time)
+                MSGS.append(curr_msg)
+                INPUTS.append(curr_input)
             FOUND_BUG = FOUND_BUG or curr_found_bug
         return traces
 
@@ -1110,7 +1111,7 @@ def binary_execute_parallel(input_bytes: bytes):
         program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
                            stderr=sp.PIPE, close_fds=True)
         try:
-            msg = program.communicate(input_bytes, timeout=30 * 60 * 60)
+            msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = program.returncode
 
             program.kill()
@@ -1118,19 +1119,24 @@ def binary_execute_parallel(input_bytes: bytes):
             return msg, ret
         except sp.TimeoutExpired:
             LOGGER.error("Binary execution time out")
-            # pdb.set_trace()
-            exit(2)
+            # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+            return None, None
 
     LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
     report_msg, return_code = report
-    error_msg = report_msg[1]
+
+    complete_conex = report_msg is not None and return_code is not None
+    if complete_conex:
+        LOGGER.info("Binary execution completed")
+
+    error_msg = report_msg[1] if complete_conex else None
 
     curr_time = curr_msg = curr_input = curr_found_bug = None
 
-    if SAVE_TESTCASES or SAVE_TESTINPUTS:
+    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
         curr_time = time.clock()
         if SAVE_TESTCASES:
             output_msg = report_msg[0].decode('utf-8')
@@ -1143,11 +1149,12 @@ def binary_execute_parallel(input_bytes: bytes):
         LOGGER.info("\n*******************"
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
-    trace = unpack(error_msg)
+    trace = unpack(error_msg) if complete_conex else None
     trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])]
+        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
+        if complete_conex else []
     LOGGER.info(trace_log)
-    return trace, curr_time, curr_msg, curr_input, curr_found_bug
+    return (trace if trace else [ROOT.addr]), curr_time, curr_msg, curr_input, curr_found_bug
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:

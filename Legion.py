@@ -587,7 +587,12 @@ def initialisation():
         firsts = [trace for trace in zip(*traces)][0]
 
         # Note: Relies on the first trace being correct at all times.
-        main_addr = firsts[0]
+        for first in firsts:
+            if first == DEFAULT_ADDR:
+                # Having the DEFAULT_ADDR means binary execution did not find a meaningful address
+                continue
+            main_addr = first
+        debug_assertion(main_addr != DEFAULT_ADDR)
         # debug_assertion(all(x == main_addr for x in firsts))
 
         # Jump to the state of main_addr

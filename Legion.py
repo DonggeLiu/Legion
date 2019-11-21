@@ -14,6 +14,7 @@ import struct
 import subprocess as sp
 import time
 from math import sqrt, log, ceil, inf
+from multiprocessing import Pool, cpu_count
 from typing import Dict, List, Tuple
 from types import GeneratorType
 
@@ -44,6 +45,7 @@ MAX_BYTES = 100000000  # Max bytes per input
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
 CORE = 1
+SIMPOOL = None
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 COVERAGE_ONLY = False
@@ -1002,97 +1004,19 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
 
     # Set the inital input to be a EoF char?
 
-    assert CORE > 0
-    if CORE == 1:
-        return [binary_execute(mutant) for mutant in mutants if not FOUND_BUG]
+    global SIMPOOL
+    SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
+    if SIMPOOL:
+        results = SIMPOOL.map(binary_execute_parallel, mutants)
     else:
-        from multiprocessing import Pool
-        pool = Pool(processes=CORE)
-        results = pool.map(binary_execute_parallel, mutants)
-        traces = []
-        for result in results:
-            trace, curr_time, curr_msg, curr_input, curr_found_bug = result
-            traces.append(trace)
-            if curr_time is not None:
-                TIMES.append(curr_time)
-                MSGS.append(curr_msg)
-                INPUTS.append(curr_input)
-            FOUND_BUG = FOUND_BUG or curr_found_bug
-        return traces
-
-
-def binary_execute(input_bytes: bytes) -> List[int]:
-    """
-    Execute the binary with an input in bytes
-    :param input_bytes: the input to feed the binary
-    :return: the execution trace in a list
-    """
-
-    def unpack(output):
-        debug_assertion((len(output) % 8 == 0))
-        # NOTE: changed addr[0] to addr
-        return [addr for i in range(int(len(output) / 8))
-                for addr in struct.unpack_from('q', output, i * 8)]
-
-    def execute():
-        program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
-                           stderr=sp.PIPE, close_fds=True)
-        try:
-            msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-            ret = program.returncode
-
-            program.kill()
-            del program
-            return msg, ret
-        except sp.TimeoutExpired:
-            LOGGER.error("Binary execution time out")
-            # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-            return None, None
-
-    global FOUND_BUG, MSGS, INPUTS, TIMES
-
-    LOGGER.info("Simulating...")
-    LOGGER.info(input_bytes)
-    bin_start = time.time()
-    report = execute()
-    bin_end = time.time()
-
-    if COLLECT_STATISTICS:
-        conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
-        with open(conex_statistics_file, "a") as file:
-            file.write("{}\n".format(bin_end-bin_start))
-
-    debug_assertion(bool(report))
-
-    report_msg, return_code = report
-    # LOGGER.info("report message: {}".format(report_msg))
-    # LOGGER.info("return code: {}".format(return_code))
-    complete_conex = report_msg is not None and return_code is not None
-    if complete_conex:
-        LOGGER.info("Binary execution completed")
-
-    error_msg = report_msg[1] if complete_conex else None
-
-    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
-        TIMES.append(time.clock())
-        # In case of timeout, binary execution cannot collect stdout
-        if SAVE_TESTCASES:
-            output_msg = report_msg[0].decode('utf-8')
-            MSGS.append(output_msg)
-        if SAVE_TESTINPUTS:
-            INPUTS.append(input_bytes)
-
-    if return_code == BUG_RET:
-        FOUND_BUG = not COVERAGE_ONLY
-        LOGGER.info("\n*******************"
-                    "\n***** EUREKA! *****"
-                    "\n*******************\n")
-    trace = unpack(error_msg) if complete_conex else None
-    trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
-        if complete_conex else []
-    LOGGER.info(trace_log)
-    return trace if trace else [ROOT.addr]
+        results = [binary_execute_parallel(mutant)
+                   for mutant in mutants if not FOUND_BUG]
+    traces = []
+    for result in results:
+        trace, curr_found_bug = result
+        traces.append(trace)
+        FOUND_BUG = FOUND_BUG or curr_found_bug
+    return traces
 
 
 def binary_execute_parallel(input_bytes: bytes):
@@ -1151,11 +1075,14 @@ def binary_execute_parallel(input_bytes: bytes):
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
     trace = unpack(error_msg) if complete_conex else None
-    trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-        trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
-        if complete_conex else []
-    LOGGER.info(trace_log)
-    return (trace if trace else [ROOT.addr]), curr_time, curr_msg, curr_input, curr_found_bug
+
+    if LOGGER.level < logging.WARNING:
+        trace_log = [hex(addr) if type(addr) is int else addr for addr in (
+            trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
+            if complete_conex else []
+        LOGGER.info(trace_log)
+
+    return (trace if trace else [ROOT.addr]), curr_found_bug
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1362,7 +1289,7 @@ if __name__ == '__main__':
                         help='Maximum number of samples per iteration')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
-    parser.add_argument("--core", type=int, default=CORE,
+    parser.add_argument("--core", type=int, default=cpu_count()-1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
                         help='The seed for randomness')
@@ -1508,3 +1435,76 @@ if __name__ == '__main__':
         print(main())
 
 #    pdb.set_trace()
+
+# def binary_execute(input_bytes: bytes) -> List[int]:
+#     """
+#     Execute the binary with an input in bytes
+#     :param input_bytes: the input to feed the binary
+#     :return: the execution trace in a list
+#     """
+#
+#     def unpack(output):
+#         debug_assertion((len(output) % 8 == 0))
+#         # NOTE: changed addr[0] to addr
+#         return [addr for i in range(int(len(output) / 8))
+#                 for addr in struct.unpack_from('q', output, i * 8)]
+#
+#     def execute():
+#         program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+#                            stderr=sp.PIPE, close_fds=True)
+#         try:
+#             msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+#             ret = program.returncode
+#
+#             program.kill()
+#             del program
+#             return msg, ret
+#         except sp.TimeoutExpired:
+#             LOGGER.error("Binary execution time out")
+#             return None, None
+#
+#     global FOUND_BUG, MSGS, INPUTS, TIMES
+#
+#     LOGGER.info("Simulating...")
+#     # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+#     bin_start = time.time()
+#     report = execute()
+#     bin_end = time.time()
+#
+#     if COLLECT_STATISTICS:
+#         conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
+#         with open(conex_statistics_file, "a") as file:
+#             file.write("{}\n".format(bin_end-bin_start))
+#
+#     debug_assertion(bool(report))
+#
+#     report_msg, return_code = report
+#     # LOGGER.info("report message: {}".format(report_msg))
+#     # LOGGER.info("return code: {}".format(return_code))
+#     complete_conex = report_msg is not None and return_code is not None
+#     if complete_conex:
+#         LOGGER.info("Binary execution completed")
+#
+#     error_msg = report_msg[1] if complete_conex else None
+#
+#     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
+#         TIMES.append(time.clock())
+#         # In case of timeout, binary execution cannot collect stdout
+#         if SAVE_TESTCASES:
+#             output_msg = report_msg[0].decode('utf-8')
+#             save_tests_to_file(time.time() - TIME_START, output_msg)
+#             # MSGS.append(output_msg)
+#         if SAVE_TESTINPUTS:
+#             INPUTS.append(input_bytes)
+#
+#     if return_code == BUG_RET:
+#         FOUND_BUG = not COVERAGE_ONLY
+#         LOGGER.info("\n*******************"
+#                     "\n***** EUREKA! *****"
+#                     "\n*******************\n")
+#     trace = unpack(error_msg) if complete_conex else None
+#     trace_log = [hex(addr) if type(addr) is int else addr for addr in (
+#         trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
+#         if complete_conex else []
+#     LOGGER.info(trace_log)
+#     return trace if trace else [ROOT.addr]

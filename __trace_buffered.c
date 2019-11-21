@@ -2,9 +2,9 @@
 
 void whatever( void ) __attribute__ ((constructor));
 
-int SIZE = BUFSIZ*10;
-char errbuf[BUFSIZ*10];
+// Having larger buffers (to 1000x) did not speed things up in experiments
+char errbuf[BUFSIZ];
 
-void whatever(void){
-  setbuffer(stderr,errbuf,SIZE);
+void set_errbuf(void){
+    setvbuf(stderr,errbuf, _IOFBF, sizeof(errbuf));
 }

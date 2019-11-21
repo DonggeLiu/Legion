@@ -35,7 +35,7 @@ clean:
 %.instr.s: %.s
 	python3 tracejump.py $^ $@
 
-%.instr: %.instr.o __trace_jump.o __VERIFIER.c __VERIFIER_assume.instr.s
+%.instr: %.instr.o __trace_jump.o __VERIFIER.c __VERIFIER_assume.instr.s __trace_buffered.c
 	$(CC) -g -o $@ $^ -no-pie
 
 %.instr.obj: %.instr

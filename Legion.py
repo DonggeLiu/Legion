@@ -58,7 +58,7 @@ SOLVING_COUNT = 0
 COLLECT_STATISTICS = False
 
 # Execution
-BINARY = None
+INSTR_BIN = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
@@ -565,7 +565,7 @@ def run() -> None:
 
 def initialisation():
     def init_angr():
-        return Project(thing=BINARY,
+        return Project(thing=INSTR_BIN,
                        ignore_functions=['printf',
                                          '__trace_jump',
                                          '__trace_jump_set'
@@ -612,7 +612,7 @@ def initialisation():
         else:
             # Switch to random fuzzing
             main_state = None
-            sp.run([args.cc, "-no-pie", "-O0", "-o", BINARY, "__VERIFIER.c", "__VERIFIER_assume.c", source])
+            # sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, "__VERIFIER.c", "__VERIFIER_assume.c", source])
 
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
@@ -1033,19 +1033,32 @@ def binary_execute_parallel(input_bytes: bytes):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
-        program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+        program = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                            stderr=sp.PIPE, close_fds=True)
+        msg = ret = None
         try:
             msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = program.returncode
 
             program.kill()
             del program
-            return msg, ret
+            LOGGER.info("Instrumented binary execution completed")
         except sp.TimeoutExpired:
-            LOGGER.error("Binary execution time out")
-            # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-            return None, None
+            # Note: Once instrumented binary execution times out,
+            #  execute with uninstrumented binary to save inputs
+            LOGGER.error("Instrumented Binary execution time out")
+            try:
+                program = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                                   stderr=sp.PIPE, close_fds=True)
+                msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+                ret = program.returncode
+                program.kill()
+                LOGGER.info("Uninstrumented binary execution completed")
+                del program
+            except sp.TimeoutExpired:
+                LOGGER.error("Uninstrumented Binary execution time out")
+                # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+        return msg, ret
 
     LOGGER.info("Simulating...")
     report = execute()
@@ -1053,15 +1066,11 @@ def binary_execute_parallel(input_bytes: bytes):
 
     report_msg, return_code = report
 
-    complete_conex = report_msg is not None and return_code is not None
-    if complete_conex:
-        LOGGER.info("Binary execution completed")
+    completed = report is not None, None
+    traced = completed and report_msg[1]
+    found_bug = False
 
-    error_msg = report_msg[1] if complete_conex else None
-
-    curr_found_bug = None
-
-    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
+    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
         curr_time = time.time() - TIME_START
         if SAVE_TESTCASES:
             stdout = report_msg[0].decode('utf-8')
@@ -1070,19 +1079,19 @@ def binary_execute_parallel(input_bytes: bytes):
             save_input_to_file(curr_time, input_bytes)
 
     if return_code == BUG_RET:
-        curr_found_bug = not COVERAGE_ONLY
+        found_bug = not COVERAGE_ONLY
         LOGGER.info("\n*******************"
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
-    trace = unpack(error_msg) if complete_conex else None
+    trace = unpack(report_msg[1]) if traced else None
 
     if LOGGER.level < logging.WARNING:
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
             trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
-            if complete_conex else []
+            if traced else []
         LOGGER.info(trace_log)
 
-    return (trace if trace else [ROOT.addr]), curr_found_bug
+    return (trace if trace else [ROOT.addr]), found_bug
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1348,45 +1357,46 @@ if __name__ == '__main__':
 
         if args.compile == "make":
             if args.o:
-                LOGGER.warning("--compile make overrides -o BINARY")
-            BINARY = stem + ".instr"
-            LOGGER.info('Making {}'.format(BINARY))
-            sp.run(["make", "-B", BINARY])
+                LOGGER.warning("--compile make overrides -o INSTR_BIN")
+            INSTR_BIN = stem + ".instr"
+            LOGGER.info('Making {}'.format(INSTR_BIN))
+            sp.run(["make", "-B", INSTR_BIN])
         elif args.compile == "svcomp":
             if not args.o:
-                LOGGER.error("--compile svcomp requires -o BINARY")
+                LOGGER.error("--compile svcomp requires -o INSTR_BIN")
                 sys.exit(2)
-            BINARY = args.o
-            asm = BINARY + ".s"
-            ins = BINARY + ".instr.s"
+            INSTR_BIN = args.o
+            asm = INSTR_BIN + ".s"
+            ins = INSTR_BIN + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
-            sp.run([args.cc, "-no-pie", "-O0", "-o", BINARY, "__VERIFIER.c",
+            sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, "__VERIFIER.c",
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",
                     "__trace_buffered.c",
                     ins])
         elif args.compile == "trace-cc":
             if args.o:
-                BINARY = args.o
+                INSTR_BIN = args.o
             else:
-                BINARY = stem
-            LOGGER.info('Compiling {} with trace-cc'.format(BINARY))
-            sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o", BINARY, source])
+                INSTR_BIN = stem
+            LOGGER.info('Compiling {} with trace-cc'.format(INSTR_BIN))
+            sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o", INSTR_BIN, source])
         else:
             LOGGER.error("Invalid compilation mode: {}".format(args.compile))
             sys.exit(2)
 
-        sp.run(["file", BINARY])
+        sp.run(["file", INSTR_BIN])
+        UNINSTR_BIN = ".".join(INSTR_BIN.split(".")[:-1])
+        sp.run([args.cc, "-no-pie", "-O0", "-o", UNINSTR_BIN,
+                "__VERIFIER.c", "__VERIFIER_assume.c", source])
     else:
-        BINARY = args.file
+        INSTR_BIN = args.file
 
-    binary_name = BINARY.split("/")[-1]
-    DIR_NAME = "{}_{}_{}_{}".format(
-        binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
+    binary_name = INSTR_BIN.split("/")[-1]
+    DIR_NAME = "{}_{}_{}_{}".format(binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
     PROGRAM_NAME = args.file.split("/")[-1]
     if COLLECT_STATISTICS:
-
         os.system("mkdir -p statistics/{}".format(PROGRAM_NAME))
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
@@ -1430,7 +1440,7 @@ if __name__ == '__main__':
 #                 for addr in struct.unpack_from('q', output, i * 8)]
 #
 #     def execute():
-#         program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+#         program = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
 #                            stderr=sp.PIPE, close_fds=True)
 #         try:
 #             msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)

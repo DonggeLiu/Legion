@@ -1092,6 +1092,7 @@ def expansion(traces: List[List[int]]) -> List[bool]:
     :param traces: the traces to be integrated into the tree
     :return: a list of booleans representing whether each trace contribute to a new path
     """
+    LOGGER.info("Expansion Stage")
     return [integrate_path(trace=trace) for trace in traces]
 
 
@@ -1128,6 +1129,7 @@ def propagation(node: TreeNode, traces: List[List[int]],
     :param traces: the binary execution traces
     :param are_new: whether each of the execution traces is new
     """
+    LOGGER.info("Propagation Stage")
     propagate_selection_path(node=node, are_new=are_new)
     propagate_execution_traces(traces=traces, are_new=are_new)
 
@@ -1163,6 +1165,7 @@ def propagate_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
+        LOGGER.info("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, new=is_new)

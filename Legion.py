@@ -627,7 +627,7 @@ def initialisation():
     are_new = expansion(traces=traces)
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
-    save_news_to_file(are_new=are_new)
+    # save_news_to_file(are_new=are_new)
 
 
 def has_budget() -> bool:
@@ -653,7 +653,7 @@ def mcts():
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
-    save_news_to_file(are_new=are_new)
+    # save_news_to_file(are_new=are_new)
 
 
 def selection() -> TreeNode:
@@ -1059,15 +1059,15 @@ def binary_execute_parallel(input_bytes: bytes):
 
     error_msg = report_msg[1] if complete_conex else None
 
-    curr_time = curr_msg = curr_input = curr_found_bug = None
+    curr_found_bug = None
 
     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
-        curr_time = time.clock()
+        curr_time = time.time() - TIME_START
         if SAVE_TESTCASES:
-            output_msg = report_msg[0].decode('utf-8')
-            curr_msg = output_msg
+            stdout = report_msg[0].decode('utf-8')
+            save_tests_to_file(curr_time, stdout)
         if SAVE_TESTINPUTS:
-            curr_input = input_bytes
+            save_input_to_file(curr_time, input_bytes)
 
     if return_code == BUG_RET:
         curr_found_bug = not COVERAGE_ONLY
@@ -1192,29 +1192,6 @@ def propagate_execution_traces(traces: List[List[int]],
     debug_assertion(len(traces) == len(are_new))
     for i in range(len(traces)):
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
-
-
-def save_news_to_file(are_new):
-    """
-    Save data to file only if it is new
-    :param are_new: a list to represent whether each datum
-                    contributes to a new path
-    """
-    global MSGS, INPUTS, TIMES
-    if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
-        return
-
-    if SAVE_TESTCASES:
-        debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
-    if SAVE_TESTINPUTS:
-        debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
-
-    for i in range(len(are_new)):
-        if SAVE_TESTCASES and i < len(MSGS):
-            save_tests_to_file(TIMES[i], MSGS[i])
-        if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
-            save_input_to_file(TIMES[i], INPUTS[i])
-    MSGS, INPUTS, TIMES = [], [], []
 
 
 def save_tests_to_file(time_stamp, data):
@@ -1508,3 +1485,25 @@ if __name__ == '__main__':
 #         if complete_conex else []
 #     LOGGER.info(trace_log)
 #     return trace if trace else [ROOT.addr]
+
+# def save_news_to_file(are_new):
+#     """
+#     Save data to file only if it is new
+#     :param are_new: a list to represent whether each datum
+#                     contributes to a new path
+#     """
+#     global MSGS, INPUTS, TIMES
+#     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
+#         return
+#
+#     if SAVE_TESTCASES:
+#         debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
+#     if SAVE_TESTINPUTS:
+#         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
+#
+#     for i in range(len(are_new)):
+#         # if SAVE_TESTCASES and i < len(MSGS):
+#         #     save_tests_to_file(TIMES[i], MSGS[i])
+#         if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
+#             save_input_to_file(TIMES[i], INPUTS[i])
+#     MSGS, INPUTS, TIMES = [], [], []

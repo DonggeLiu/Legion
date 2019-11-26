@@ -612,7 +612,7 @@ def initialisation():
         else:
             # Switch to random fuzzing
             main_state = None
-            # sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, "__VERIFIER.c", "__VERIFIER_assume.c", source])
+            # sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, verifier_c, "__VERIFIER_assume.c", source])
 
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
@@ -1357,6 +1357,11 @@ if __name__ == '__main__':
             LOGGER.error("-32 is incompatible with -64")
             sys.exit(2)
 
+        if args.m32:
+            verifier_c = "__VERIFIER32.c"
+        else:
+            verifier_c = "__VERIFIER.c"
+
         if args.compile == "make":
             if args.o:
                 LOGGER.warning("--compile make overrides -o INSTR_BIN")
@@ -1372,7 +1377,7 @@ if __name__ == '__main__':
             ins = INSTR_BIN + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
-            sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, "__VERIFIER.c",
+            sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, verifier_c,
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",
                     "__trace_buffered.c",
@@ -1391,7 +1396,7 @@ if __name__ == '__main__':
         sp.run(["file", INSTR_BIN])
         UNINSTR_BIN = ".".join(INSTR_BIN.split(".")[:-1])
         sp.run([args.cc, "-no-pie", "-O0", "-o", UNINSTR_BIN,
-                "__VERIFIER.c", "__VERIFIER_assume.c", source])
+                verifier_c, "__VERIFIER_assume.c", source])
     else:
         INSTR_BIN = args.file
 

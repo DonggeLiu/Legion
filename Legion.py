@@ -1068,7 +1068,7 @@ def binary_execute_parallel(input_bytes: bytes):
 
     report_msg, return_code = report
 
-    completed = report is not None, None
+    completed = report != (None, None)
     traced = completed and report_msg[1]
     found_bug = False
 

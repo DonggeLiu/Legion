@@ -565,6 +565,7 @@ def run() -> None:
 
 def initialisation():
     def init_angr():
+        LOGGER.info("Initialising ANGR Project")
         return Project(thing=INSTR_BIN,
                        ignore_functions=['printf',
                                          '__trace_jump',
@@ -616,15 +617,17 @@ def initialisation():
 
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
+        LOGGER.info("ROOT created")
         return root
 
     global ROOT
-
+    LOGGER.info("Simulating on the seeded inputs")
     traces = simulation(node=None)
-
+    LOGGER.info("Initialising the ROOT")
     ROOT = init_root()
-
+    LOGGER.info("Expanding the tree with paths taken by seeded inputs")
     are_new = expansion(traces=traces)
+    LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
     # save_news_to_file(are_new=are_new)
@@ -1389,7 +1392,9 @@ if __name__ == '__main__':
             sys.exit(2)
 
         sp.run(["file", INSTR_BIN])
+
         UNINSTR_BIN = ".".join(INSTR_BIN.split(".")[:-1])
+        sp.run(["file", INSTR_BIN])
         sp.run([args.cc, "-no-pie", "-O0", "-o", UNINSTR_BIN,
                 "__VERIFIER.c", "__VERIFIER_assume.c", source])
     else:

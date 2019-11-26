@@ -1375,7 +1375,8 @@ if __name__ == '__main__':
             ins = INSTR_BIN + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
-            sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, "__VERIFIER.c",
+            sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN,
+                    "__VERIFIER_32.c" if args.m32 else "__VERIFIER.c",
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",
                     "__trace_buffered.c",

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-../../../workspace/cpachecker/scripts/table-generator.py \
+~/tools/benchexec/bin/table-generator \
     "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-Arrays.xml.bz2" \
     "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-BitVectors.xml.bz2" \
     "test/results/tbf.$1.results.test-comp19_prop-coverage-branches.ReachSafety-ControlFlow.xml.bz2" \

@@ -5,6 +5,7 @@ import argparse
 import cProfile
 import datetime
 import enum
+import gc
 import logging
 import os
 import pdb
@@ -1038,30 +1039,37 @@ def binary_execute_parallel(input_bytes: bytes):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
-        program = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+        instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                         stderr=sp.PIPE, close_fds=True)
+        uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                            stderr=sp.PIPE, close_fds=True)
         msg = ret = None
         try:
-            msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-            ret = program.returncode
-
-            program.kill()
-            del program
+            msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+            ret = instr.returncode
+            instr.terminate()
+            del instr
+            gc.collect()
             LOGGER.info("Instrumented binary execution completed")
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
             LOGGER.error("Instrumented Binary execution time out")
+            instr.kill()
+            del instr
+            gc.collect()
             try:
-                program = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-                                   stderr=sp.PIPE, close_fds=True)
-                msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-                ret = program.returncode
-                program.kill()
+                msg = uninstr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+                ret = uninstr.returncode
                 LOGGER.info("Uninstrumented binary execution completed")
-                del program
+                uninstr.terminate()
+                del uninstr
+                gc.collect()
             except sp.TimeoutExpired:
                 LOGGER.error("Uninstrumented Binary execution time out")
+                uninstr.kill()
+                del uninstr
+                gc.collect()
                 # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
         return msg, ret
 

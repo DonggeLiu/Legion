@@ -5,7 +5,9 @@ A concolic (concrete-symbolic) execution tool assisted by the Monte Carlo tree s
 Concolic (concrete-symbolic) testing is a natural combination to balance the complementary nature of fuzzing and symbolic execution and aim for the best of both worlds: 
    * Fuzzing generates concrete inputs at a low cost, but cannot guarantee the coverage of deep execution paths; 
    * Conversely, symbolic execution can compute inputs for all paths, despite being expensive and unscalable due to the path explosion problem.
-  During the recent years, a main open challenge that have ben studied in coverage-based concolic execution is an efficient program exploration strategy to determine when and where to apply which technique.
+
+## Challenge to solve
+During the recent years, a main open challenge that have ben studied in coverage-based concolic execution is an efficient program exploration strategy to determine when and where to apply which technique.
   
 ## Contribution
 ### Main contribution

@@ -20,6 +20,26 @@ During the recent years, a main open challenge that have ben studied in coverage
 Moreover, while most existing fuzzing frameworks are designed for specific metrics, Legion adopts a modularised score function to avoid suffering from degraded performance on other metrics of interests.
 
 
+## contributions
+### Designers
+
+[Dongge Liu](https://github.com/Alan32Liu)
+
+[Gidon Ernst](https://github.com/gernst)
+
+[Toby Murray](https://github.com/tobycmurray)
+
+[Benjamin Rubinstein](https://github.com/brubinstein)
+
+### Deveolopers
+
+[Dongge Liu](https://github.com/Alan32Liu)
+
+[Gidon Ernst](https://github.com/gernst)
+
+[Toby Murray](https://github.com/tobycmurray)
+
+
 
 ## TODO
 

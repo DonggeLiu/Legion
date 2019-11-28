@@ -1042,8 +1042,6 @@ def binary_execute_parallel(input_bytes: bytes):
     def execute():
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
-        uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-                           stderr=sp.PIPE, close_fds=True)
         msg = ret = None
         try:
             msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
@@ -1060,6 +1058,8 @@ def binary_execute_parallel(input_bytes: bytes):
             del instr
             gc.collect()
             try:
+                uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                                   stderr=sp.PIPE, close_fds=True)
                 msg = uninstr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
                 ret = uninstr.returncode
                 LOGGER.info("Uninstrumented binary execution completed")

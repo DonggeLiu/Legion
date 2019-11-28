@@ -12,14 +12,14 @@
   <option name="--reduction-output">test-suite</option>
 
   <rundefinition name="test-comp19_prop-coverage-error-call">
-    <requiredfiles>test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
   </rundefinition>
 
   <rundefinition name="test-comp19_prop-coverage-branches">
-    <requiredfiles>test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
 
@@ -52,7 +52,7 @@
     <includesfile>../sv-benchmarks/c/ReachSafety-Sequentialized.set</includesfile>
   </tasks>
 
-  <tasks name="SoftwareSystems-BusyBox-MemSafety">
+  <!-- <tasks name="SoftwareSystems-BusyBox-MemSafety">
     <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
     <option name="-64"/>
   </tasks>
@@ -69,7 +69,7 @@
 
   <tasks name="Termination-MainHeap">
     <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
-  </tasks>
+  </tasks> -->
 
 
   <columns>

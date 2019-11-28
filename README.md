@@ -14,7 +14,7 @@ During the recent years, a main open challenge that have ben studied in coverage
   *Legion* formulates this challenge as a problem of sequential decision-making under uncertainty for the first time. It generalises conconlic execution strategies to the exploration-exploitation problem in machine learning and leverages the *Monte Carlo tree search (MCTS)* - a popular framework from AI literature to solve such problem by marrying search \& planning and statistical estimation. Specifically, through iterations of decision sequences, Legion resolves the trade-off between fuzzing and symbolic execution by balancing the considerations of program structure estimation and program exploration planning. This best-first strategy of MCTS provides a principled approach to determine which constraints to flip in pre-existing concolic testing systems.
 
 ### Second contribution
-  Also, it proposes an *approximate path preserving fuzzing (APPFuzzing) technique as an alternative to the widely used *American Fuzzing Lop (AFL)* to estimate program structure.
+  Also, it proposes an *approximate path preserving fuzzing (APPFuzzing)* technique as an alternative to the widely used *American Fuzzing Lop (AFL)* to estimate program structure.
 
 ### Third contribution
 Moreover, while most existing fuzzing frameworks are designed for specific metrics, Legion adopts a modularised score function to avoid suffering from degraded performance on other metrics of interests.

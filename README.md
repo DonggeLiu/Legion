@@ -22,7 +22,7 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 
 ## Collaborators
 
-### Designers
+### Designers & Developers 
 
 [Dongge Liu](https://github.com/Alan32Liu)
 
@@ -31,15 +31,6 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 [Toby Murray](https://github.com/tobycmurray)
 
 [Benjamin Rubinstein](https://github.com/brubinstein)
-
-### Deveolopers
-
-[Dongge Liu](https://github.com/Alan32Liu)
-
-[Gidon Ernst](https://github.com/gernst)
-
-[Toby Murray](https://github.com/tobycmurray)
-
 
 
 ## TODO

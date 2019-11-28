@@ -1,30 +1,25 @@
 <?xml version="1.0"?>
-<!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.9//EN" "http://www.sosy-lab.org/benchexec/benchmark-1.9.dtd">
-<benchmark tool="tbf_testsuite_validator" displayName="TBF Test-Suite Validator" timelimit="15 min" memlimit="7 GB" cpuCores="1">
+<!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.18//EN" "https://www.sosy-lab.org/benchexec/benchmark-1.18.dtd">
+<benchmark tool="testcov" displayName="TestCov" timelimit="15 min" memlimit="7 GB" cpuCores="1">
 
-  <require cpuModel="Intel Core i5" cpuCores="2"/>
+  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="1"/>
 
-  <resultfiles>**test-suite/*</resultfiles>
+  <resultfiles>**output/**</resultfiles>
 
-  <columns>
-    <column title="lines_covered">Lines covered</column>
-    <column title="branches_covered">Branches covered</column>
-  </columns>
-
-  <option name="--verbose" />
-  <option name="--sequence-file">cov-seq.txt</option>
-  <option name="-r" />
+  <option name="--no-isolation" />
+  <option name="--no-plots" />
+  <option name="--reduction">BY_ORDER</option>
+  <option name="--reduction-output">test-suite</option>
 
   <rundefinition name="test-comp19_prop-coverage-error-call">
-    <option name="--stop-after-found-violation" />
-    <requiredfiles>test/results/legion.2019-10-29_0914.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion.2019-10-29_0914.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-error-call.prp</propertyfile>
   </rundefinition>
 
   <rundefinition name="test-comp19_prop-coverage-branches">
-    <requiredfiles>test/results/legion.2019-10-29_0914.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
-    <option name="--test-suite">test/results/legion.2019-10-29_0914.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
+    <requiredfiles>test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</requiredfiles>
+    <option name="--test-suite">test/results/legion-long.RUNDATE.files/${rundefinition_name}.${taskdef_name}/test-suite.zip</option>
     <propertyfile>../sv-benchmarks/c/properties/coverage-branches.prp</propertyfile>
   </rundefinition>
 
@@ -56,6 +51,31 @@
   <tasks name="ReachSafety-Sequentialized">
     <includesfile>../sv-benchmarks/c/ReachSafety-Sequentialized.set</includesfile>
   </tasks>
+
+  <tasks name="SoftwareSystems-BusyBox-MemSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="SoftwareSystems-DeviceDriversLinux64-ReachSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-DeviceDriversLinux64-ReachSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="SoftwareSystems-SQLite-MemSafety">
+    <includesfile>../sv-benchmarks/c/SoftwareSystems-SQLite-MemSafety.set</includesfile>
+    <option name="-64"/>
+  </tasks>
+
+  <tasks name="Termination-MainHeap">
+    <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
+  </tasks>
+
+
+  <columns>
+    <column title="branches_covered">.INFO:root:Accumulated coverage:</column>
+    <column title="branches_total">Number of goals</column>
+  </columns>
 
 </benchmark>
 

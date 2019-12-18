@@ -8,8 +8,8 @@
   <option name="--persistent"/>
   <option name="--time-penalty">0</option>
   <option name="--random-seed">0</option>
-  <option name="--symex-timeout">2</option>
-  <option name="--conex-timeout">5</option>
+  <option name="--symex-timeout">10</option>
+  <option name="--conex-timeout">10</option>
   <option name="-o">./binary.instr</option>
   <option name="--compile">svcomp</option>
 
@@ -61,6 +61,7 @@
     <option name="-32"/>
   </tasks>
 
+<!--
   <tasks name="SoftwareSystems-BusyBox-MemSafety">
     <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
     <option name="-64"/>
@@ -76,6 +77,6 @@
   <tasks name="Termination-MainHeap">
     <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
     <option name="-64"/>
-  </tasks>
+  </tasks> -->
 </benchmark>
 

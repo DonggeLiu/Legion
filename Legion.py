@@ -220,7 +220,7 @@ class TreeNode:
             if ROOT.fully_explored and self is not ROOT:
                 return (self.is_leaf() and self.colour is not Colour.G) \
                        or self.exhausted
-        return self.fully_explored
+        return self.fully_explored or self.exhausted
 
     def mark_fully_explored(self):
         """

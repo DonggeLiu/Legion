@@ -13,6 +13,7 @@ import random
 import pdb
 from typing import List
 
+from multiprocessing import Pool, cpu_count
 from angr import Project
 from angr.errors import SimProcedureError, SimMemoryAddressError, SimUnsatError
 from angr.storage.file import SimFileStream
@@ -43,38 +44,43 @@ def explore():
         ignore_functions=['printf', '__trace_jump', '__trace_jump_set'])
     entry = project.factory.entry_state(stdin=SimFileStream)
     symex_paths_gen = my_symex_rec(entry, [entry])
+    symex_paths = [symex_path for symex_path in symex_paths_gen]
+    global SIMPOOL
+    SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
 
-    path_count = 0
-    while True:
-        try:
-            symex_path = next(symex_paths_gen)
-        except StopIteration:
-            break
-        path_count += 1
-        value = solve_inputs(symex_path[-1])
-        conex_result = my_conex(value)
-        conex_path, return_code = conex_result
+    if SIMPOOL:
+        conex_paths = SIMPOOL.map(enumerate_path, symex_paths)
+    else:
+        conex_paths = [enumerate_path(symex_path) for symex_path in symex_paths]
+    return len(conex_paths)
 
-        LOGGER.info("INPUT value: {}; INPUT bytes: {}; RETURN code: {}"
-                    .format(int.from_bytes(value, 'big', signed=True),
-                            value,
-                            return_code))
-        LOGGER.info("{} {} {}".format("SymEx".rjust(9), "ConEx".ljust(9),
-                                      "Constraints"))
-        for node in symex_path:
-            constraints = node.solver.constraints
-            if conex_path and hex(node.addr) == conex_path[0]:
-                LOGGER.info(hex(node.addr).rjust(9),
-                            conex_path[0].ljust(9),
-                            constraints)
-                conex_path.pop(0)
-            else:
-                LOGGER.info("{} {} {}".format(
-                    hex(node.addr).rjust(9), ''.rjust(9), constraints))
-        for addr in conex_path:
-            LOGGER.info("ConEx addr not in SymEx:", addr)
-        LOGGER.info("\n")
-    return path_count
+
+def enumerate_path(symex_path):
+    LOGGER.info("Starting to enumerate a path...")
+    value = solve_inputs(symex_path[-1])
+    conex_result = my_conex(value)
+    conex_path, return_code = conex_result
+
+    LOGGER.info("INPUT value: {}; INPUT bytes: {}; RETURN code: {}"
+                .format(int.from_bytes(value, 'big', signed=True),
+                        value,
+                        return_code))
+    LOGGER.info("{} {} {}".format("SymEx".rjust(9), "ConEx".ljust(9),
+                                  "Constraints"))
+    for node in symex_path:
+        constraints = node.solver.constraints
+        if conex_path and hex(node.addr) == conex_path[0]:
+            LOGGER.info(hex(node.addr).rjust(9),
+                        conex_path[0].ljust(9),
+                        constraints)
+            conex_path.pop(0)
+        else:
+            LOGGER.info("{} {} {}".format(
+                hex(node.addr).rjust(9), ''.rjust(9), constraints))
+    for addr in conex_path:
+        LOGGER.info("ConEx addr not in SymEx:", addr)
+    LOGGER.info("\n")
+    return conex_path
 
 
 def symex_step(node):

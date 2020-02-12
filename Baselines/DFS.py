@@ -20,6 +20,8 @@ SAVE_TESTCASES = False
 SAVE_TESTINPUTS = False
 TIME_START = time.time()
 MAX_TIME = 0
+SYMEX_TIMEOUT = 0  # in secs
+CONEX_TIMEOUT = None  # in secs
 
 # Logging
 LOGGER = logging.getLogger("Legion")
@@ -31,7 +33,7 @@ logging.getLogger('angr').setLevel('ERROR')
 
 
 def explore():
-    project = Project(thing=BINARY, ignore_functions=['printf', '__stack_chk_fail'])
+    project = Project(thing=BINARY, ignore_functions=['printf', '__trace_jump','__trace_jump_set'])
     entry = project.factory.entry_state(stdin=SimFileStream)
     symex_paths_gen = my_symex_rec(entry, [entry])
 
@@ -190,7 +192,7 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.setrecursionlimit(1000000)
-    parser = argparse.ArgumentParser(description='Legion')
+    parser = argparse.ArgumentParser(description='DFS')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
     parser.add_argument('--save-inputs', action='store_true',
@@ -201,10 +203,25 @@ if __name__ == '__main__':
                         help='Increase output verbosity')
     parser.add_argument("file",
                         help='Binary or source file')
+    parser.add_argument("--core", type=int, default=cpu_count()-1,
+                        help='Number of cores available')
+    parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
+                        help='The time limit for concrete binary execution')
+    parser.add_argument("-o", default=None,
+                        help='Binary file output location when input is a C source')
+    parser.add_argument("--compile", default="make",
+                        help='How to compile C input files')
+    parser.add_argument("-64", dest="m64", action="store_true",
+                        help='Compile with -m64 (override platform default)')
+    parser.add_argument("-32", dest="m32", action="store_true",
+                        help='Compile with -m32 (override platform default)')
     args = parser.parse_args()
 
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
+    CORE = args.core
+    SYMEX_TIMEOUT = args.symex_timeout
+    CONEX_TIMEOUT = args.conex_timeout
     LOGGER.setLevel(logging.DEBUG if args.verbose else logging.ERROR)
 
     is_source = args.file[-2:] in ['.c', '.i']

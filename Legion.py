@@ -220,7 +220,7 @@ class TreeNode:
             if ROOT.fully_explored and self is not ROOT:
                 return (self.is_leaf() and self.colour is not Colour.G) \
                        or self.exhausted
-        return self.fully_explored
+        return self.fully_explored or self.exhausted
 
     def mark_fully_explored(self):
         """
@@ -414,6 +414,7 @@ class TreeNode:
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
+                self.parent.parent.mark_fully_explored()
                 # NOTE: In some case, no input can be found from the simul child
                 #   even if its red parent is considered as feasible, weird.
                 #   In this case, parent.sel_try is 0, which prevents it to
@@ -429,7 +430,6 @@ class TreeNode:
                 #         which does not imply no input was found
                 #         here there could be a child to be selected in the
                 #         next iteration
-                # self.parent.mark_fully_explored()
                 break
         return results
 

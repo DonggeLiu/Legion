@@ -9,6 +9,8 @@ import struct
 import subprocess as sp
 import sys
 import time
+import random
+import pdb
 from typing import List
 
 from angr import Project
@@ -22,6 +24,9 @@ TIME_START = time.time()
 MAX_TIME = 0
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
+# PATH_COUNT = 0
+SIMPOOL = None
+RAN_SEED = 0
 
 # Logging
 LOGGER = logging.getLogger("Legion")
@@ -33,7 +38,9 @@ logging.getLogger('angr').setLevel('ERROR')
 
 
 def explore():
-    project = Project(thing=BINARY, ignore_functions=['printf', '__trace_jump','__trace_jump_set'])
+    project = Project(
+        thing=UNINSTR_BIN,
+        ignore_functions=['printf', '__trace_jump', '__trace_jump_set'])
     entry = project.factory.entry_state(stdin=SimFileStream)
     symex_paths_gen = my_symex_rec(entry, [entry])
 
@@ -111,10 +118,10 @@ def concrete_execute(input_bytes: bytes) -> (List[str], int):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
-        program = sp.Popen(BINARY, stdin=sp.PIPE, stdout=sp.PIPE,
+        program = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                            stderr=sp.PIPE, close_fds=True)
         try:
-            msg = program.communicate(input_bytes, timeout=30 * 60 * 60)
+            msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = program.returncode
 
             program.kill()
@@ -203,8 +210,12 @@ if __name__ == '__main__':
                         help='Increase output verbosity')
     parser.add_argument("file",
                         help='Binary or source file')
+    parser.add_argument("--random-seed", type=int, default=RAN_SEED,
+                        help='The seed for randomness')
     parser.add_argument("--core", type=int, default=cpu_count()-1,
                         help='Number of cores available')
+    parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
+                        help='The time limit for symbolic execution')
     parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
                         help='The time limit for concrete binary execution')
     parser.add_argument("-o", default=None,
@@ -215,6 +226,8 @@ if __name__ == '__main__':
                         help='Compile with -m64 (override platform default)')
     parser.add_argument("-32", dest="m32", action="store_true",
                         help='Compile with -m32 (override platform default)')
+    parser.add_argument("--cc", default="cc",
+                        help='C compiler to use together with --compile svcomp')
     args = parser.parse_args()
 
     SAVE_TESTINPUTS = args.save_inputs
@@ -222,19 +235,72 @@ if __name__ == '__main__':
     CORE = args.core
     SYMEX_TIMEOUT = args.symex_timeout
     CONEX_TIMEOUT = args.conex_timeout
+    RAN_SEED = args.random_seed
     LOGGER.setLevel(logging.DEBUG if args.verbose else logging.ERROR)
+
+    if RAN_SEED is not None:
+        random.seed(RAN_SEED)
+
+    if args.verbose:
+        LOGGER.setLevel(logging.DEBUG)
 
     is_source = args.file[-2:] in ['.c', '.i']
     if is_source:
         source = args.file
-        BINARY = source[:-2]
-        LOGGER.info('Building {}'.format(BINARY))
-        os.system("gcc -ggdb -o {} {} __VERIFIER.c".format(BINARY, source))
-    else:
-        BINARY = args.file
+        stem = source[:-2]
 
-    binary_name = BINARY.split("/")[-1]
+        if args.m32 and args.m64:
+            LOGGER.error("-32 is incompatible with -64")
+            sys.exit(2)
+
+        if args.m32:
+            verifier_c = "./__VERIFIER32.c"
+        else:
+            verifier_c = "./__VERIFIER.c"
+
+        # if args.compile == "make":
+        #     if args.o:
+        #         LOGGER.warning("--compile make overrides -o INSTR_BIN")
+        #     UNINSTR_BIN = stem
+        #     LOGGER.info('Making {}'.format(UNINSTR_BIN))
+        #     sp.run(["make", "-B", UNINSTR_BIN])
+        # elif args.compile == "svcomp":
+        #     if not args.o:
+        #         LOGGER.error("--compile svcomp requires -o UNINSTR_BIN")
+        #         sys.exit(2)
+        #     UNINSTR_BIN = args.o
+        #     asm = UNINSTR_BIN + ".s"
+        #     sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
+        #     sp.run([args.cc, "-no-pie", "-O0", "-o", UNINSTR_BIN, verifier_c,
+        #             "./__VERIFIER_assume.s",
+        #             "./__trace_jump.s",
+        #             "./__trace_buffered.c",
+        #             asm])
+        # elif args.compile == "trace-cc":
+        #     if args.o:
+        #         UNINSTR_BIN = args.o
+        #     else:
+        #         UNINSTR_BIN = stem
+        #     LOGGER.info('Compiling {} with trace-cc'.format(UNINSTR_BIN))
+        #     sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o", UNINSTR_BIN, source])
+        # else:
+        #     LOGGER.error("Invalid compilation mode: {}".format(args.compile))
+        #     sys.exit(2)
+        #
+        # sp.run(["file", UNINSTR_BIN])
+
+        UNINSTR_BIN = args.o
+        sp.run([args.cc, "-no-pie", "-O0", "-o", UNINSTR_BIN,
+                verifier_c, "./__VERIFIER_assume.c", source])
+        sp.run(["file", UNINSTR_BIN])
+    else:
+        UNINSTR_BIN = args.file
+        sp.run(["file", UNINSTR_BIN])
+
+    binary_name = UNINSTR_BIN.split("/")[-1]
     DIR_NAME = "{}_{}".format(binary_name, TIME_START)
+    PROGRAM_NAME = args.file.split("/")[-1]
+
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:

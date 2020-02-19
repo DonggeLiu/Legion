@@ -32,7 +32,7 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 
 [Benjamin Rubinstein](https://github.com/brubinstein)
 
-
+<!--
 ## TODO
 
 ### Version control
@@ -125,3 +125,4 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 2. Claripy: 
     * Added a new approximate constraint solver backend: Quick Sampler
     * An assertion on the length of `exprs`
+-->

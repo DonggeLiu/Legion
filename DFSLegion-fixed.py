@@ -220,7 +220,7 @@ class TreeNode:
             if ROOT.fully_explored and self is not ROOT:
                 return (self.is_leaf() and self.colour is not Colour.G) \
                        or self.exhausted
-        return self.fully_explored
+        return self.fully_explored or self.exhausted
 
     def mark_fully_explored(self):
         """
@@ -414,6 +414,7 @@ class TreeNode:
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
+                self.parent.parent.mark_fully_explored()
                 # NOTE: In some case, no input can be found from the simul child
                 #   even if its red parent is considered as feasible, weird.
                 #   In this case, parent.sel_try is 0, which prevents it to
@@ -429,7 +430,6 @@ class TreeNode:
                 #         which does not imply no input was found
                 #         here there could be a child to be selected in the
                 #         next iteration
-                # self.parent.mark_fully_explored()
                 break
         return results
 
@@ -564,7 +564,6 @@ def run() -> None:
     ROOT.pp()
     while has_budget():
         mcts()
-
 
 def initialisation():
     def init_angr():
@@ -838,6 +837,7 @@ def dye_siblings(child: TreeNode) -> None:
         # if hex(child.addr)[-4:] == '0731':
         #     pdb.set_trace()
         child.fully_explored = True
+        child.exhausted = True
         child.parent.mark_fully_explored()
 
     if len(sibling_states) == 1:
@@ -935,6 +935,9 @@ def symex(state: State) -> List[State]:
     """
     # Note: Need to keep all successors?
     LOGGER.debug("computing successors for {}".format(state))
+    if state is None:
+        LOGGER.debug("No corresponding state found, any dynamic array allocation in the code?")
+        return []
     successors = state.step().successors
     LOGGER.debug("Successors are: {}".format(successors))
     return successors
@@ -1046,6 +1049,12 @@ def binary_execute_parallel(input_bytes: bytes):
             msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = instr.returncode
             instr.terminate()
+            # import pdb
+            # pdb.set_trace()
+            instr.stdout.close()
+            instr.stdin.close()
+            instr.stderr.close()
+            instr.kill()
             del instr
             gc.collect()
             LOGGER.info("Instrumented binary execution completed")
@@ -1053,6 +1062,10 @@ def binary_execute_parallel(input_bytes: bytes):
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
             LOGGER.error("Instrumented Binary execution time out")
+            instr.kill()
+            instr.stdout.close()
+            instr.stdin.close()
+            instr.stderr.close()
             instr.kill()
             del instr
             gc.collect()
@@ -1063,10 +1076,18 @@ def binary_execute_parallel(input_bytes: bytes):
                 ret = uninstr.returncode
                 LOGGER.info("Uninstrumented binary execution completed")
                 uninstr.terminate()
+                uninstr.stdout.close()
+                uninstr.stdin.close()
+                uninstr.stderr.close()
+                uninstr.kill()
                 del uninstr
                 gc.collect()
             except sp.TimeoutExpired:
                 LOGGER.error("Uninstrumented Binary execution time out")
+                uninstr.kill()
+                uninstr.stdout.close()
+                uninstr.stdin.close()
+                uninstr.stderr.close()
                 uninstr.kill()
                 del uninstr
                 gc.collect()
@@ -1439,11 +1460,11 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    if args.verbose:
-        cProfile.run('main()', sort='cumtime')
-    else:
-        print(main())
-
+    # if args.verbose:
+    #     cProfile.run('main()', sort='cumtime')
+    # else:
+    #     print(main())
+    print(main())
 #    pdb.set_trace()
 
 # def binary_execute(input_bytes: bytes) -> List[int]:

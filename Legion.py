@@ -837,6 +837,9 @@ def dye_siblings(child: TreeNode) -> None:
         # if hex(child.addr)[-4:] == '0731':
         #     pdb.set_trace()
         child.fully_explored = True
+        # Note: Making the node exhausted to make sure it is evaluated to -inf
+        #   This is specific for white nodes whose corresponding state
+        #   cannot be found due to dynmaic array allocation
         child.exhausted = True
         child.parent.mark_fully_explored()
 

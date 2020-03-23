@@ -61,7 +61,6 @@
     <option name="-32"/>
   </tasks>
 
-<!--
   <tasks name="SoftwareSystems-BusyBox-MemSafety">
     <includesfile>../sv-benchmarks/c/SoftwareSystems-BusyBox-MemSafety.set</includesfile>
     <option name="-64"/>
@@ -77,6 +76,6 @@
   <tasks name="Termination-MainHeap">
     <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
     <option name="-64"/>
-  </tasks> -->
+  </tasks>
 </benchmark>
 

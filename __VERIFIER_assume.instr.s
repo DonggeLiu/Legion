@@ -4,9 +4,9 @@
 	.globl	__VERIFIER_assume
 	.type	__VERIFIER_assume, @function
 __VERIFIER_assume:
-.LFB5:
+.LFB6:
 	.file 1 "__VERIFIER_assume.c"
-	.loc 1 3 0
+	.loc 1 3 31
 	.cfi_startproc
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
@@ -15,7 +15,7 @@ __VERIFIER_assume:
 	.cfi_def_cfa_register 6
 	subq	$16, %rsp
 	movl	%edi, -4(%rbp)
-	.loc 1 4 0
+	.loc 1 4 8
 	sub $128,%rsp
 	push %rax
 	call	__trace_jump_set
@@ -38,7 +38,7 @@ __VERIFIER_assume:
 	pop  %rdi
 	pop  %rax
 	add $128,%rsp
-	.loc 1 5 0
+	.loc 1 5 9
 	movl	$1, %edi
 	call	exit@PLT
 .L3:
@@ -57,18 +57,18 @@ __VERIFIER_assume:
 	pop  %rdi
 	pop  %rax
 	add $128,%rsp
-	.loc 1 6 0
+	.loc 1 6 1
 	nop
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE5:
+.LFE6:
 	.size	__VERIFIER_assume, .-__VERIFIER_assume
 .Letext0:
 	.section	.debug_info,"",@progbits
 .Ldebug_info0:
-	.long	0x9d
+	.long	0x9f
 	.value	0x4
 	.long	.Ldebug_abbrev0
 	.byte	0x8
@@ -89,23 +89,23 @@ __VERIFIER_assume:
 	.byte	0x5
 	.string	"int"
 	.uleb128 0x2
-	.byte	0x4
-	.byte	0x7
+	.byte	0x8
+	.byte	0x5
 	.long	.LASF1
 	.uleb128 0x2
 	.byte	0x8
 	.byte	0x5
 	.long	.LASF2
 	.uleb128 0x2
-	.byte	0x8
-	.byte	0x5
-	.long	.LASF3
-	.uleb128 0x2
 	.byte	0x1
 	.byte	0x8
-	.long	.LASF4
+	.long	.LASF3
 	.uleb128 0x2
 	.byte	0x2
+	.byte	0x7
+	.long	.LASF4
+	.uleb128 0x2
+	.byte	0x4
 	.byte	0x7
 	.long	.LASF5
 	.uleb128 0x2
@@ -128,14 +128,16 @@ __VERIFIER_assume:
 	.long	.LASF13
 	.byte	0x1
 	.byte	0x3
-	.quad	.LFB5
-	.quad	.LFE5-.LFB5
+	.byte	0x6
+	.quad	.LFB6
+	.quad	.LFE6-.LFB6
 	.uleb128 0x1
 	.byte	0x9c
 	.uleb128 0x5
 	.string	"b"
 	.byte	0x1
 	.byte	0x3
+	.byte	0x1c
 	.long	0x34
 	.uleb128 0x2
 	.byte	0x91
@@ -196,6 +198,8 @@ __VERIFIER_assume:
 	.uleb128 0xb
 	.uleb128 0x3b
 	.uleb128 0xb
+	.uleb128 0x39
+	.uleb128 0xb
 	.uleb128 0x27
 	.uleb128 0x19
 	.uleb128 0x11
@@ -216,6 +220,8 @@ __VERIFIER_assume:
 	.uleb128 0x3a
 	.uleb128 0xb
 	.uleb128 0x3b
+	.uleb128 0xb
+	.uleb128 0x39
 	.uleb128 0xb
 	.uleb128 0x49
 	.uleb128 0x13
@@ -239,9 +245,9 @@ __VERIFIER_assume:
 	.section	.debug_line,"",@progbits
 .Ldebug_line0:
 	.section	.debug_str,"MS",@progbits,1
-.LASF3:
+.LASF2:
 	.string	"long long int"
-.LASF1:
+.LASF5:
 	.string	"unsigned int"
 .LASF13:
 	.string	"__VERIFIER_assume"
@@ -249,23 +255,23 @@ __VERIFIER_assume:
 	.string	"long unsigned int"
 .LASF9:
 	.string	"long long unsigned int"
-.LASF12:
-	.string	"/home/donggel/Legion"
 .LASF11:
 	.string	"__VERIFIER_assume.c"
-.LASF4:
+.LASF3:
 	.string	"unsigned char"
 .LASF8:
 	.string	"char"
-.LASF2:
+.LASF10:
+	.string	"GNU C17 10.0.0 20191001 (experimental) -mtune=generic -march=x86-64 -g -O0"
+.LASF1:
 	.string	"long int"
-.LASF5:
+.LASF4:
 	.string	"short unsigned int"
 .LASF6:
 	.string	"signed char"
+.LASF12:
+	.string	"/home/ernst/projects/fuzzing/Legion"
 .LASF7:
 	.string	"short int"
-.LASF10:
-	.string	"GNU C11 7.4.0 -mtune=generic -march=x86-64 -g -O0 -fstack-protector-strong"
-	.ident	"GCC: (Ubuntu 7.4.0-1ubuntu1~18.04.1) 7.4.0"
+	.ident	"GCC: (GNU) 10.0.0 20191001 (experimental)"
 	.section	.note.GNU-stack,"",@progbits

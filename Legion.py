@@ -220,7 +220,7 @@ class TreeNode:
             if ROOT.fully_explored and self is not ROOT:
                 return (self.is_leaf() and self.colour is not Colour.G) \
                        or self.exhausted
-        return self.fully_explored or self.exhausted
+        return self.fully_explored
 
     def mark_fully_explored(self):
         """
@@ -414,7 +414,6 @@ class TreeNode:
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
-                self.parent.parent.mark_fully_explored()
                 # NOTE: In some case, no input can be found from the simul child
                 #   even if its red parent is considered as feasible, weird.
                 #   In this case, parent.sel_try is 0, which prevents it to
@@ -430,6 +429,7 @@ class TreeNode:
                 #         which does not imply no input was found
                 #         here there could be a child to be selected in the
                 #         next iteration
+                # self.parent.mark_fully_explored()
                 break
         return results
 
@@ -837,10 +837,6 @@ def dye_siblings(child: TreeNode) -> None:
         # if hex(child.addr)[-4:] == '0731':
         #     pdb.set_trace()
         child.fully_explored = True
-        # Note: Making the node exhausted to make sure it is evaluated to -inf
-        #   This is specific for white nodes whose corresponding state
-        #   cannot be found due to dynmaic array allocation
-        child.exhausted = True
         child.parent.mark_fully_explored()
 
     if len(sibling_states) == 1:
@@ -938,9 +934,6 @@ def symex(state: State) -> List[State]:
     """
     # Note: Need to keep all successors?
     LOGGER.debug("computing successors for {}".format(state))
-    if state is None:
-        LOGGER.debug("No corresponding state found, any dynamic array allocation in the code?")
-        return []
     successors = state.step().successors
     LOGGER.debug("Successors are: {}".format(successors))
     return successors

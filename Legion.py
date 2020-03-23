@@ -37,7 +37,7 @@ if __name__ == '__main__':
 MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
-RHO = 1 / sqrt(2)
+RHO = 2 * 1 / sqrt(2)
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
@@ -208,7 +208,7 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
-        uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
+        uct_score = self.exploit_score() + RHO * self.explore_score()
 
         score = uct_score - TIME_COEFF * time_penalisation() \
             if TIME_COEFF else uct_score

@@ -37,8 +37,8 @@ if __name__ == '__main__':
 MIN_SAMPLES = 1
 MAX_SAMPLES = 100
 TIME_COEFF = 0
-Cp = 2
-RHO = 0 * Cp
+Cp = 1 / sqrt(2)
+RHO = 2 * Cp
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs

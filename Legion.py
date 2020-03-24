@@ -37,7 +37,8 @@ if __name__ == '__main__':
 MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
-RHO = 1 / sqrt(2)
+Cp = 2
+RHO = 0 * Cp
 RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
@@ -172,7 +173,11 @@ class TreeNode:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
             return inf
-        return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+        # If the exploration ratio is 0, then explore score is 0
+        # This is to avoid 0 * inf = nan
+        if RHO == 0:
+            return 0
+        return RHO * sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
     def score(self) -> float:
 
@@ -208,7 +213,7 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
-        uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
+        uct_score = self.exploit_score() + self.explore_score()
 
         score = uct_score - TIME_COEFF * time_penalisation() \
             if TIME_COEFF else uct_score

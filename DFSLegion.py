@@ -39,7 +39,7 @@ MAX_SAMPLES = 1
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 RAN_SEED = None
-SYMEX_TIMEOUT = 0  # in secs
+SYMEX_TIMEOUT = None  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 

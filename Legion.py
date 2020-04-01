@@ -208,6 +208,11 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
+        if self.colour is Colour.G and len(self.parent.children) > 1 \
+                and len([child for child in self.parent.children.values()
+                         if child is not self and child.score() > -inf]) == 1:
+            return -inf
+
         uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
 
         score = uct_score - TIME_COEFF * time_penalisation() \

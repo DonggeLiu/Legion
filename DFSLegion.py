@@ -39,7 +39,7 @@ MAX_SAMPLES = 1
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 RAN_SEED = None
-SYMEX_TIMEOUT = 0  # in secs
+SYMEX_TIMEOUT = None  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 
@@ -129,6 +129,7 @@ class TreeNode:
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
         self.exhausted = False
+        self.random_score = random.uniform(0, 100)
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -213,7 +214,7 @@ class TreeNode:
         score = uct_score - TIME_COEFF * time_penalisation() \
             if TIME_COEFF else uct_score
 
-        return inf if self.phantom else -inf if self.colour is Colour.G else self.addr
+        return inf if self.phantom else -inf if self.colour is Colour.G else self.random_score
 
     def is_fully_explored(self):
         if PERSISTENT:

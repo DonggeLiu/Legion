@@ -945,6 +945,9 @@ def symex(state: State) -> List[State]:
     """
     # Note: Need to keep all successors?
     LOGGER.debug("computing successors for {}".format(state))
+    if state is None:
+        LOGGER.debug("No corresponding state found, any dynamic array allocation in the code?")
+        return []
     successors = state.step().successors
     LOGGER.debug("Successors are: {}".format(successors))
     return successors

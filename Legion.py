@@ -66,6 +66,7 @@ SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
+SAVE_TESTCASES_TIMEOUT = False
 DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
@@ -1048,6 +1049,8 @@ def binary_execute_parallel(input_bytes: bytes):
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
         msg = ret = None
+        # 0: no timeout; 1: instrumented binary timeout; 2: uninstrumented binary timeout
+        timeout = False
         try:
             msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
             ret = instr.returncode
@@ -1062,6 +1065,7 @@ def binary_execute_parallel(input_bytes: bytes):
             instr.kill()
             del instr
             gc.collect()
+            timeout = True
             try:
                 uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                                    stderr=sp.PIPE, close_fds=True)
@@ -1077,13 +1081,13 @@ def binary_execute_parallel(input_bytes: bytes):
                 del uninstr
                 gc.collect()
                 # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-        return msg, ret
+        return msg, ret, timeout
 
     LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
-    report_msg, return_code = report
+    report_msg, return_code, time_out = report
 
     completed = report != (None, None)
     traced = completed and report_msg[1]
@@ -1091,9 +1095,9 @@ def binary_execute_parallel(input_bytes: bytes):
 
     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
         curr_time = time.time() - TIME_START
-        if SAVE_TESTCASES:
+        if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
             stdout = report_msg[0].decode('utf-8')
-            save_tests_to_file(curr_time, stdout)
+            save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C"))
         if SAVE_TESTINPUTS:
             save_input_to_file(curr_time, input_bytes)
 
@@ -1225,10 +1229,10 @@ def propagate_execution_traces(traces: List[List[int]],
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
-def save_tests_to_file(time_stamp, data):
+def save_tests_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
-    with open('tests/{}/{}_{}.xml'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt+') as input_file:
+    with open('tests/{}/{}_{}{}.xml'.format(
+            DIR_NAME, time_stamp, SOLVING_COUNT, suffix), 'wt+') as input_file:
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
@@ -1341,6 +1345,10 @@ if __name__ == '__main__':
                         help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
+    parser.add_argument("--save-tests-timeout", action="store_true",
+                        help="Also save inputs that triggers instrumented binary timeout "
+                             "in TEST-COMP xml files")
+
     args = parser.parse_args()
 
     MIN_SAMPLES = args.min_samples
@@ -1355,6 +1363,7 @@ if __name__ == '__main__':
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
+    SAVE_TESTCASES_TIMEOUT = args.save_tests_timeout
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

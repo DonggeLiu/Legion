@@ -362,7 +362,7 @@ class TreeNode:
             return results
         return self.random_fuzzing()
 
-    def app_fuzzing(self) -> List[bytes]:
+    def app_fuzzing(self) -> List[Tuple[bytes, str]]:
         def byte_len() -> int:
             """
             The number of bytes in the input
@@ -388,6 +388,9 @@ class TreeNode:
                 self.fully_explored = True
                 return results
 
+        # Denotes the generation method for each input
+        # S: constraint solving; F: fuzzing; R: random generation
+        method = "S"
         while len(results) < MAX_SAMPLES:
             try:
                 val = next(self.samples)
@@ -396,9 +399,11 @@ class TreeNode:
                     break
                 if val is None and len(results) < MIN_SAMPLES:
                     # requires constraint solving but not enough results
+                    method = "S"
                     continue
-                result = val.to_bytes(byte_len(), 'big')
+                result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
+                method = "F"
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:
@@ -440,7 +445,7 @@ class TreeNode:
         return results
 
     @staticmethod
-    def random_fuzzing() -> List[bytes]:
+    def random_fuzzing() -> List[Tuple[bytes, str]]:
         def random_bytes():
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
             # input_bytes = b''
@@ -449,7 +454,7 @@ class TreeNode:
             # return input_bytes
             # Or return end of file char?
             return os.urandom(MAX_BYTES)
-        return [random_bytes() for _ in range(MIN_SAMPLES)]
+        return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:
         debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
@@ -1006,12 +1011,12 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
-        [bytes("".join(mutant), 'utf-8')
+        [(bytes("".join(mutant), 'utf-8'), "D")
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
-         for mutant in SEEDS] if SEEDS else ([b'\x00'*MAX_BYTES]
-                                             + [b'\x01\x00\x00\x00'*(MAX_BYTES//4)]
-                                             + [b'\x0a'] + TreeNode.random_fuzzing())
+         for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")]
+                                             + [(b'\x01\x00\x00\x00'*(MAX_BYTES//4), "D")]
+                                             + [(b'\x0a', "D")] + TreeNode.random_fuzzing())
          # for mutant in SEEDS] if SEEDS else [b'\x0a']
          # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 
@@ -1032,7 +1037,7 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     return traces
 
 
-def binary_execute_parallel(input_bytes: bytes):
+def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     """
     Execute the binary with an input in bytes
     :param input_bytes: the input to feed the binary
@@ -1052,7 +1057,7 @@ def binary_execute_parallel(input_bytes: bytes):
         # 0: no timeout; 1: instrumented binary timeout; 2: uninstrumented binary timeout
         timeout = False
         try:
-            msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+            msg = instr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
             ret = instr.returncode
             instr.terminate()
             del instr
@@ -1069,7 +1074,7 @@ def binary_execute_parallel(input_bytes: bytes):
             try:
                 uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                                    stderr=sp.PIPE, close_fds=True)
-                msg = uninstr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+                msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
                 ret = uninstr.returncode
                 LOGGER.info("Uninstrumented binary execution completed")
                 uninstr.terminate()
@@ -1088,8 +1093,7 @@ def binary_execute_parallel(input_bytes: bytes):
     debug_assertion(bool(report))
 
     report_msg, return_code, time_out = report
-
-    completed = report != (None, None)
+    completed = report != (None, None, True)
     traced = completed and report_msg[1]
     found_bug = False
 
@@ -1097,7 +1101,7 @@ def binary_execute_parallel(input_bytes: bytes):
         curr_time = time.time() - TIME_START
         if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
             stdout = report_msg[0].decode('utf-8')
-            save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C"))
+            save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C")+("-"+input_bytes[1]))
         if SAVE_TESTINPUTS:
             save_input_to_file(curr_time, input_bytes)
 

@@ -91,6 +91,7 @@ class Colour(enum.Enum):
     R = 'Red'
     G = 'Gold'
     B = 'Black'
+    P = 'Purple'
 
 
 # TreeNode:
@@ -101,6 +102,7 @@ class TreeNode:
     Red    | True         | True         | False, stored in its simulation child
     Gold   | False        | False        | True, stores its parent's state
     Black  | True         | no sibling   | True if is intermediate, False if is leaf
+    Purple | False        | True         | True, only showed up in ANGR, not found by TraceJump
     """
 
     def __init__(self, addr: int = DEFAULT_ADDR, parent: 'TreeNode' = None,
@@ -551,6 +553,7 @@ class TreeNode:
     def __repr__(self) -> str:
         return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
             .format(colour=30 if self.colour is Colour.B else
+                    35 if self.phantom else
                     31 if self.colour is Colour.R else
                     33 if self.colour is Colour.G else
                     37 if self.colour is Colour.W else 32,

@@ -23,6 +23,7 @@ from types import GeneratorType
 from angr import Project
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
+from angr.sim_options import LAZY_SOLVES
 from z3.z3types import Z3Exception
 
 VERSION = "0.1-testcomp2020"
@@ -625,7 +626,9 @@ def initialisation():
             #     argc=claripy.BVS('argc', 100*8)
             # )
             main_state = project.factory.blank_state(addr=main_addr,
-                                                     stdin=SimFileStream)
+                                                     stdin=SimFileStream,
+                                                     # add_options={LAZY_SOLVES}
+                                                     )
         else:
             # Switch to random fuzzing
             main_state = None

@@ -627,7 +627,7 @@ def initialisation():
             # )
             main_state = project.factory.blank_state(addr=main_addr,
                                                      stdin=SimFileStream,
-                                                     # add_options={LAZY_SOLVES}
+                                                     add_options={LAZY_SOLVES}
                                                      )
         else:
             # Switch to random fuzzing

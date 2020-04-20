@@ -1480,13 +1480,14 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    if args.verbose:
-        cProfile.run('main()', sort='cumtime')
-    else:
-        print(main())
-
-    print("Seed {}; Solving {}; Fuzzing {}, Random {}".format(
-          SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT))
+    try:
+        if args.verbose:
+            cProfile.run('main()', sort='cumtime')
+        else:
+            print(main())
+    except:
+        print("Seed {}; Solving {}; Fuzzing {}, Random {}".format(
+            SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT))
 
 #    pdb.set_trace()
 

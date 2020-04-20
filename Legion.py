@@ -57,7 +57,11 @@ PERSISTENT = False
 # Statistics
 CUR_ROUND = 0
 TIME_START = time.time()
-SOLVING_COUNT = 0
+SEED_IN_COUNT = 0
+SOL_GEN_COUNT = 0
+FUZ_GEN_COUNT = 0
+RND_GEN_COUNT = 0
+
 COLLECT_STATISTICS = False
 
 # Execution
@@ -351,8 +355,6 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
-        global SOLVING_COUNT
-        SOLVING_COUNT += 1
         if self.state and self.state.solver.constraints:
             solving_start = time.time()
             results = self.app_fuzzing()
@@ -1097,6 +1099,8 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
         return msg, ret, timeout
 
+    global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT
+
     LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
@@ -1105,6 +1109,15 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     completed = report != (None, None, True)
     traced = completed and report_msg[1]
     found_bug = False
+
+    if input_bytes[1] == "D":
+        SEED_IN_COUNT += 1
+    elif input_bytes[1] == "S":
+        SOL_GEN_COUNT += 1
+    elif input_bytes[1] == "F":
+        FUZ_GEN_COUNT += 1
+    elif input_bytes[1] == "R":
+        RND_GEN_COUNT += 1
 
     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
         curr_time = time.time() - TIME_START
@@ -1245,7 +1258,7 @@ def propagate_execution_traces(traces: List[List[int]],
 def save_tests_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
     with open('tests/{}/{}_{}{}.xml'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT, suffix), 'wt+') as input_file:
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wt+') as input_file:
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
@@ -1260,7 +1273,7 @@ def save_input_to_file(time_stamp, input_bytes):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
     with open('inputs/{}/{}_{}'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb+') as input_file:
+            DIR_NAME, time_stamp, SOL_GEN_COUNT), 'wb+') as input_file:
         input_file.write(input_bytes)
 
 
@@ -1471,6 +1484,9 @@ if __name__ == '__main__':
         cProfile.run('main()', sort='cumtime')
     else:
         print(main())
+
+    print("Seed {}; Solving {}; Fuzzing {}, Random {}".format(
+          SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT))
 
 #    pdb.set_trace()
 

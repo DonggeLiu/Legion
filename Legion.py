@@ -1125,7 +1125,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             stdout = report_msg[0].decode('utf-8')
             save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C")+("-"+input_bytes[1]))
         if SAVE_TESTINPUTS:
-            save_input_to_file(curr_time, input_bytes)
+            save_input_to_file(curr_time, input_bytes, ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1268,12 +1268,12 @@ def save_tests_to_file(time_stamp, data, suffix):
         input_file.write('</testcase>\n')
 
 
-def save_input_to_file(time_stamp, input_bytes):
+def save_input_to_file(time_stamp, input_bytes, suffix):
     # if DIR_NAME not in os.listdir('inputs'):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
     with open('inputs/{}/{}_{}'.format(
-            DIR_NAME, time_stamp, SOL_GEN_COUNT), 'wb+') as input_file:
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wb+') as input_file:
         input_file.write(input_bytes)
 
 

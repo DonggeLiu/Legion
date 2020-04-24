@@ -91,6 +91,8 @@ sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 logging.getLogger('angr').setLevel('ERROR')
 
+SCORE_FUN = 'uct'
+
 
 # Colour of tree nodes
 class Colour(enum.Enum):
@@ -223,10 +225,13 @@ class TreeNode:
                          if child is not self and child.score() > -inf]) == 1:
             return -inf
 
-        uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
-
-        score = uct_score - TIME_COEFF * time_penalisation() \
-            if TIME_COEFF else uct_score
+        if SCORE_FUN == 'random':
+            score = random.uniform(0, 100)
+        else:
+            debug_assertion(SCORE_FUN == 'uct')
+            uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
+            score = uct_score - TIME_COEFF * time_penalisation() \
+                if TIME_COEFF else uct_score
 
         return score
 
@@ -1332,8 +1337,12 @@ if __name__ == '__main__':
                         help='Minimum number of samples per iteration')
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
                         help='Maximum number of samples per iteration')
+    parser.add_argument("--score", default=SCORE_FUN,
+                        help='Which score function to use [uct,random]')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
+    parser.add_argument('--rho', type=float, default=RHO,
+                        help='Exploration factor (default: 1/sqrt(2))')
     parser.add_argument("--core", type=int, default=cpu_count()-1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1393,6 +1402,8 @@ if __name__ == '__main__':
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty
+    SCORE_FUN = args.score
+    RHO = args.rho
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests

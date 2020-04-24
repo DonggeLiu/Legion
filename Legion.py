@@ -61,6 +61,8 @@ SEED_IN_COUNT = 0
 SOL_GEN_COUNT = 0
 FUZ_GEN_COUNT = 0
 RND_GEN_COUNT = 0
+SYMEX_TIMEOUT_COUNT = 0
+CONEX_TIMEOUT_COUNT = 0
 
 COLLECT_STATISTICS = False
 
@@ -707,6 +709,8 @@ def selection() -> TreeNode:
         LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
+    global SYMEX_TIMEOUT_COUNT
+
     symex_time = 0
     last_red = ROOT
     node = ROOT
@@ -745,6 +749,7 @@ def selection() -> TreeNode:
             LOGGER.info(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
+            SYMEX_TIMEOUT_COUNT += 1
             break
 
         if node.is_leaf():
@@ -1062,6 +1067,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
+        global CONEX_TIMEOUT_COUNT
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
         msg = ret = None
@@ -1077,6 +1083,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
+            CONEX_TIMEOUT_COUNT += 1
             LOGGER.error("Instrumented Binary execution time out")
             instr.kill()
             del instr
@@ -1486,8 +1493,12 @@ if __name__ == '__main__':
         else:
             print(main())
     except:
-        print("Seed {}; Solving {}; Fuzzing {}, Random {}".format(
-            SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT))
+        print("Number of inputs from seed:", SEED_IN_COUNT)
+        print("Number of inputs from random:", RND_GEN_COUNT)
+        print("Number of inputs from solving:", SOL_GEN_COUNT)
+        print("Number of inputs from fuzzing:", FUZ_GEN_COUNT)
+        print("Number of symex timeout:", SYMEX_TIMEOUT_COUNT)
+        print("Number of conex timeout:", CONEX_TIMEOUT_COUNT)
 
 #    pdb.set_trace()
 

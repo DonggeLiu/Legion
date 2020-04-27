@@ -1503,7 +1503,7 @@ if __name__ == '__main__':
             cProfile.run('main()', sort='cumtime')
         else:
             print(main())
-    except:
+    finally:
         print("Number of inputs from seed:", SEED_IN_COUNT)
         print("Number of inputs from random:", RND_GEN_COUNT)
         print("Number of inputs from solving:", SOL_GEN_COUNT)

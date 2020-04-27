@@ -178,6 +178,9 @@ class TreeNode:
         return self.sim_win / self.sel_try
 
     def explore_score(self) -> float:
+        # If the exploration ratio rho is 0, then return 0
+        if RHO == 0:
+            return 0
         # Evaluate to maximum value if is root
         if self.is_root():
             return inf

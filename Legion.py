@@ -63,6 +63,10 @@ FUZ_GEN_COUNT = 0
 RND_GEN_COUNT = 0
 SYMEX_TIMEOUT_COUNT = 0
 CONEX_TIMEOUT_COUNT = 0
+SYMEX_TIME = 0
+CONEX_TIME = 0
+SYMEX_SUCCESS_COUNT = 0
+CONEX_SUCCESS_COUNT = 0
 
 COLLECT_STATISTICS = False
 
@@ -717,11 +721,12 @@ def selection() -> TreeNode:
         LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
-    global SYMEX_TIMEOUT_COUNT
+    global SYMEX_TIME, SYMEX_TIMEOUT_COUNT, SYMEX_SUCCESS_COUNT
 
     symex_time = 0
     last_red = ROOT
     node = ROOT
+    selection_start_time = time.time()
     while node.colour is not Colour.G:
         if node.colour is Colour.R:
             last_red = node
@@ -734,7 +739,7 @@ def selection() -> TreeNode:
 
         # If the node is white, dye it
         if node.colour is Colour.W:
-            start_time = time.time()
+            dye_start_time = time.time()
             try:
                 dye_siblings(child=node)  # Upon an exception, mark this node fully explored
             except Z3Exception:
@@ -742,7 +747,7 @@ def selection() -> TreeNode:
                 node.fully_explored = True
                 node.exhausted = True
                 node.parent.mark_fully_explored()
-            symex_time += time.time() - start_time
+            symex_time += time.time() - dye_start_time
 
             # # IF the node is dyed to black and there is no states left,
             # # it implies the previous parent state does not have any diverging
@@ -808,6 +813,9 @@ def selection() -> TreeNode:
             file.write("{}\n".format(symex_time))
 
     debug_assertion(node.colour is Colour.G)
+
+    SYMEX_TIME += time.time() - selection_start_time
+    SYMEX_SUCCESS_COUNT += 1
 
     return node
 
@@ -1075,12 +1083,14 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
-        global CONEX_TIMEOUT_COUNT
+        global CONEX_TIME, CONEX_TIMEOUT_COUNT, CONEX_SUCCESS_COUNT
+
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
         msg = ret = None
         # 0: no timeout; 1: instrumented binary timeout; 2: uninstrumented binary timeout
         timeout = False
+        start_conex = time.time()
         try:
             msg = instr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
             ret = instr.returncode
@@ -1088,6 +1098,8 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             del instr
             gc.collect()
             LOGGER.info("Instrumented binary execution completed")
+            CONEX_TIME += time.time() - start_conex
+            CONEX_SUCCESS_COUNT += 1
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
@@ -1513,6 +1525,8 @@ if __name__ == '__main__':
         print("Number of inputs from fuzzing:", FUZ_GEN_COUNT)
         print("Number of symex timeout:", SYMEX_TIMEOUT_COUNT)
         print("Number of conex timeout:", CONEX_TIMEOUT_COUNT)
+        print("Average conex time:", CONEX_TIME)
+        print("Average symex time:", SYMEX_TIME)
 
 #    pdb.set_trace()
 

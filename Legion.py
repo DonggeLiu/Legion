@@ -763,6 +763,7 @@ def selection() -> TreeNode:
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
             SYMEX_TIMEOUT_COUNT += 1
+            print("SYMEX_TIMEOUT count: {}".format(SYMEX_TIMEOUT_COUNT))
             break
 
         if node.is_leaf():
@@ -814,9 +815,12 @@ def selection() -> TreeNode:
 
     debug_assertion(node.colour is Colour.G)
 
-    SYMEX_TIME += time.time() - selection_start_time
+    selection_end_time = time.time()
+    SYMEX_TIME += (selection_end_time - selection_start_time)
+    print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
     SYMEX_SUCCESS_COUNT += 1
-
+    print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))
+    print("SYMEX_TIME_AVG: {:.4f}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT))
     return node
 
 
@@ -1098,12 +1102,17 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             del instr
             gc.collect()
             LOGGER.info("Instrumented binary execution completed")
-            CONEX_TIME += time.time() - start_conex
+            end_conex = time.time()
+            CONEX_TIME += end_conex - start_conex
             CONEX_SUCCESS_COUNT += 1
+            print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
+            print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
+            print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
             CONEX_TIMEOUT_COUNT += 1
+            print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
             LOGGER.error("Instrumented Binary execution time out")
             instr.kill()
             del instr
@@ -1139,12 +1148,16 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
 
     if input_bytes[1] == "D":
         SEED_IN_COUNT += 1
+        print("Seed count: {}".format(SEED_IN_COUNT))
     elif input_bytes[1] == "S":
         SOL_GEN_COUNT += 1
+        print("Solving count: {}".format(SOL_GEN_COUNT))
     elif input_bytes[1] == "F":
         FUZ_GEN_COUNT += 1
+        print("Fuzzing count: {}".format(FUZ_GEN_COUNT))
     elif input_bytes[1] == "R":
         RND_GEN_COUNT += 1
+        print("Random count: {}".format(RND_GEN_COUNT))
 
     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
         curr_time = time.time() - TIME_START
@@ -1325,6 +1338,7 @@ def run_with_timeout() -> None:
     signal.signal(signal.SIGALRM, raise_timeout)
     # Schedule the signal to be sent after MAX_TIME
     signal.alarm(MAX_TIME)
+    # signal.setitimer(signal.ITIMER_PROF, MAX_TIME, 1)
     try:
         run()
     except TimeoutError:
@@ -1519,14 +1533,14 @@ if __name__ == '__main__':
         else:
             print(main())
     finally:
-        print("Number of inputs from seed:", SEED_IN_COUNT)
-        print("Number of inputs from random:", RND_GEN_COUNT)
-        print("Number of inputs from solving:", SOL_GEN_COUNT)
-        print("Number of inputs from fuzzing:", FUZ_GEN_COUNT)
-        print("Number of symex timeout:", SYMEX_TIMEOUT_COUNT)
-        print("Number of conex timeout:", CONEX_TIMEOUT_COUNT)
-        print("Average conex time:", CONEX_TIME)
-        print("Average symex time:", SYMEX_TIME)
+        print("Number of inputs from seed:{}".format(SEED_IN_COUNT))
+        print("Number of inputs from random:{}".format(RND_GEN_COUNT))
+        print("Number of inputs from solving:{}".format(SOL_GEN_COUNT))
+        print("Number of inputs from fuzzing:{}".format(FUZ_GEN_COUNT))
+        print("Number of symex timeout:{}".format(SYMEX_TIMEOUT_COUNT))
+        print("Number of conex timeout:{}".format(CONEX_TIMEOUT_COUNT))
+        print("Average symex time:{}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT if SYMEX_SUCCESS_COUNT else 1 ))
+        print("Average conex time:{}".format(CONEX_TIME / CONEX_SUCCESS_COUNT if CONEX_SUCCESS_COUNT else 1 ))
 
 #    pdb.set_trace()
 

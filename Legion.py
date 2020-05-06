@@ -1050,9 +1050,9 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
         [(bytes("".join(mutant), 'utf-8'), "D")
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
-         for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")]
-                                             + [(b'\x01\x00\x00\x00'*(MAX_BYTES//4), "D")]
-                                             + [(b'\x0a', "D")] + TreeNode.random_fuzzing())
+         for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")])
+                                             # + [(b'\x01\x00\x00\x00'*(MAX_BYTES//4), "D")]
+                                             # + [(b'\x0a', "D")] + TreeNode.random_fuzzing())
          # for mutant in SEEDS] if SEEDS else [b'\x0a']
          # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 

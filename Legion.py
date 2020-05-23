@@ -1426,14 +1426,14 @@ if __name__ == '__main__':
     parser.add_argument('--collect-statistics', action="store_true",
                         help="Collect the performance statistics, "
                              "e.g. conex time")
-    parser.add_argument('--save-inputs', default=None, action='append',
+    parser.add_argument('--save-inputs', default=None, nargs='*',
                         choices=["FULL", "TIMEOUT", "REDUCED"],
                         help='Save inputs as binary files.'
                              'FULL: All inputs that did not trigger timeout;'
                              'REDUCED: Inputs that found new paths without timeout;'
                              'TIMEOUT: Inputs that triggered timeout;'
                              'No flag: No input;')
-    parser.add_argument('--save-tests', default=None, action='append',
+    parser.add_argument('--save-tests', default=None, nargs='*',
                         choices=["FULL", "TIMEOUT", "REDUCED"],
                         help='Save inputs as TEST-COMP xml files, [FULL, REDUCED, NONE]'
                              'FULL: All inputs that did not trigger timeout;'

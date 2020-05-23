@@ -82,7 +82,6 @@ SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = None
 SAVE_TESTCASES = None
-SAVE_TESTCASES_TIMEOUT = False
 DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
@@ -1104,30 +1103,32 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
                 print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
-            # Note: Once instrumented binary execution times out,
-            #  execute with uninstrumented binary to save inputs
-            CONEX_TIMEOUT_COUNT += 1
-            print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
-            LOGGER.error("Instrumented Binary execution time out")
-            instr.kill()
-            del instr
-            gc.collect()
-            timeout = True
-            try:
-                uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-                                   stderr=sp.PIPE, close_fds=True)
-                msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
-                ret = uninstr.returncode
-                LOGGER.info("Uninstrumented binary execution completed")
-                uninstr.terminate()
-                del uninstr
+            if "TIMEOUT" in SAVE_TESTCASES + SAVE_TESTINPUTS:
+                # Note: Once instrumented binary execution times out,
+                #  execute with uninstrumented binary to save inputs
+                CONEX_TIMEOUT_COUNT += 1
+                if COLLECT_STATISTICS:
+                    print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
+                LOGGER.error("Instrumented Binary execution time out")
+                instr.kill()
+                del instr
                 gc.collect()
-            except sp.TimeoutExpired:
-                LOGGER.error("Uninstrumented Binary execution time out")
-                uninstr.kill()
-                del uninstr
-                gc.collect()
-                # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+                timeout = True
+                try:
+                    uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                                       stderr=sp.PIPE, close_fds=True)
+                    msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
+                    ret = uninstr.returncode
+                    LOGGER.info("Uninstrumented binary execution completed")
+                    uninstr.terminate()
+                    del uninstr
+                    gc.collect()
+                except sp.TimeoutExpired:
+                    LOGGER.error("Uninstrumented Binary execution time out")
+                    uninstr.kill()
+                    del uninstr
+                    gc.collect()
+                    # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
         return msg, ret, timeout
 
     global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
@@ -1162,10 +1163,15 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     # Record the test case
     testcase = testinput = None
     curr_time = time.time() - TIME_START
-    if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
+    if SAVE_TESTCASES and not time_out:
         testcase = (curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
     if SAVE_TESTINPUTS:
         testinput = (curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+
+    if time_out and "TIMEOUT" in SAVE_TESTCASES:
+        save_test_to_file(curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+    if time_out and "TIMEOUT" in SAVE_TESTCASES:
+        save_input_to_file(curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1310,9 +1316,9 @@ def save_results_to_files(test_cases, test_inputs, are_new):
     debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
 
     for i in range(len(are_new)):
-        if SAVE_TESTCASES and (are_new[i] or SAVE_TESTCASES == "FULL"):
+        if SAVE_TESTCASES and (are_new[i] or "FULL" in SAVE_TESTCASES):
             save_test_to_file(*test_cases[i])
-        if SAVE_TESTINPUTS and (are_new[i] or SAVE_TESTINPUTS == "FULL"):
+        if SAVE_TESTINPUTS and (are_new[i] or "FULL" in SAVE_TESTINPUTS):
             save_input_to_file(*test_inputs[i])
 
 
@@ -1420,16 +1426,20 @@ if __name__ == '__main__':
     parser.add_argument('--collect-statistics', action="store_true",
                         help="Collect the performance statistics, "
                              "e.g. conex time")
-    parser.add_argument('--save-inputs', default=None, choices=["FULL", "REDUCED"],
+    parser.add_argument('--save-inputs', default=None, action='append',
+                        choices=["FULL", "TIMEOUT", "REDUCED"],
                         help='Save inputs as binary files.'
-                             'FULL: All inputs;'
-                             'REDUCED: Only the inputs that found new paths;'
-                             'None: No input;')
-    parser.add_argument('--save-tests', default=None, choices=["FULL", "REDUCED"],
+                             'FULL: All inputs that did not trigger timeout;'
+                             'REDUCED: Inputs that found new paths without timeout;'
+                             'TIMEOUT: Inputs that triggered timeout;'
+                             'No flag: No input;')
+    parser.add_argument('--save-tests', default=None, action='append',
+                        choices=["FULL", "TIMEOUT", "REDUCED"],
                         help='Save inputs as TEST-COMP xml files, [FULL, REDUCED, NONE]'
-                             'FULL: All inputs;'
-                             'REDUCED: Only the inputs that found new paths;'
-                             'None: No input;')
+                             'FULL: All inputs that did not trigger timeout;'
+                             'REDUCED: Only the inputs that found new paths without timeout;'
+                             'TIMEOUT: Inputs that triggered timeout;'
+                             'No flag: No input;')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
     parser.add_argument("-o", default=None,
@@ -1446,9 +1456,6 @@ if __name__ == '__main__':
                         help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
-    parser.add_argument("--save-tests-timeout", action="store_true",
-                        help="Also save inputs that triggers instrumented binary timeout "
-                             "in TEST-COMP xml files")
 
     args = parser.parse_args()
 
@@ -1467,7 +1474,6 @@ if __name__ == '__main__':
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
-    SAVE_TESTCASES_TIMEOUT = args.save_tests_timeout
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

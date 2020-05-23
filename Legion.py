@@ -68,6 +68,10 @@ SYMEX_TIME = 0
 CONEX_TIME = 0
 SYMEX_SUCCESS_COUNT = 0
 CONEX_SUCCESS_COUNT = 0
+MIN_TREE_DEPTH = inf
+MAX_TREE_DEPTH = 0
+SUM_TREE_DEPTH = 0
+
 
 COLLECT_STATISTICS = False
 
@@ -371,14 +375,7 @@ class TreeNode:
 
     def mutate(self):
         if self.state and self.state.solver.constraints:
-            solving_start = time.time()
             results = self.app_fuzzing()
-            solving_end = time.time()
-
-            if COLLECT_STATISTICS:
-                conex_statistics_file = "./statistics/{}/solver.txt".format(PROGRAM_NAME)
-                with open(conex_statistics_file, "a") as file:
-                    file.write("{}\n".format(solving_end-solving_start))
             return results
         return self.random_fuzzing()
 
@@ -764,7 +761,8 @@ def selection() -> TreeNode:
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
             SYMEX_TIMEOUT_COUNT += 1
-            print("SYMEX_TIMEOUT count: {}".format(SYMEX_TIMEOUT_COUNT))
+            if COLLECT_STATISTICS:
+                print("SYMEX_TIMEOUT count: {}".format(SYMEX_TIMEOUT_COUNT))
             break
 
         if node.is_leaf():
@@ -809,19 +807,15 @@ def selection() -> TreeNode:
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
 
-    if COLLECT_STATISTICS:
-        conex_statistics_file = "./statistics/{}/symex.txt".format(PROGRAM_NAME)
-        with open(conex_statistics_file, "a") as file:
-            file.write("{}\n".format(symex_time))
-
     debug_assertion(node.colour is Colour.G)
 
     selection_end_time = time.time()
     SYMEX_TIME += (selection_end_time - selection_start_time)
-    print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
     SYMEX_SUCCESS_COUNT += 1
-    print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))
-    print("SYMEX_TIME_AVG: {:.4f}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT))
+    if COLLECT_STATISTICS:
+        print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
+        print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))
+        print("SYMEX_TIME_AVG: {:.4f}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT))
     return node
 
 
@@ -1053,10 +1047,6 @@ def simulation(node: TreeNode = None) \
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
          for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")])
-                                             # + [(b'\x01\x00\x00\x00'*(MAX_BYTES//4), "D")]
-                                             # + [(b'\x0a', "D")] + TreeNode.random_fuzzing())
-         # for mutant in SEEDS] if SEEDS else [b'\x0a']
-         # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 
     # Set the inital input to be a EoF char?
 
@@ -1109,9 +1099,10 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             end_conex = time.time()
             CONEX_TIME += end_conex - start_conex
             CONEX_SUCCESS_COUNT += 1
-            print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
-            print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
-            print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
+            if COLLECT_STATISTICS:
+                print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
+                print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
+                print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
@@ -1139,7 +1130,8 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
         return msg, ret, timeout
 
-    global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT
+    global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
+        MIN_TREE_DEPTH, MAX_TREE_DEPTH, SUM_TREE_DEPTH
 
     LOGGER.info("Simulating...")
     report = execute()
@@ -1152,16 +1144,20 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
 
     if input_bytes[1] == "D":
         SEED_IN_COUNT += 1
-        print("Seed count: {}".format(SEED_IN_COUNT))
+        if COLLECT_STATISTICS:
+            print("Seed count: {}".format(SEED_IN_COUNT))
     elif input_bytes[1] == "S":
         SOL_GEN_COUNT += 1
-        print("Solving count: {}".format(SOL_GEN_COUNT))
+        if COLLECT_STATISTICS:
+            print("Solving count: {}".format(SOL_GEN_COUNT))
     elif input_bytes[1] == "F":
         FUZ_GEN_COUNT += 1
-        print("Fuzzing count: {}".format(FUZ_GEN_COUNT))
+        if COLLECT_STATISTICS:
+            print("Fuzzing count: {}".format(FUZ_GEN_COUNT))
     elif input_bytes[1] == "R":
         RND_GEN_COUNT += 1
-        print("Random count: {}".format(RND_GEN_COUNT))
+        if COLLECT_STATISTICS:
+            print("Random count: {}".format(RND_GEN_COUNT))
 
     # Record the test case
     testcase = testinput = None
@@ -1177,6 +1173,17 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                     "\n***** EUREKA! *****"
                     "\n*******************\n")
     trace = unpack(report_msg[1]) if traced else None
+
+    if not time_out:
+        MAX_TREE_DEPTH = max(len(trace), MAX_TREE_DEPTH)
+        if COLLECT_STATISTICS:
+            print("Max tree depth:{}".format(MAX_TREE_DEPTH))
+        MIN_TREE_DEPTH = min(len(trace), MIN_TREE_DEPTH)
+        if COLLECT_STATISTICS:
+            print("Min tree depth:{}".format(MIN_TREE_DEPTH))
+        SUM_TREE_DEPTH += len(trace)
+        if COLLECT_STATISTICS:
+            print("Avg tree depth:{}".format(SUM_TREE_DEPTH//CONEX_SUCCESS_COUNT))
 
     if LOGGER.level < logging.WARNING:
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
@@ -1529,8 +1536,6 @@ if __name__ == '__main__':
     binary_name = INSTR_BIN.split("/")[-1]
     DIR_NAME = "{}_{}_{}_{}".format(binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
     PROGRAM_NAME = args.file.split("/")[-1]
-    if COLLECT_STATISTICS:
-        os.system("mkdir -p statistics/{}".format(PROGRAM_NAME))
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
@@ -1558,108 +1563,4 @@ if __name__ == '__main__':
         else:
             print(main())
     finally:
-        print("Number of inputs from seed:{}".format(SEED_IN_COUNT))
-        print("Number of inputs from random:{}".format(RND_GEN_COUNT))
-        print("Number of inputs from solving:{}".format(SOL_GEN_COUNT))
-        print("Number of inputs from fuzzing:{}".format(FUZ_GEN_COUNT))
-        print("Number of symex timeout:{}".format(SYMEX_TIMEOUT_COUNT))
-        print("Number of conex timeout:{}".format(CONEX_TIMEOUT_COUNT))
-        print("Average symex time:{}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT if SYMEX_SUCCESS_COUNT else 1 ))
-        print("Average conex time:{}".format(CONEX_TIME / CONEX_SUCCESS_COUNT if CONEX_SUCCESS_COUNT else 1 ))
-
-#    pdb.set_trace()
-
-# def binary_execute(input_bytes: bytes) -> List[int]:
-#     """
-#     Execute the binary with an input in bytes
-#     :param input_bytes: the input to feed the binary
-#     :return: the execution trace in a list
-#     """
-#
-#     def unpack(output):
-#         debug_assertion((len(output) % 8 == 0))
-#         # NOTE: changed addr[0] to addr
-#         return [addr for i in range(int(len(output) / 8))
-#                 for addr in struct.unpack_from('q', output, i * 8)]
-#
-#     def execute():
-#         program = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-#                            stderr=sp.PIPE, close_fds=True)
-#         try:
-#             msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-#             ret = program.returncode
-#
-#             program.kill()
-#             del program
-#             return msg, ret
-#         except sp.TimeoutExpired:
-#             LOGGER.error("Binary execution time out")
-#             return None, None
-#
-#     global FOUND_BUG, MSGS, INPUTS, TIMES
-#
-#     LOGGER.info("Simulating...")
-#     # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-#     bin_start = time.time()
-#     report = execute()
-#     bin_end = time.time()
-#
-#     if COLLECT_STATISTICS:
-#         conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
-#         with open(conex_statistics_file, "a") as file:
-#             file.write("{}\n".format(bin_end-bin_start))
-#
-#     debug_assertion(bool(report))
-#
-#     report_msg, return_code = report
-#     # LOGGER.info("report message: {}".format(report_msg))
-#     # LOGGER.info("return code: {}".format(return_code))
-#     complete_conex = report_msg is not None and return_code is not None
-#     if complete_conex:
-#         LOGGER.info("Binary execution completed")
-#
-#     error_msg = report_msg[1] if complete_conex else None
-#
-#     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
-#         TIMES.append(time.clock())
-#         # In case of timeout, binary execution cannot collect stdout
-#         if SAVE_TESTCASES:
-#             output_msg = report_msg[0].decode('utf-8')
-#             save_tests_to_file(time.time() - TIME_START, output_msg)
-#             # MSGS.append(output_msg)
-#         if SAVE_TESTINPUTS:
-#             INPUTS.append(input_bytes)
-#
-#     if return_code == BUG_RET:
-#         FOUND_BUG = not COVERAGE_ONLY
-#         LOGGER.info("\n*******************"
-#                     "\n***** EUREKA! *****"
-#                     "\n*******************\n")
-#     trace = unpack(error_msg) if complete_conex else None
-#     trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-#         trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
-#         if complete_conex else []
-#     LOGGER.info(trace_log)
-#     return trace if trace else [ROOT.addr]
-
-# def save_news_to_file(are_new):
-#     """
-#     Save data to file only if it is new
-#     :param are_new: a list to represent whether each datum
-#                     contributes to a new path
-#     """
-#     global MSGS, INPUTS, TIMES
-#     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
-#         return
-#
-#     if SAVE_TESTCASES:
-#         debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
-#     if SAVE_TESTINPUTS:
-#         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
-#
-#     for i in range(len(are_new)):
-#         # if SAVE_TESTCASES and i < len(MSGS):
-#         #     save_tests_to_file(TIMES[i], MSGS[i])
-#         if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
-#             save_input_to_file(TIMES[i], INPUTS[i])
-#     MSGS, INPUTS, TIMES = [], [], []
+        pass

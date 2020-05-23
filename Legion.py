@@ -43,6 +43,7 @@ RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
+TREE_DEPTH_LIMIT = 100000000   # INT_MAX is 2147483647, a large value will cause a compilation error
 
 # Budget
 MAX_PATHS = float('inf')
@@ -1178,7 +1179,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
             trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
             if traced else []
-        LOGGER.info(trace_log)
+        LOGGER.info("{} of {} addresses".format(trace_log, len(trace)))
 
     return (trace if trace else [ROOT.addr]), found_bug
 
@@ -1376,6 +1377,9 @@ if __name__ == '__main__':
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
                         help='The seed for randomness')
+    parser.add_argument("--tree-depth-limit", type=int, default=TREE_DEPTH_LIMIT,
+                        help="The maximum depth of the tree, "
+                             "controlled by the length of concrete execution traces")
     parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
                         help='The time limit for symbolic execution')
     parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
@@ -1428,6 +1432,7 @@ if __name__ == '__main__':
     RAN_SEED = args.random_seed
     SYMEX_TIMEOUT = args.symex_timeout
     CONEX_TIMEOUT = args.conex_timeout
+    TREE_DEPTH_LIMIT = args.tree_depth_limit
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty
@@ -1466,7 +1471,7 @@ if __name__ == '__main__':
                 LOGGER.warning("--compile make overrides -o INSTR_BIN")
             INSTR_BIN = stem + ".instr"
             LOGGER.info('Making {}'.format(INSTR_BIN))
-            sp.run(["make", "-B", INSTR_BIN])
+            sp.run(["make", "-B", INSTR_BIN, "MAX_TRACE_LEN={}".format(TREE_DEPTH_LIMIT)])
         elif args.compile == "svcomp":
             if not args.o:
                 LOGGER.error("--compile svcomp requires -o INSTR_BIN")
@@ -1480,7 +1485,8 @@ if __name__ == '__main__':
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",
                     "__trace_buffered.c",
-                    ins])
+                    ins,
+                    "-DMAX_TRACE_LEN={}".format(TREE_DEPTH_LIMIT)])
         elif args.compile == "trace-cc":
             if args.o:
                 INSTR_BIN = args.o

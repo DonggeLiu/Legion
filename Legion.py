@@ -76,8 +76,8 @@ INSTR_BIN = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
-SAVE_TESTINPUTS = False
-SAVE_TESTCASES = False
+SAVE_TESTINPUTS = None
+SAVE_TESTCASES = None
 SAVE_TESTCASES_TIMEOUT = False
 DEFAULT_ADDR = -1
 
@@ -658,7 +658,7 @@ def initialisation():
 
     global ROOT
     LOGGER.info("Simulating on the seeded inputs")
-    traces = simulation(node=None)
+    traces, test_cases, test_inputs = simulation(node=None)
     LOGGER.info("Initialising the ROOT")
     ROOT = init_root()
     LOGGER.info("Expanding the tree with paths taken by seeded inputs")
@@ -666,7 +666,7 @@ def initialisation():
     LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
-    # save_news_to_file(are_new=are_new)
+    save_results_to_files(test_cases, test_inputs, are_new)
 
 
 def has_budget() -> bool:
@@ -687,12 +687,12 @@ def mcts():
     node = selection()
     if node is ROOT:
         return
-    traces = simulation(node=node)
+    traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
-    # save_news_to_file(are_new=are_new)
+    save_results_to_files(test_cases, test_inputs, are_new)
 
 
 def selection() -> TreeNode:
@@ -1035,7 +1035,8 @@ def add_phantom(parent: TreeNode, state: State) -> None:
     LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
-def simulation(node: TreeNode = None) -> List[List[int]]:
+def simulation(node: TreeNode = None) \
+        -> Tuple[List[List[int]], List[Tuple[float, str, str]], List[Tuple[float, bytes, str]]]:
     """
     Generate mutants (i.e. inputs that tend to preserve the path to the node)
     Execute the instrumented binary with mutants to collect the execution traces
@@ -1066,12 +1067,14 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     else:
         results = [binary_execute_parallel(mutant)
                    for mutant in mutants if not FOUND_BUG]
-    traces = []
+    traces, testcases, testinputs = [], [], []
     for result in results:
-        trace, curr_found_bug = result
+        trace, curr_found_bug, testcase, testinput = result
         traces.append(trace)
+        testcases.append(testcase)
+        testinputs.append(testinput)
         FOUND_BUG = FOUND_BUG or curr_found_bug
-    return traces
+    return traces, testcases, testinputs
 
 
 def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
@@ -1160,13 +1163,13 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         RND_GEN_COUNT += 1
         print("Random count: {}".format(RND_GEN_COUNT))
 
-    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
-        curr_time = time.time() - TIME_START
-        if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
-            stdout = report_msg[0].decode('utf-8')
-            save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C")+("-"+input_bytes[1]))
-        if SAVE_TESTINPUTS:
-            save_input_to_file(curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+    # Record the test case
+    testcase = testinput = None
+    curr_time = time.time() - TIME_START
+    if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
+        testcase = (curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+    if SAVE_TESTINPUTS:
+        testinput = (curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1181,7 +1184,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             if traced else []
         LOGGER.info("{} of {} addresses".format(trace_log, len(trace)))
 
-    return (trace if trace else [ROOT.addr]), found_bug
+    return (trace if trace else [ROOT.addr]), found_bug, testcase, testinput
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1296,7 +1299,17 @@ def propagate_execution_traces(traces: List[List[int]],
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
-def save_tests_to_file(time_stamp, data, suffix):
+def save_results_to_files(test_cases, test_inputs, are_new):
+    debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
+
+    for i in range(len(are_new)):
+        if SAVE_TESTCASES and (are_new[i] or SAVE_TESTCASES == "FULL"):
+            save_test_to_file(*test_cases[i])
+        if SAVE_TESTINPUTS and (are_new[i] or SAVE_TESTINPUTS == "FULL"):
+            save_input_to_file(*test_inputs[i])
+
+
+def save_test_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
     with open('tests/{}/{}_{}{}.xml'.format(
             DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wt+') as input_file:
@@ -1400,10 +1413,16 @@ if __name__ == '__main__':
     parser.add_argument('--collect-statistics', action="store_true",
                         help="Collect the performance statistics, "
                              "e.g. conex time")
-    parser.add_argument('--save-inputs', action="store_true",
-                        help='Save inputs as binary files')
-    parser.add_argument('--save-tests', action="store_true",
-                        help='Save inputs as TEST-COMP xml files')
+    parser.add_argument('--save-inputs', default=None, choices=["FULL", "REDUCED"],
+                        help='Save inputs as binary files.'
+                             'FULL: All inputs;'
+                             'REDUCED: Only the inputs that found new paths;'
+                             'None: No input;')
+    parser.add_argument('--save-tests', default=None, choices=["FULL", "REDUCED"],
+                        help='Save inputs as TEST-COMP xml files, [FULL, REDUCED, NONE]'
+                             'FULL: All inputs;'
+                             'REDUCED: Only the inputs that found new paths;'
+                             'None: No input;')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
     parser.add_argument("-o", default=None,

@@ -11,6 +11,10 @@ A  = libegion.a
 # optimisation
 OFLAG ?= -O0
 
+# Tracing
+MAX_TRACE_LEN ?= 42
+VERBOSE ?= 0
+
 # compiled without -fPIC
 O  = __VERIFIER.o __trace_jump.o
 
@@ -36,7 +40,7 @@ clean:
 	python3 tracejump.py $^ $@
 
 %.instr: %.instr.o __trace_jump.o __VERIFIER.c __VERIFIER_assume.instr.s __trace_buffered.c
-	$(CC) -g -o $@ $^ -no-pie
+	$(CC) -g -o $@ $^ -no-pie -DMAX_TRACE_LEN=$(MAX_TRACE_LEN) -DVERBOSE=$(VERBOSE)
 
 %.instr.obj: %.instr
 	objdump -d $^ > $@

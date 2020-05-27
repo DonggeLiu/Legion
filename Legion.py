@@ -1513,6 +1513,8 @@ if __name__ == '__main__':
             ins = INSTR_BIN + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
+            sp.run([args.cc, "-S", "-g", "-O0", "-o", "__VERIFIER_assume.s", "__VERIFIER_assume.c"])
+            sp.run(["./tracejump.py", "__VERIFIER_assume.s", "__VERIFIER_assume.instr.s"])
             sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, verifier_c,
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",

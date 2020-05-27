@@ -1181,13 +1181,13 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     trace = unpack(report_msg[1]) if traced else None
 
     if not time_out:
-        MAX_TREE_DEPTH = max(len(trace), MAX_TREE_DEPTH)
+        MAX_TREE_DEPTH = max(len(trace) if trace else 0, MAX_TREE_DEPTH)
         if COLLECT_STATISTICS:
             print("Max tree depth:{}".format(MAX_TREE_DEPTH))
-        MIN_TREE_DEPTH = min(len(trace), MIN_TREE_DEPTH)
+        MIN_TREE_DEPTH = min(len(trace) if trace else 0, MIN_TREE_DEPTH)
         if COLLECT_STATISTICS:
             print("Min tree depth:{}".format(MIN_TREE_DEPTH))
-        SUM_TREE_DEPTH += len(trace)
+        SUM_TREE_DEPTH += len(trace) if trace else 0
         if COLLECT_STATISTICS:
             print("Avg tree depth:{}".format(SUM_TREE_DEPTH//CONEX_SUCCESS_COUNT))
 
@@ -1195,7 +1195,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
             trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
             if traced else []
-        LOGGER.info("{} of {} addresses".format(trace_log, len(trace)))
+        LOGGER.info("{} of {} addresses".format(trace_log, len(trace) if trace else 0))
 
     return (trace if trace else [ROOT.addr]), found_bug, testcase, testinput
 

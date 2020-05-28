@@ -80,8 +80,8 @@ INSTR_BIN = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
-SAVE_TESTINPUTS = None
-SAVE_TESTCASES = None
+SAVE_TESTINPUTS = []
+SAVE_TESTCASES = []
 DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
@@ -1168,10 +1168,10 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     if SAVE_TESTINPUTS:
         testinput = (curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
-    if time_out and "TIMEOUT" in SAVE_TESTCASES:
+    if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
         save_test_to_file(curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
-    if time_out and "TIMEOUT" in SAVE_TESTCASES:
-        save_input_to_file(curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+    if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
+        save_input_to_file(curr_time, report_msg[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1472,8 +1472,8 @@ if __name__ == '__main__':
     SCORE_FUN = args.score
     RHO = args.rho
     COLLECT_STATISTICS = args.collect_statistics
-    SAVE_TESTINPUTS = args.save_inputs
-    SAVE_TESTCASES = args.save_tests
+    SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
+    SAVE_TESTCASES = args.save_tests if args.save_tests else[]
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

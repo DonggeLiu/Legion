@@ -1217,6 +1217,8 @@ def integrate_path(trace: List[int]) -> bool:
     :param trace: the trace to be integrated into the tree
     :return: a bool representing whether the trace contributes to a new path
     """
+    if trace[0] != ROOT.addr and ROOT.addr == -1:
+        ROOT.addr = trace[0]
     debug_assertion(trace[0] == ROOT.addr)
 
     node, is_new = ROOT, False
@@ -1314,7 +1316,8 @@ def propagate_execution_traces(traces: List[List[int]],
 
 def save_results_to_files(test_cases, test_inputs, are_new):
     debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
-
+    if not any(test_cases) or not any(test_inputs):
+        return
     for i in range(len(are_new)):
         if SAVE_TESTCASES and (are_new[i] or "FULL" in SAVE_TESTCASES):
             save_test_to_file(*test_cases[i])

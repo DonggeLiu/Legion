@@ -1322,7 +1322,7 @@ def propagate_execution_traces(traces: List[List[int]],
 
 def save_results_to_files(test_cases, test_inputs, are_new):
     debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
-    if not any(test_cases) or not any(test_inputs):
+    if not any(test_cases) and not any(test_inputs):
         return
     for i in range(len(are_new)):
         if SAVE_TESTCASES and (are_new[i] or "FULL" in SAVE_TESTCASES):

@@ -231,9 +231,15 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
+        # Fish bone optimisation: if a simulation child
+        #   has only one sibling X who is not fully explored,
+        #   and X is not white (so that all siblings are found)
+        #   then do not simulate from that simulation child but only from X
+        #   as all new paths can only come from X
         if self.colour is Colour.G and len(self.parent.children) > 1 \
                 and len([child for child in self.parent.children.values()
-                         if child is not self and child.score() > -inf]) == 1:
+                         if child is not self and child.score() > -inf
+                        and child.colour is not Colour.W]) == 1:
             return -inf
 
         if SCORE_FUN == 'random':

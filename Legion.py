@@ -14,6 +14,7 @@ import signal
 import struct
 import subprocess as sp
 import time
+from contextlib import closing
 from math import sqrt, log, ceil, inf
 # from memory_profiler import profile
 from multiprocessing import Pool, cpu_count
@@ -1056,12 +1057,15 @@ def simulation(node: TreeNode = None) \
     # Set the inital input to be a EoF char?
 
     global SIMPOOL
-    SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
-    if SIMPOOL:
-        results = SIMPOOL.map(binary_execute_parallel, mutants)
-    else:
-        results = [binary_execute_parallel(mutant)
-                   for mutant in mutants if not FOUND_BUG]
+    with closing (Pool(processes=CORE)) as conex_pool:
+        results = conex_pool.map(binary_execute_parallel, mutants)
+
+    # SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
+    # if SIMPOOL:
+    #    results = SIMPOOL.map(binary_execute_parallel, mutants)
+    # else:
+    #    results = [binary_execute_parallel(mutant)
+    #               for mutant in mutants if not FOUND_BUG]
     traces, testcases, testinputs = [], [], []
     for result in results:
         trace, curr_found_bug, testcase, testinput = result

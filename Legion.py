@@ -1108,17 +1108,18 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                 print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
                 print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
+            # Note: Once instrumented binary execution times out,
+            #  execute with uninstrumented binary to save inputs
+            CONEX_TIMEOUT_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
+            LOGGER.error("Instrumented Binary execution time out")
+            instr.kill()
+            del instr
+            gc.collect()
+            timeout = True
+
             if "TIMEOUT" in SAVE_TESTCASES + SAVE_TESTINPUTS:
-                # Note: Once instrumented binary execution times out,
-                #  execute with uninstrumented binary to save inputs
-                CONEX_TIMEOUT_COUNT += 1
-                if COLLECT_STATISTICS:
-                    print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
-                LOGGER.error("Instrumented Binary execution time out")
-                instr.kill()
-                del instr
-                gc.collect()
-                timeout = True
                 try:
                     uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                                        stderr=sp.PIPE, close_fds=True)

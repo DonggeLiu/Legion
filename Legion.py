@@ -1415,9 +1415,9 @@ if __name__ == '__main__':
     parser.add_argument("--tree-depth-limit", type=int, default=TREE_DEPTH_LIMIT,
                         help="The maximum depth of the tree, "
                              "controlled by the length of concrete execution traces")
-    parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
+    parser.add_argument("--symex-timeout", type=float, default=SYMEX_TIMEOUT,
                         help='The time limit for symbolic execution')
-    parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
+    parser.add_argument("--conex-timeout", type=float, default=CONEX_TIMEOUT,
                         help='The time limit for concrete binary execution')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')

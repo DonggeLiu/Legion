@@ -50,7 +50,6 @@ TREE_DEPTH_LIMIT = 100000000   # INT_MAX is 2147483647, a large value will cause
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
 CORE = 1
-SIMPOOL = None
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 COVERAGE_ONLY = False
@@ -1056,16 +1055,12 @@ def simulation(node: TreeNode = None) \
 
     # Set the inital input to be a EoF char?
 
-    global SIMPOOL
-    with closing (Pool(processes=CORE)) as conex_pool:
-        results = conex_pool.map(binary_execute_parallel, mutants)
+    if CORE == 1:
+        results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
+    else:
+        with closing(Pool(processes=CORE)) as conex_pool:
+            results = conex_pool.map(binary_execute_parallel, mutants)
 
-    # SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
-    # if SIMPOOL:
-    #    results = SIMPOOL.map(binary_execute_parallel, mutants)
-    # else:
-    #    results = [binary_execute_parallel(mutant)
-    #               for mutant in mutants if not FOUND_BUG]
     traces, testcases, testinputs = [], [], []
     for result in results:
         trace, curr_found_bug, testcase, testinput = result

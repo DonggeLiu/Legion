@@ -24,6 +24,7 @@ from typing import Dict, List, Tuple
 from types import GeneratorType
 
 from angr import Project
+from angr.errors import SimUnsatError
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
 from angr.sim_options import LAZY_SOLVES
@@ -503,6 +504,15 @@ class TreeNode:
                 result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
                 method = "F"
+            except Z3Exception:
+                # NOTE: In case of z3.z3types.Z3Exception: b'maximization suspended'
+                # TODO: May have a better way to solve this, e.g. redo sampling?
+                LOGGER.info("Exhausted {}".format(self))
+                LOGGER.info("Fully explored {}".format(self))
+                self.fully_explored = True
+                self.exhausted = True
+                self.parent.exhausted = True
+                break
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:
@@ -843,6 +853,13 @@ def selection() -> TreeNode:
                 dye_siblings(child=node)  # Upon an exception, mark this node fully explored
             except Z3Exception:
                 LOGGER.debug("Z3 exception occurred in symex, any type casting in program")
+                node.fully_explored = True
+                node.exhausted = True
+                node.parent.mark_fully_explored()
+            except SimUnsatError:
+                # NOTE: angr.errors.SimUnsatError: Got an unsat result, caused by
+                #  claripy.errors.UnsatError: CompositeSolver is already unsat
+                LOGGER.info("claripy.errors.UnsatError: CompositeSolver is already unsat")
                 node.fully_explored = True
                 node.exhausted = True
                 node.parent.mark_fully_explored()

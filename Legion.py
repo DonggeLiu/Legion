@@ -34,7 +34,6 @@ if __name__ == '__main__':
         print(VERSION)
         sys.exit(0)
 
-
 # Hyper-parameters
 MIN_SAMPLES = 3
 MAX_SAMPLES = 100
@@ -44,7 +43,7 @@ RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
-TREE_DEPTH_LIMIT = 100000000   # INT_MAX is 2147483647, a large value will cause a compilation error
+TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
 
 # Budget
 MAX_PATHS = float('inf')
@@ -71,7 +70,6 @@ CONEX_SUCCESS_COUNT = 0
 MIN_TREE_DEPTH = inf
 MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
-
 
 COLLECT_STATISTICS = False
 
@@ -237,9 +235,9 @@ class TreeNode:
         #   then do not simulate from that simulation child but only from X
         #   as all new paths can only come from X
         if self.colour is Colour.G and len(self.parent.children) > 1 \
-                and len([child for child in self.parent.children.values()
-                         if child is not self and child.score() > -inf
-                        and child.colour is not Colour.W]) == 1:
+                and len([child for child in self.parent.children.values() if
+                         child is not self and child.score() > -inf
+                         and child.colour is not Colour.W]) == 1:
             return -inf
 
         if SCORE_FUN == 'random':
@@ -338,8 +336,7 @@ class TreeNode:
         :return: whether the node is a leaf
         """
         no_child_or_only_gold = not self.children \
-                                or all([child.colour == Colour.G
-                                        for child in self.children.values()])
+            or all([child.colour == Colour.G for child in self.children.values()])
         return not self.phantom and no_child_or_only_gold
 
     def dye(self, colour: Colour,
@@ -476,6 +473,7 @@ class TreeNode:
             # return input_bytes
             # Or return end of file char?
             return os.urandom(MAX_BYTES)
+
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:
@@ -677,9 +675,9 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return not FOUND_BUG \
-           and not consider_tree_fully_explored() \
-           and ROOT.sim_win < MAX_PATHS \
-           and CUR_ROUND < MAX_ROUNDS
+        and not consider_tree_fully_explored() \
+        and ROOT.sim_win < MAX_PATHS \
+        and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():
@@ -1051,7 +1049,7 @@ def simulation(node: TreeNode = None) \
         [(bytes("".join(mutant), 'utf-8'), "D")
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
-         for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")])
+         for mutant in SEEDS] if SEEDS else ([(b'\x00' * MAX_BYTES, "D")])
 
     # Set the inital input to be a EoF char?
 
@@ -1138,7 +1136,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         return msg, ret, timeout
 
     global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
-        MIN_TREE_DEPTH, MAX_TREE_DEPTH, SUM_TREE_DEPTH
+        MIN_TREE_DEPTH, MAX_TREE_DEPTH, SUM_TREE_DEPTH, CONEX_SUCCESS_COUNT
 
     LOGGER.info("Simulating...")
     report = execute()
@@ -1170,14 +1168,18 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     testcase = testinput = None
     curr_time = time.time() - TIME_START
     if SAVE_TESTCASES and not time_out:
-        testcase = (curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+        testcase = (curr_time, report_msg[0].decode('utf-8'),
+                    ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
     if SAVE_TESTINPUTS:
-        testinput = (curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+        testinput = (curr_time, input_bytes[0],
+                     ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
     if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
-        save_test_to_file(curr_time, report_msg[0].decode('utf-8'), ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+        save_test_to_file(curr_time, report_msg[0].decode('utf-8'),
+                          ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
     if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
-        save_input_to_file(curr_time, report_msg[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
+        save_input_to_file(curr_time, report_msg[0],
+                           ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1195,7 +1197,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             print("Min tree depth:{}".format(MIN_TREE_DEPTH))
         SUM_TREE_DEPTH += len(trace) if trace else 0
         if COLLECT_STATISTICS:
-            print("Avg tree depth:{}".format(SUM_TREE_DEPTH//CONEX_SUCCESS_COUNT))
+            print("Avg tree depth:{}".format(SUM_TREE_DEPTH // CONEX_SUCCESS_COUNT))
 
     if LOGGER.level < logging.WARNING:
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
@@ -1364,6 +1366,7 @@ def run_with_timeout() -> None:
     """
     A wrapper for run(), break run() when MAX_TIME is reached
     """
+
     def raise_timeout(signum, frame):
         LOGGER.debug("Signum: {};\nFrame: {};".format(signum, frame))
         LOGGER.info("{} seconds time out!".format(MAX_TIME))
@@ -1408,7 +1411,7 @@ if __name__ == '__main__':
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,
                         help='Exploration factor (default: 1/sqrt(2))')
-    parser.add_argument("--core", type=int, default=cpu_count()-1,
+    parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
                         help='The seed for randomness')
@@ -1482,7 +1485,7 @@ if __name__ == '__main__':
     RHO = args.rho
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
-    SAVE_TESTCASES = args.save_tests if args.save_tests else[]
+    SAVE_TESTCASES = args.save_tests if args.save_tests else []
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
@@ -1557,7 +1560,8 @@ if __name__ == '__main__':
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
-            md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+            md.write(
+                '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
             md.write('<test-metadata>\n')
             md.write('<sourcecodelang>C</sourcecodelang>\n')
             md.write('<producer>Legion</producer>\n')

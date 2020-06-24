@@ -46,6 +46,7 @@ SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
+INFINITY = 9999  # using inf will incur nan values, this is temporary workaround
 
 # Budget
 MAX_PATHS = float('inf')
@@ -165,8 +166,8 @@ class TreeNode:
         self.alpha = 1 + sqrt(log(2/DELTA)/2)
         self.arms = []
         self.num_arms = len(self.children)
-        self.A = [np.identity(NUM_CONTEXT) for _ in range(self.num_arms)]
-        self.B = [np.zeros(NUM_CONTEXT) for _ in range(self.num_arms)]
+        self.A = np.identity(NUM_CONTEXT)
+        self.B = np.zeros(NUM_CONTEXT)
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -205,9 +206,9 @@ class TreeNode:
         #  4. simulation node or not
         #  5. phantom node or not
 
-        context1 = (self.sim_win / self.sel_try) if self.sel_try else inf
-        context2 = (self.sel_win / self.sel_try) if self.sel_try else inf
-        context3 = (self.sim_win / self.sim_try) if self.sim_try else inf
+        context1 = (self.sim_win / self.sel_try) if self.sel_try else INFINITY
+        context2 = (self.sel_win / self.sel_try) if self.sel_try else INFINITY
+        context3 = (self.sim_win / self.sim_try) if self.sim_try else INFINITY
         context4 = 1 if self.colour is Colour.G else 0
         context5 = 1 if self.colour is Colour.P else 0
         context6 = self.parent.sel_try if self.parent else self.sel_try
@@ -219,7 +220,7 @@ class TreeNode:
     def exploit_score(self) -> float:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
-            return inf
+            return INFINITY
         return self.sim_win / self.sel_try
 
     def explore_score(self) -> float:
@@ -228,10 +229,10 @@ class TreeNode:
             return 0
         # Evaluate to maximum value if is root
         if self.is_root():
-            return inf
+            return INFINITY
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
-            return inf
+            return INFINITY
         return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
     def score(self) -> float:
@@ -266,7 +267,7 @@ class TreeNode:
 
         # Evaluate to minimum value if fully explored
         if self.is_fully_explored():
-            return -inf
+            return -INFINITY
 
         # Fish bone optimisation: if a simulation child
         #   has only one sibling X who is not fully explored,
@@ -275,9 +276,9 @@ class TreeNode:
         #   as all new paths can only come from X
         if self.colour is Colour.G and len(self.parent.children) > 1 \
                 and len([child for child in self.parent.children.values() if
-                         child is not self and child.score() > -inf
+                         child is not self and child.score() > -INFINITY
                          and child.colour is not Colour.W]) == 1:
-            return -inf
+            return -INFINITY
 
         if SCORE_FUN == 'random':
             score = random.uniform(0, 100)
@@ -293,7 +294,7 @@ class TreeNode:
             uncertainty = float(self.alpha * np.sqrt(X))
             score = estimated_reward + uncertainty
         else:
-            score = -inf
+            score = -INFINITY
             debug_assertion(False)
 
         return score
@@ -358,7 +359,7 @@ class TreeNode:
 
         LOGGER.info("Selecting from children: {}".format(self.children))
         # TODO: more elegant method, if time permitted
-        max_score, candidates = -inf, []  # type: float, List[TreeNode]
+        max_score, candidates = -INFINITY, []  # type: float, List[TreeNode]
         for child in self.children.values():
             cur_score = child.score()
             if cur_score == max_score:
@@ -596,15 +597,18 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
-        return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
-               "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
-            .format(uct=self.score(),
-                    explore=self.exploit_score(),
-                    exploit=self.explore_score(),
-                    simw=self.sim_win,
-                    selt=self.sel_try,
-                    pselt=self.parent.sel_try if self.parent else None,
-                    simt=self.sim_try)
+        if SCORE_FUN == 'uct':
+            return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
+                   "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
+                .format(uct=self.score(),
+                        explore=self.exploit_score(),
+                        exploit=self.explore_score(),
+                        simw=self.sim_win,
+                        selt=self.sel_try,
+                        pselt=self.parent.sel_try if self.parent else None,
+                        simt=self.sim_try)
+        else:
+            return "{:.2f}".format(self.score())
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
         #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
@@ -1320,8 +1324,8 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     # Reward the simulation node selected for findings as well
     while node:
         for is_new in are_new:
-            node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
-            node.B = np.sum(node.B, np.dot(is_new, node.context()))
+            node.A += node.context().T.dot(node.context())
+            node.B += np.array(is_new).dot(node.context())[0]
         node = node.parent
 
 
@@ -1342,10 +1346,10 @@ def propagate_context_execution_traces(traces: List[List[int]],
         LOGGER.info("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
-        record_simulation(node=node, new=is_new)
+        record_simulation(node=node, is_new=is_new)
         for addr in trace[1:]:
             node = node.children[addr]
-            record_simulation(node=node, new=is_new)
+            record_simulation(node=node, is_new=is_new)
 
         # NOTE: mark the last node as fully explored
         #   as fuzzing it will not give any new path
@@ -1353,20 +1357,20 @@ def propagate_context_execution_traces(traces: List[List[int]],
         #   (i.e. no [1,2,3] and [1,2,3,4]
         # node.mark_fully_explored()
 
-    def record_simulation(node: TreeNode, new: bool) -> None:
+    def record_simulation(node: TreeNode, is_new: bool) -> None:
         """
         Record a node has been traversed in simulation
         NOTE: increment the statistics of its simulation child as welll
             otherwise it will always have sim_try = 0
         :param node: the node to record
-        :param new: whether the node contributes to the discovery of a new path
+        :param is_new: whether the node contributes to the discovery of a new path
         """
-        node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
-        node.B = np.sum(node.B, np.dot(np.array(are_new), node.context()))
+        node.A += node.context().T.dot(node.context())
+        node.B += np.array(is_new).dot(node.context())[0]
         if 'Simulation' in node.children:
             node = node.children['Simulation']
-            node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
-            node.B = np.sum(node.B, np.dot(new, node.context()))
+            node.A += node.context().T.dot(node.context())
+            node.B += np.array(is_new).dot(node.context())[0]
 
     debug_assertion(len(traces) == len(are_new))
     for i in range(len(traces)):
@@ -1601,6 +1605,8 @@ if __name__ == '__main__':
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
 
+    LOGGER.info('score function {}'.format(SCORE_FUN))
+
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
 
@@ -1694,7 +1700,8 @@ if __name__ == '__main__':
 
     try:
         if args.verbose:
-            cProfile.run('main()', sort='cumtime')
+            print(main())
+            # cProfile.run('main()', sort='cumtime')
         else:
             print(main())
     finally:

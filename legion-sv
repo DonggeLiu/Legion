@@ -1,4 +1,4 @@
 #!/bin/bash
 
 export PYTHONPATH=lib
-python3 ./Legion.py $@
+python3.5 ./Legion.py $@

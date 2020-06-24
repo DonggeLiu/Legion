@@ -7,6 +7,7 @@ import datetime
 import enum
 import gc
 import logging
+import numpy as np
 import os
 # import pdb
 import random
@@ -14,6 +15,7 @@ import signal
 import struct
 import subprocess as sp
 import time
+
 from contextlib import closing
 from math import sqrt, log, ceil, inf
 # from memory_profiler import profile
@@ -86,6 +88,17 @@ INPUTS = []  # type: List
 MSGS = []  # type: List
 TIMES = []  # type: List
 
+# Context of bandits
+# Note:
+#  1. sim_win / sel_try
+#  2. sel_win / sel_try
+#  3. sim_win / sim_try
+#  4. simulation node or not
+#  5. phantom node or not
+#  6. parent sel_try
+NUM_CONTEXT = 6
+DELTA = 0.9
+
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
 
@@ -148,6 +161,13 @@ class TreeNode:
         self.fully_explored = False
         self.exhausted = False
 
+        # Context of bandits
+        self.alpha = 1 + sqrt(log(2/DELTA)/2)
+        self.arms = []
+        self.num_arms = len(self.children)
+        self.A = [np.identity(NUM_CONTEXT) for _ in range(self.num_arms)]
+        self.B = [np.zeros(NUM_CONTEXT) for _ in range(self.num_arms)]
+
     def child(self, name) -> 'TreeNode' or None:
         """
         Get the child whose hex(addr) matches with the name
@@ -161,7 +181,7 @@ class TreeNode:
 
     def sim_state(self) -> State or None:
         """
-        SimStates of red nodes are stored in their simualtion child
+        SimStates of red nodes are stored in their simulation child
         SimStates of white nodes are None
         SimStates of black/gold nodes are stored in them
         :return: the symbolic state of the node
@@ -176,6 +196,25 @@ class TreeNode:
         """
         return self.sim_state().solver.constraints \
             if self.sim_state() else "No SimState"
+
+    def context(self) -> np.array:
+        # Note:
+        #  1. sim_win / sel_try
+        #  2. sel_win / sel_try
+        #  3. sim_win / sim_try
+        #  4. simulation node or not
+        #  5. phantom node or not
+
+        context1 = (self.sim_win / self.sel_try) if self.sel_try else inf
+        context2 = (self.sel_win / self.sel_try) if self.sel_try else inf
+        context3 = (self.sim_win / self.sim_try) if self.sim_try else inf
+        context4 = 1 if self.colour is Colour.G else 0
+        context5 = 1 if self.colour is Colour.P else 0
+        context6 = self.parent.sel_try if self.parent else self.sel_try
+
+        context = [context1, context2, context3, context4, context5, context6]
+        debug_assertion(len(context) == NUM_CONTEXT)
+        return np.array(context)
 
     def exploit_score(self) -> float:
         # Evaluate to maximum value if not tried before
@@ -242,11 +281,20 @@ class TreeNode:
 
         if SCORE_FUN == 'random':
             score = random.uniform(0, 100)
-        else:
-            debug_assertion(SCORE_FUN == 'uct')
+        elif SCORE_FUN == 'uct':
             uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
             score = uct_score - TIME_COEFF * time_penalisation() \
                 if TIME_COEFF else uct_score
+        elif SCORE_FUN == 'context':
+            context = self.context()
+            A_inv = np.linalg.inv(self.A)
+            estimated_reward = float(A_inv.dot(self.B).dot(context))
+            X = np.dot(np.dot(context, A_inv), np.array([context]).T)
+            uncertainty = float(self.alpha * np.sqrt(X))
+            score = estimated_reward + uncertainty
+        else:
+            score = -inf
+            debug_assertion(False)
 
         return score
 
@@ -1255,11 +1303,77 @@ def propagation(node: TreeNode, traces: List[List[int]],
     :param are_new: whether each of the execution traces is new
     """
     LOGGER.info("Propagation Stage")
-    propagate_selection_path(node=node, are_new=are_new)
-    propagate_execution_traces(traces=traces, are_new=are_new)
+
+    propagate_context_selection_path(node=node, are_new=are_new)
+    propagate_context_execution_traces(traces=traces, are_new=are_new)
+    propagate_reward_selection_path(node=node, are_new=are_new)
+    propagate_reward_execution_traces(traces=traces, are_new=are_new)
 
 
-def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
+def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> None:
+    """
+    Back-propagate selection counter to each node in the selection path
+    :param node: the node selected in selection step
+    :param are_new: whether each of the execution traces is new
+    :return:
+    """
+    # Reward the simulation node selected for findings as well
+    while node:
+        for is_new in are_new:
+            node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
+            node.B = np.sum(node.B, np.dot(is_new, node.context()))
+        node = node.parent
+
+
+def propagate_context_execution_traces(traces: List[List[int]],
+                                      are_new: List[bool]) -> None:
+    """
+    Forward propagate the results to all execution traces correspondingly
+    :param traces: the binary execution traces
+    :param are_new: whether each of the execution traces is new
+    """
+
+    def propagate_execution_trace(trace: List[int], is_new: bool) -> None:
+        """
+        Forward propagate the results to all execution traces correspondingly
+        :param trace: the binary execution trace
+        :param is_new: whether the execution trace is new
+        """
+        LOGGER.info("propagate_execution_trace")
+        debug_assertion(trace[0] == ROOT.addr)
+        node = ROOT
+        record_simulation(node=node, new=is_new)
+        for addr in trace[1:]:
+            node = node.children[addr]
+            record_simulation(node=node, new=is_new)
+
+        # NOTE: mark the last node as fully explored
+        #   as fuzzing it will not give any new path
+        #   this assumes no trace can be a prefix of another
+        #   (i.e. no [1,2,3] and [1,2,3,4]
+        # node.mark_fully_explored()
+
+    def record_simulation(node: TreeNode, new: bool) -> None:
+        """
+        Record a node has been traversed in simulation
+        NOTE: increment the statistics of its simulation child as welll
+            otherwise it will always have sim_try = 0
+        :param node: the node to record
+        :param new: whether the node contributes to the discovery of a new path
+        """
+        node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
+        node.B = np.sum(node.B, np.dot(np.array(are_new), node.context()))
+        if 'Simulation' in node.children:
+            node = node.children['Simulation']
+            node.A = np.sum(node.A, np.dot(node.context(), np.transpose(node.context())))
+            node.B = np.sum(node.B, np.dot(new, node.context()))
+
+    debug_assertion(len(traces) == len(are_new))
+    for i in range(len(traces)):
+        propagate_execution_trace(trace=traces[i], is_new=are_new[i])
+
+
+def propagate_reward_selection_path(node: TreeNode, are_new: List[bool]) -> None:
     """
     Back-propagate selection counter to each node in the selection path
     :param node: the node selected in selection step
@@ -1276,8 +1390,8 @@ def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
         node = node.parent
 
 
-def propagate_execution_traces(traces: List[List[int]],
-                               are_new: List[bool]) -> None:
+def propagate_reward_execution_traces(traces: List[List[int]],
+                                      are_new: List[bool]) -> None:
     """
     Forward propagate the results to all execution traces correspondingly
     :param traces: the binary execution traces
@@ -1406,7 +1520,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
                         help='Maximum number of samples per iteration')
     parser.add_argument("--score", default=SCORE_FUN,
-                        help='Which score function to use [uct,random]')
+                        help='Which score function to use [uct,random,context]')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,

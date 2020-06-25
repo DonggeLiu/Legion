@@ -149,7 +149,12 @@ Testing/**/*[!c]
 
 ## MacOS
 **/.DS_Store
+
+# Experiments
 Legion-status.py
+Legion-exp.py
+
+#Testings
 Testing/ANGRTests/test_2
 Testing/ANGRTests/test_2.c
 Testing/ANGRTests/test_2.instr
@@ -194,12 +199,18 @@ Testing/TraceJumpTests/test_if.s
 Testing/TraceJumpTests/test_while.instr
 Testing/TraceJumpTests/test_while.instr.s
 Testing/TraceJumpTests/test_while.s
+
+# Intermediate files
 __VERIFIER.s
 __VERIFIER_assume.s
 binary
 binary.instr.s
 binary.s
+__VERIFIER_assume.instr.s
+binary.instr
+binary.instr.instr.s
+
+# Results
 past-scoes.ods
 statistics/
-
 test/results

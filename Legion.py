@@ -72,7 +72,7 @@ CONEX_SUCCESS_COUNT = 0
 MIN_TREE_DEPTH = inf
 MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
-
+PROFILE = False
 COLLECT_STATISTICS = False
 
 # Execution
@@ -1573,6 +1573,8 @@ if __name__ == '__main__':
                         help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
+    parser.add_argument("--profile", action="store_true",
+                        help="Whether to print the profiling of functions")
 
     args = parser.parse_args()
 
@@ -1591,6 +1593,7 @@ if __name__ == '__main__':
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
+    PROFILE = args.profile
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
@@ -1684,7 +1687,7 @@ if __name__ == '__main__':
     SEEDS = args.seeds
 
     try:
-        if args.verbose:
+        if PROFILE:
             cProfile.run('main()', sort='cumtime')
         else:
             print(main())

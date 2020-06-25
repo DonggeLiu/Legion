@@ -14,6 +14,7 @@ import signal
 import struct
 import subprocess as sp
 import time
+from contextlib import closing
 from math import sqrt, log, ceil, inf
 # from memory_profiler import profile
 from multiprocessing import Pool, cpu_count
@@ -21,8 +22,10 @@ from typing import Dict, List, Tuple
 from types import GeneratorType
 
 from angr import Project
+from angr.errors import SimUnsatError
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
+from angr.sim_options import LAZY_SOLVES
 from z3.z3types import Z3Exception
 
 VERSION = "0.1-testcomp2020"
@@ -31,7 +34,6 @@ if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == '--version':
         print(VERSION)
         sys.exit(0)
-
 
 # Hyper-parameters
 MIN_SAMPLES = 1
@@ -43,12 +45,12 @@ RAN_SEED = None
 SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
+TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
 
 # Budget
 MAX_PATHS = float('inf')
 MAX_ROUNDS = float('inf')
 CORE = 1
-SIMPOOL = None
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
 COVERAGE_ONLY = False
@@ -57,7 +59,20 @@ PERSISTENT = False
 # Statistics
 CUR_ROUND = 0
 TIME_START = time.time()
-SOLVING_COUNT = 0
+SEED_IN_COUNT = 0
+SOL_GEN_COUNT = 0
+FUZ_GEN_COUNT = 0
+RND_GEN_COUNT = 0
+SYMEX_TIMEOUT_COUNT = 0
+CONEX_TIMEOUT_COUNT = 0
+SYMEX_TIME = 0
+CONEX_TIME = 0
+SYMEX_SUCCESS_COUNT = 0
+CONEX_SUCCESS_COUNT = 0
+MIN_TREE_DEPTH = inf
+MAX_TREE_DEPTH = 0
+SUM_TREE_DEPTH = 0
+
 COLLECT_STATISTICS = False
 
 # Execution
@@ -65,8 +80,8 @@ INSTR_BIN = None
 DIR_NAME = None
 SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
-SAVE_TESTINPUTS = False
-SAVE_TESTCASES = False
+SAVE_TESTINPUTS = []
+SAVE_TESTCASES = []
 DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
@@ -84,6 +99,8 @@ sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
 LOGGER.addHandler(sthl)
 logging.getLogger('angr').setLevel('ERROR')
 
+SCORE_FUN = 'uct'
+
 
 # Colour of tree nodes
 class Colour(enum.Enum):
@@ -91,6 +108,7 @@ class Colour(enum.Enum):
     R = 'Red'
     G = 'Gold'
     B = 'Black'
+    P = 'Purple'
 
 
 # TreeNode:
@@ -101,6 +119,7 @@ class TreeNode:
     Red    | True         | True         | False, stored in its simulation child
     Gold   | False        | False        | True, stores its parent's state
     Black  | True         | no sibling   | True if is intermediate, False if is leaf
+    Purple | False        | True         | True, only showed up in ANGR, not found by TraceJump
     """
 
     def __init__(self, addr: int = DEFAULT_ADDR, parent: 'TreeNode' = None,
@@ -167,6 +186,9 @@ class TreeNode:
         return self.sim_win / self.sel_try
 
     def explore_score(self) -> float:
+        # If the exploration ratio rho is 0, then return 0
+        if RHO == 0:
+            return 0
         # Evaluate to maximum value if is root
         if self.is_root():
             return inf
@@ -213,10 +235,24 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
-        uct_score = self.exploit_score() + self.explore_score()
+        # Fish bone optimisation: if a simulation child
+        #   has only one sibling X who is not fully explored,
+        #   and X is not white (so that all siblings are found)
+        #   then do not simulate from that simulation child but only from X
+        #   as all new paths can only come from X
+        if self.colour is Colour.G and len(self.parent.children) > 1 \
+                and len([child for child in self.parent.children.values() if
+                         child is not self and child.score() > -inf
+                         and child.colour is not Colour.W]) == 1:
+            return -inf
 
-        score = uct_score - TIME_COEFF * time_penalisation() \
-            if TIME_COEFF else uct_score
+        if SCORE_FUN == 'random':
+            score = random.uniform(0, 100)
+        else:
+            debug_assertion(SCORE_FUN == 'uct')
+            uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
+            score = uct_score - TIME_COEFF * time_penalisation() \
+                if TIME_COEFF else uct_score
 
         return score
 
@@ -225,7 +261,7 @@ class TreeNode:
             if ROOT.fully_explored and self is not ROOT:
                 return (self.is_leaf() and self.colour is not Colour.G) \
                        or self.exhausted
-        return self.fully_explored or self.exhausted
+        return self.fully_explored
 
     def mark_fully_explored(self):
         """
@@ -306,8 +342,7 @@ class TreeNode:
         :return: whether the node is a leaf
         """
         no_child_or_only_gold = not self.children \
-                                or all([child.colour == Colour.G
-                                        for child in self.children.values()])
+            or all([child.colour == Colour.G for child in self.children.values()])
         return not self.phantom and no_child_or_only_gold
 
     def dye(self, colour: Colour,
@@ -347,21 +382,12 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
-        global SOLVING_COUNT
-        SOLVING_COUNT += 1
         if self.state and self.state.solver.constraints:
-            solving_start = time.time()
             results = self.app_fuzzing()
-            solving_end = time.time()
-
-            if COLLECT_STATISTICS:
-                conex_statistics_file = "./statistics/{}/solver.txt".format(PROGRAM_NAME)
-                with open(conex_statistics_file, "a") as file:
-                    file.write("{}\n".format(solving_end-solving_start))
             return results
         return self.random_fuzzing()
 
-    def app_fuzzing(self) -> List[bytes]:
+    def app_fuzzing(self) -> List[Tuple[bytes, str]]:
         def byte_len() -> int:
             """
             The number of bytes in the input
@@ -387,6 +413,9 @@ class TreeNode:
                 self.fully_explored = True
                 return results
 
+        # Denotes the generation method for each input
+        # S: constraint solving; F: fuzzing; R: random generation
+        method = "S"
         while len(results) < MAX_SAMPLES:
             try:
                 val = next(self.samples)
@@ -395,9 +424,20 @@ class TreeNode:
                     break
                 if val is None and len(results) < MIN_SAMPLES:
                     # requires constraint solving but not enough results
+                    method = "S"
                     continue
-                result = val.to_bytes(byte_len(), 'big')
+                result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
+                method = "F"
+            except Z3Exception:
+                # NOTE: In case of z3.z3types.Z3Exception: b'maximization suspended'
+                # TODO: May have a better way to solve this, e.g. redo sampling?
+                LOGGER.info("Exhausted {}".format(self))
+                LOGGER.info("Fully explored {}".format(self))
+                self.fully_explored = True
+                self.exhausted = True
+                self.parent.exhausted = True
+                break
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:
@@ -419,7 +459,6 @@ class TreeNode:
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
-                self.parent.parent.mark_fully_explored()
                 # NOTE: In some case, no input can be found from the simul child
                 #   even if its red parent is considered as feasible, weird.
                 #   In this case, parent.sel_try is 0, which prevents it to
@@ -435,11 +474,12 @@ class TreeNode:
                 #         which does not imply no input was found
                 #         here there could be a child to be selected in the
                 #         next iteration
+                # self.parent.mark_fully_explored()
                 break
         return results
 
     @staticmethod
-    def random_fuzzing() -> List[bytes]:
+    def random_fuzzing() -> List[Tuple[bytes, str]]:
         def random_bytes():
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
             # input_bytes = b''
@@ -448,7 +488,8 @@ class TreeNode:
             # return input_bytes
             # Or return end of file char?
             return os.urandom(MAX_BYTES)
-        return [random_bytes() for _ in range(MIN_SAMPLES)]
+
+        return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:
         debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
@@ -700,7 +741,9 @@ def initialisation():
             #     argc=claripy.BVS('argc', 100*8)
             # )
             main_state = project.factory.blank_state(addr=main_addr,
-                                                     stdin=SimFileStream)
+                                                     stdin=SimFileStream,
+                                                     add_options={LAZY_SOLVES}
+                                                     )
         else:
             # Switch to random fuzzing
             main_state = None
@@ -713,7 +756,7 @@ def initialisation():
 
     global ROOT
     LOGGER.info("Simulating on the seeded inputs")
-    traces = simulation(node=None)
+    traces, test_cases, test_inputs = simulation(node=None)
     LOGGER.info("Initialising the ROOT")
     ROOT = init_root()
     LOGGER.info("Expanding the tree with paths taken by seeded inputs")
@@ -721,7 +764,7 @@ def initialisation():
     LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
-    # save_news_to_file(are_new=are_new)
+    save_results_to_files(test_cases, test_inputs, are_new)
 
 
 def has_budget() -> bool:
@@ -730,9 +773,9 @@ def has_budget() -> bool:
     :return: True if terminate
     """
     return not FOUND_BUG \
-           and not consider_tree_fully_explored() \
-           and ROOT.sim_win < MAX_PATHS \
-           and CUR_ROUND < MAX_ROUNDS
+        and not consider_tree_fully_explored() \
+        and ROOT.sim_win < MAX_PATHS \
+        and CUR_ROUND < MAX_ROUNDS
 
 
 def mcts():
@@ -742,12 +785,12 @@ def mcts():
     node = selection()
     if node is ROOT:
         return
-    traces = simulation(node=node)
+    traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
-    # save_news_to_file(are_new=are_new)
+    save_results_to_files(test_cases, test_inputs, are_new)
 
 
 def selection() -> TreeNode:
@@ -777,9 +820,12 @@ def selection() -> TreeNode:
         # LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
+    global SYMEX_TIME, SYMEX_TIMEOUT_COUNT, SYMEX_SUCCESS_COUNT
+
     symex_time = 0
     last_red = ROOT
     node = ROOT
+    selection_start_time = time.time()
     while node.colour is not Colour.G:
         if node.colour is Colour.R:
             last_red = node
@@ -792,7 +838,7 @@ def selection() -> TreeNode:
 
         # If the node is white, dye it
         if node.colour is Colour.W:
-            start_time = time.time()
+            dye_start_time = time.time()
             try:
                 dye_siblings(child=node)  # Upon an exception, mark this node fully explored
             except Z3Exception:
@@ -800,7 +846,14 @@ def selection() -> TreeNode:
                 node.fully_explored = True
                 node.exhausted = True
                 node.parent.mark_fully_explored()
-            symex_time += time.time() - start_time
+            except SimUnsatError:
+                # NOTE: angr.errors.SimUnsatError: Got an unsat result, caused by
+                #  claripy.errors.UnsatError: CompositeSolver is already unsat
+                LOGGER.info("claripy.errors.UnsatError: CompositeSolver is already unsat")
+                node.fully_explored = True
+                node.exhausted = True
+                node.parent.mark_fully_explored()
+            symex_time += time.time() - dye_start_time
 
             # # IF the node is dyed to black and there is no states left,
             # # it implies the previous parent state does not have any diverging
@@ -815,6 +868,9 @@ def selection() -> TreeNode:
             LOGGER.info(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
+            SYMEX_TIMEOUT_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("SYMEX_TIMEOUT count: {}".format(SYMEX_TIMEOUT_COUNT))
             break
 
         if node.is_leaf():
@@ -859,13 +915,15 @@ def selection() -> TreeNode:
         debug_assertion(node is not None)
         LOGGER.info("Select: {}".format(node))
 
-    if COLLECT_STATISTICS:
-        conex_statistics_file = "./statistics/{}/symex.txt".format(PROGRAM_NAME)
-        with open(conex_statistics_file, "a") as file:
-            file.write("{}\n".format(symex_time))
-
     debug_assertion(node.colour is Colour.G)
 
+    selection_end_time = time.time()
+    SYMEX_TIME += (selection_end_time - selection_start_time)
+    SYMEX_SUCCESS_COUNT += 1
+    if COLLECT_STATISTICS:
+        print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
+        print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))
+        print("SYMEX_TIME_AVG: {:.4f}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT))
     return node
 
 
@@ -926,10 +984,6 @@ def dye_siblings(child: TreeNode) -> None:
         # if hex(child.addr)[-4:] == '0731':
         #     pdb.set_trace()
         child.fully_explored = True
-        # Note: Making the node exhausted to make sure it is evaluated to -inf
-        #   This is specific for white nodes whose corresponding state
-        #   cannot be found due to dynmaic array allocation
-        child.exhausted = True
         child.parent.mark_fully_explored()
 
     if len(sibling_states) == 1:
@@ -1083,7 +1137,8 @@ def add_phantom(parent: TreeNode, state: State) -> None:
     LOGGER.info("Add Phantom {} to {}".format(state, parent))
 
 
-def simulation(node: TreeNode = None) -> List[List[int]]:
+def simulation(node: TreeNode = None) \
+        -> Tuple[List[List[int]], List[Tuple[float, str, str]], List[Tuple[float, bytes, str]]]:
     """
     Generate mutants (i.e. inputs that tend to preserve the path to the node)
     Execute the instrumented binary with mutants to collect the execution traces
@@ -1096,33 +1151,30 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
-        [bytes("".join(mutant), 'utf-8')
+        [(bytes("".join(mutant), 'utf-8'), "D")
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
-         for mutant in SEEDS] if SEEDS else ([b'\x00'*MAX_BYTES]
-                                             + [b'\x01\x00\x00\x00'*(MAX_BYTES//4)]
-                                             + [b'\x0a'] + TreeNode.random_fuzzing())
-         # for mutant in SEEDS] if SEEDS else [b'\x0a']
-         # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
+         for mutant in SEEDS] if SEEDS else ([(b'\x00' * MAX_BYTES, "D")])
 
     # Set the inital input to be a EoF char?
 
-    global SIMPOOL
-    SIMPOOL = Pool(processes=CORE) if (CORE > 1 and not SIMPOOL) else None
-    if SIMPOOL:
-        results = SIMPOOL.map(binary_execute_parallel, mutants)
+    if CORE == 1:
+        results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
     else:
-        results = [binary_execute_parallel(mutant)
-                   for mutant in mutants if not FOUND_BUG]
-    traces = []
+        with closing(Pool(processes=CORE)) as conex_pool:
+            results = conex_pool.map(binary_execute_parallel, mutants)
+
+    traces, testcases, testinputs = [], [], []
     for result in results:
-        trace, curr_found_bug = result
+        trace, curr_found_bug, testcase, testinput = result
         traces.append(trace)
+        testcases.append(testcase)
+        testinputs.append(testinput)
         FOUND_BUG = FOUND_BUG or curr_found_bug
-    return traces
+    return traces, testcases, testinputs
 
 
-def binary_execute_parallel(input_bytes: bytes):
+def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     """
     Execute the binary with an input in bytes
     :param input_bytes: the input to feed the binary
@@ -1136,57 +1188,103 @@ def binary_execute_parallel(input_bytes: bytes):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
+        global CONEX_TIME, CONEX_TIMEOUT_COUNT, CONEX_SUCCESS_COUNT
+
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
         msg = ret = None
+        # 0: no timeout; 1: instrumented binary timeout; 2: uninstrumented binary timeout
+        timeout = False
+        start_conex = time.time()
         try:
-            msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+            msg = instr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
             ret = instr.returncode
             instr.terminate()
             del instr
             gc.collect()
             LOGGER.info("Instrumented binary execution completed")
+            end_conex = time.time()
+            CONEX_TIME += end_conex - start_conex
+            CONEX_SUCCESS_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
+                print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
+                print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
+            CONEX_TIMEOUT_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
             LOGGER.error("Instrumented Binary execution time out")
             instr.kill()
             del instr
             gc.collect()
-            try:
-                uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-                                   stderr=sp.PIPE, close_fds=True)
-                msg = uninstr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-                ret = uninstr.returncode
-                LOGGER.info("Uninstrumented binary execution completed")
-                uninstr.terminate()
-                del uninstr
-                gc.collect()
-            except sp.TimeoutExpired:
-                LOGGER.error("Uninstrumented Binary execution time out")
-                uninstr.kill()
-                del uninstr
-                gc.collect()
-                # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-        return msg, ret
+            timeout = True
+
+            if "TIMEOUT" in SAVE_TESTCASES + SAVE_TESTINPUTS:
+                try:
+                    uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                                       stderr=sp.PIPE, close_fds=True)
+                    msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
+                    ret = uninstr.returncode
+                    LOGGER.info("Uninstrumented binary execution completed")
+                    uninstr.terminate()
+                    del uninstr
+                    gc.collect()
+                except sp.TimeoutExpired:
+                    LOGGER.error("Uninstrumented Binary execution time out")
+                    uninstr.kill()
+                    del uninstr
+                    gc.collect()
+                    # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+        return msg, ret, timeout
+
+    global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
+        MIN_TREE_DEPTH, MAX_TREE_DEPTH, SUM_TREE_DEPTH, CONEX_SUCCESS_COUNT
 
     LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
-    report_msg, return_code = report
-
-    completed = report != (None, None)
+    report_msg, return_code, time_out = report
+    completed = report != (None, None, True)
     traced = completed and report_msg[1]
     found_bug = False
 
-    if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
-        curr_time = time.time() - TIME_START
-        if SAVE_TESTCASES:
-            stdout = report_msg[0].decode('utf-8')
-            save_tests_to_file(curr_time, stdout)
-        if SAVE_TESTINPUTS:
-            save_input_to_file(curr_time, input_bytes)
+    if input_bytes[1] == "D":
+        SEED_IN_COUNT += 1
+        if COLLECT_STATISTICS:
+            print("Seed count: {}".format(SEED_IN_COUNT))
+    elif input_bytes[1] == "S":
+        SOL_GEN_COUNT += 1
+        if COLLECT_STATISTICS:
+            print("Solving count: {}".format(SOL_GEN_COUNT))
+    elif input_bytes[1] == "F":
+        FUZ_GEN_COUNT += 1
+        if COLLECT_STATISTICS:
+            print("Fuzzing count: {}".format(FUZ_GEN_COUNT))
+    elif input_bytes[1] == "R":
+        RND_GEN_COUNT += 1
+        if COLLECT_STATISTICS:
+            print("Random count: {}".format(RND_GEN_COUNT))
+
+    # Record the test case
+    testcase = testinput = None
+    curr_time = time.time() - TIME_START
+    if SAVE_TESTCASES and not time_out:
+        testcase = (curr_time, report_msg[0].decode('utf-8'),
+                    ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
+    if SAVE_TESTINPUTS:
+        testinput = (curr_time, input_bytes[0],
+                     ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
+
+    if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
+        save_test_to_file(curr_time, report_msg[0].decode('utf-8'),
+                          ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
+    if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
+        save_input_to_file(curr_time, report_msg[0],
+                           ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1195,13 +1293,24 @@ def binary_execute_parallel(input_bytes: bytes):
                     "\n*******************\n")
     trace = unpack(report_msg[1]) if traced else None
 
+    if not time_out:
+        MAX_TREE_DEPTH = max(len(trace) if trace else 0, MAX_TREE_DEPTH)
+        if COLLECT_STATISTICS:
+            print("Max tree depth:{}".format(MAX_TREE_DEPTH))
+        MIN_TREE_DEPTH = min(len(trace) if trace else 0, MIN_TREE_DEPTH)
+        if COLLECT_STATISTICS:
+            print("Min tree depth:{}".format(MIN_TREE_DEPTH))
+        SUM_TREE_DEPTH += len(trace) if trace else 0
+        if COLLECT_STATISTICS:
+            print("Avg tree depth:{}".format(SUM_TREE_DEPTH // CONEX_SUCCESS_COUNT))
+
     if LOGGER.level < logging.WARNING:
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
             trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
             if traced else []
-        LOGGER.info(trace_log)
+        LOGGER.info("{} of {} addresses".format(trace_log, len(trace) if trace else 0))
 
-    return (trace if trace else [ROOT.addr]), found_bug
+    return (trace if trace else [ROOT.addr]), found_bug, testcase, testinput
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1221,6 +1330,8 @@ def integrate_path(trace: List[int]) -> bool:
     :param trace: the trace to be integrated into the tree
     :return: a bool representing whether the trace contributes to a new path
     """
+    if trace[0] != ROOT.addr and ROOT.addr == -1:
+        ROOT.addr = trace[0]
     debug_assertion(trace[0] == ROOT.addr)
 
     node, is_new = ROOT, False
@@ -1316,10 +1427,21 @@ def propagate_execution_traces(traces: List[List[int]],
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
-def save_tests_to_file(time_stamp, data):
+def save_results_to_files(test_cases, test_inputs, are_new):
+    debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
+    if not any(test_cases) and not any(test_inputs):
+        return
+    for i in range(len(are_new)):
+        if SAVE_TESTCASES and (are_new[i] or "FULL" in SAVE_TESTCASES):
+            save_test_to_file(*test_cases[i])
+        if SAVE_TESTINPUTS and (are_new[i] or "FULL" in SAVE_TESTINPUTS):
+            save_input_to_file(*test_inputs[i])
+
+
+def save_test_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
-    with open('tests/{}/{}_{}.xml'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt+') as input_file:
+    with open('tests/{}/{}_{}{}.xml'.format(
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wt+') as input_file:
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
@@ -1329,12 +1451,12 @@ def save_tests_to_file(time_stamp, data):
         input_file.write('</testcase>\n')
 
 
-def save_input_to_file(time_stamp, input_bytes):
+def save_input_to_file(time_stamp, input_bytes, suffix):
     # if DIR_NAME not in os.listdir('inputs'):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
-    with open('inputs/{}/{}_{}'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb+') as input_file:
+    with open('inputs/{}/{}_{}{}'.format(
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wb+') as input_file:
         input_file.write(input_bytes)
 
 
@@ -1349,6 +1471,7 @@ def run_with_timeout() -> None:
     """
     A wrapper for run(), break run() when MAX_TIME is reached
     """
+
     def raise_timeout(signum, frame):
         LOGGER.debug("Signum: {};\nFrame: {};".format(signum, frame))
         LOGGER.info("{} seconds time out!".format(MAX_TIME))
@@ -1359,6 +1482,7 @@ def run_with_timeout() -> None:
     signal.signal(signal.SIGALRM, raise_timeout)
     # Schedule the signal to be sent after MAX_TIME
     signal.alarm(MAX_TIME)
+    # signal.setitimer(signal.ITIMER_PROF, MAX_TIME, 1)
     try:
         run()
     except TimeoutError:
@@ -1386,15 +1510,22 @@ if __name__ == '__main__':
                         help='Minimum number of samples per iteration')
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
                         help='Maximum number of samples per iteration')
+    parser.add_argument("--score", default=SCORE_FUN,
+                        help='Which score function to use [uct,random]')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
-    parser.add_argument("--core", type=int, default=cpu_count()-1,
+    parser.add_argument('--rho', type=float, default=RHO,
+                        help='Exploration factor (default: 1/sqrt(2))')
+    parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
                         help='The seed for randomness')
-    parser.add_argument("--symex-timeout", type=int, default=SYMEX_TIMEOUT,
+    parser.add_argument("--tree-depth-limit", type=int, default=TREE_DEPTH_LIMIT,
+                        help="The maximum depth of the tree, "
+                             "controlled by the length of concrete execution traces")
+    parser.add_argument("--symex-timeout", type=float, default=SYMEX_TIMEOUT,
                         help='The time limit for symbolic execution')
-    parser.add_argument("--conex-timeout", type=int, default=CONEX_TIMEOUT,
+    parser.add_argument("--conex-timeout", type=float, default=CONEX_TIMEOUT,
                         help='The time limit for concrete binary execution')
     # parser.add_argument('--sv-comp', action="store_true",
     #                     help='Link __VERIFIER_*() functions, *.i files implies --source')
@@ -1412,10 +1543,20 @@ if __name__ == '__main__':
     parser.add_argument('--collect-statistics', action="store_true",
                         help="Collect the performance statistics, "
                              "e.g. conex time")
-    parser.add_argument('--save-inputs', action="store_true",
-                        help='Save inputs as binary files')
-    parser.add_argument('--save-tests', action="store_true",
-                        help='Save inputs as TEST-COMP xml files')
+    parser.add_argument('--save-inputs', default=None, nargs='*',
+                        choices=["FULL", "TIMEOUT", "REDUCED"],
+                        help='Save inputs as binary files.'
+                             'FULL: All inputs that did not trigger timeout;'
+                             'REDUCED: Inputs that found new paths without timeout;'
+                             'TIMEOUT: Inputs that triggered timeout;'
+                             'No flag: No input;')
+    parser.add_argument('--save-tests', default=None, nargs='*',
+                        choices=["FULL", "TIMEOUT", "REDUCED"],
+                        help='Save inputs as TEST-COMP xml files, [FULL, REDUCED, NONE]'
+                             'FULL: All inputs that did not trigger timeout;'
+                             'REDUCED: Only the inputs that found new paths without timeout;'
+                             'TIMEOUT: Inputs that triggered timeout;'
+                             'No flag: No input;')
     parser.add_argument('-v', '--verbose', action="store_true",
                         help='Increase output verbosity')
     parser.add_argument("-o", default=None,
@@ -1432,6 +1573,7 @@ if __name__ == '__main__':
                         help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
+
     args = parser.parse_args()
 
     MIN_SAMPLES = args.min_samples
@@ -1440,12 +1582,15 @@ if __name__ == '__main__':
     RAN_SEED = args.random_seed
     SYMEX_TIMEOUT = args.symex_timeout
     CONEX_TIMEOUT = args.conex_timeout
+    TREE_DEPTH_LIMIT = args.tree_depth_limit
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
     TIME_COEFF = args.time_penalty
+    SCORE_FUN = args.score
+    RHO = args.rho
     COLLECT_STATISTICS = args.collect_statistics
-    SAVE_TESTINPUTS = args.save_inputs
-    SAVE_TESTCASES = args.save_tests
+    SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
+    SAVE_TESTCASES = args.save_tests if args.save_tests else []
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
@@ -1475,7 +1620,7 @@ if __name__ == '__main__':
                 LOGGER.warning("--compile make overrides -o INSTR_BIN")
             INSTR_BIN = stem + ".instr"
             LOGGER.info('Making {}'.format(INSTR_BIN))
-            sp.run(["make", "-B", INSTR_BIN])
+            sp.run(["make", "-B", INSTR_BIN, "MAX_TRACE_LEN={}".format(TREE_DEPTH_LIMIT)])
         elif args.compile == "svcomp":
             if not args.o:
                 LOGGER.error("--compile svcomp requires -o INSTR_BIN")
@@ -1485,11 +1630,14 @@ if __name__ == '__main__':
             ins = INSTR_BIN + ".instr.s"
             sp.run([args.cc, "-no-pie", "-o", asm, "-S", source])
             sp.run(["./tracejump.py", asm, ins])
+            sp.run([args.cc, "-S", "-g", "-O0", "-o", "__VERIFIER_assume.s", "__VERIFIER_assume.c"])
+            sp.run(["./tracejump.py", "__VERIFIER_assume.s", "__VERIFIER_assume.instr.s"])
             sp.run([args.cc, "-no-pie", "-O0", "-o", INSTR_BIN, verifier_c,
                     "__VERIFIER_assume.instr.s",
                     "__trace_jump.s",
                     "__trace_buffered.c",
-                    ins])
+                    ins,
+                    "-DMAX_TRACE_LEN={}".format(TREE_DEPTH_LIMIT)])
         elif args.compile == "trace-cc":
             if args.o:
                 INSTR_BIN = args.o
@@ -1513,13 +1661,12 @@ if __name__ == '__main__':
     binary_name = INSTR_BIN.split("/")[-1]
     DIR_NAME = "{}_{}_{}_{}".format(binary_name, MIN_SAMPLES, TIME_COEFF, TIME_START)
     PROGRAM_NAME = args.file.split("/")[-1]
-    if COLLECT_STATISTICS:
-        os.system("mkdir -p statistics/{}".format(PROGRAM_NAME))
     if is_source and SAVE_TESTCASES:
         os.system("mkdir -p tests/{}".format(DIR_NAME))
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
-            md.write('<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+            md.write(
+                '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
             md.write('<test-metadata>\n')
             md.write('<sourcecodelang>C</sourcecodelang>\n')
             md.write('<producer>Legion</producer>\n')
@@ -1536,105 +1683,10 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    # if args.verbose:
-    #     cProfile.run('main()', sort='cumtime')
-    # else:
-    #     print(main())
-    print(main())
-
-#    pdb.set_trace()
-
-# def binary_execute(input_bytes: bytes) -> List[int]:
-#     """
-#     Execute the binary with an input in bytes
-#     :param input_bytes: the input to feed the binary
-#     :return: the execution trace in a list
-#     """
-#
-#     def unpack(output):
-#         debug_assertion((len(output) % 8 == 0))
-#         # NOTE: changed addr[0] to addr
-#         return [addr for i in range(int(len(output) / 8))
-#                 for addr in struct.unpack_from('q', output, i * 8)]
-#
-#     def execute():
-#         program = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-#                            stderr=sp.PIPE, close_fds=True)
-#         try:
-#             msg = program.communicate(input_bytes, timeout=CONEX_TIMEOUT)
-#             ret = program.returncode
-#
-#             program.kill()
-#             del program
-#             return msg, ret
-#         except sp.TimeoutExpired:
-#             LOGGER.error("Binary execution time out")
-#             return None, None
-#
-#     global FOUND_BUG, MSGS, INPUTS, TIMES
-#
-#     LOGGER.info("Simulating...")
-#     # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-#     bin_start = time.time()
-#     report = execute()
-#     bin_end = time.time()
-#
-#     if COLLECT_STATISTICS:
-#         conex_statistics_file = "./statistics/{}/conex.txt".format(PROGRAM_NAME)
-#         with open(conex_statistics_file, "a") as file:
-#             file.write("{}\n".format(bin_end-bin_start))
-#
-#     debug_assertion(bool(report))
-#
-#     report_msg, return_code = report
-#     # LOGGER.info("report message: {}".format(report_msg))
-#     # LOGGER.info("return code: {}".format(return_code))
-#     complete_conex = report_msg is not None and return_code is not None
-#     if complete_conex:
-#         LOGGER.info("Binary execution completed")
-#
-#     error_msg = report_msg[1] if complete_conex else None
-#
-#     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and complete_conex:
-#         TIMES.append(time.clock())
-#         # In case of timeout, binary execution cannot collect stdout
-#         if SAVE_TESTCASES:
-#             output_msg = report_msg[0].decode('utf-8')
-#             save_tests_to_file(time.time() - TIME_START, output_msg)
-#             # MSGS.append(output_msg)
-#         if SAVE_TESTINPUTS:
-#             INPUTS.append(input_bytes)
-#
-#     if return_code == BUG_RET:
-#         FOUND_BUG = not COVERAGE_ONLY
-#         LOGGER.info("\n*******************"
-#                     "\n***** EUREKA! *****"
-#                     "\n*******************\n")
-#     trace = unpack(error_msg) if complete_conex else None
-#     trace_log = [hex(addr) if type(addr) is int else addr for addr in (
-#         trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
-#         if complete_conex else []
-#     LOGGER.info(trace_log)
-#     return trace if trace else [ROOT.addr]
-
-# def save_news_to_file(are_new):
-#     """
-#     Save data to file only if it is new
-#     :param are_new: a list to represent whether each datum
-#                     contributes to a new path
-#     """
-#     global MSGS, INPUTS, TIMES
-#     if not SAVE_TESTCASES and not SAVE_TESTINPUTS:
-#         return
-#
-#     if SAVE_TESTCASES:
-#         debug_assertion(len(are_new) == len(TIMES) == len(MSGS))
-#     if SAVE_TESTINPUTS:
-#         debug_assertion(len(are_new) == len(TIMES) == len(INPUTS))
-#
-#     for i in range(len(are_new)):
-#         # if SAVE_TESTCASES and i < len(MSGS):
-#         #     save_tests_to_file(TIMES[i], MSGS[i])
-#         if are_new[i] and SAVE_TESTINPUTS and i < len(MSGS):
-#             save_input_to_file(TIMES[i], INPUTS[i])
-#     MSGS, INPUTS, TIMES = [], [], []
+    try:
+        if args.verbose:
+            cProfile.run('main()', sort='cumtime')
+        else:
+            print(main())
+    finally:
+        pass

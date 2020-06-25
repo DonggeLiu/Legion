@@ -23,6 +23,7 @@ from types import GeneratorType
 from angr import Project
 from angr.sim_state import SimState as State
 from angr.storage.file import SimFileStream
+from angr.sim_options import LAZY_SOLVES
 from z3.z3types import Z3Exception
 
 VERSION = "0.1-testcomp2020"
@@ -34,12 +35,12 @@ if __name__ == '__main__':
 
 
 # Hyper-parameters
-MIN_SAMPLES = 1
-MAX_SAMPLES = 1
+MIN_SAMPLES = 3
+MAX_SAMPLES = 100
 TIME_COEFF = 0
 RHO = 1 / sqrt(2)
 RAN_SEED = None
-SYMEX_TIMEOUT = None  # in secs
+SYMEX_TIMEOUT = 0  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 
@@ -56,7 +57,13 @@ PERSISTENT = False
 # Statistics
 CUR_ROUND = 0
 TIME_START = time.time()
-SOLVING_COUNT = 0
+SEED_IN_COUNT = 0
+SOL_GEN_COUNT = 0
+FUZ_GEN_COUNT = 0
+RND_GEN_COUNT = 0
+SYMEX_TIMEOUT_COUNT = 0
+CONEX_TIMEOUT_COUNT = 0
+
 COLLECT_STATISTICS = False
 
 # Execution
@@ -66,6 +73,7 @@ SEEDS = []
 BUG_RET = 100  # the return code when finding a bug
 SAVE_TESTINPUTS = False
 SAVE_TESTCASES = False
+SAVE_TESTCASES_TIMEOUT = False
 DEFAULT_ADDR = -1
 
 INPUTS = []  # type: List
@@ -90,6 +98,7 @@ class Colour(enum.Enum):
     R = 'Red'
     G = 'Gold'
     B = 'Black'
+    P = 'Purple'
 
 
 # TreeNode:
@@ -100,6 +109,7 @@ class TreeNode:
     Red    | True         | True         | False, stored in its simulation child
     Gold   | False        | False        | True, stores its parent's state
     Black  | True         | no sibling   | True if is intermediate, False if is leaf
+    Purple | False        | True         | True, only showed up in ANGR, not found by TraceJump
     """
 
     def __init__(self, addr: int = DEFAULT_ADDR, parent: 'TreeNode' = None,
@@ -129,7 +139,6 @@ class TreeNode:
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
         self.exhausted = False
-        self.random_score = random.uniform(0, 100)
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -209,12 +218,17 @@ class TreeNode:
         if self.is_fully_explored():
             return -inf
 
+        if self.colour is Colour.G and len(self.parent.children) > 1 \
+                and len([child for child in self.parent.children.values()
+                         if child is not self and child.score() > -inf]) == 1:
+            return -inf
+
         uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
 
         score = uct_score - TIME_COEFF * time_penalisation() \
             if TIME_COEFF else uct_score
 
-        return inf if self.phantom else -inf if self.colour is Colour.G else self.random_score
+        return random.uniform(0, 100)
 
     def is_fully_explored(self):
         if PERSISTENT:
@@ -343,8 +357,6 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
-        global SOLVING_COUNT
-        SOLVING_COUNT += 1
         if self.state and self.state.solver.constraints:
             solving_start = time.time()
             results = self.app_fuzzing()
@@ -357,7 +369,7 @@ class TreeNode:
             return results
         return self.random_fuzzing()
 
-    def app_fuzzing(self) -> List[bytes]:
+    def app_fuzzing(self) -> List[Tuple[bytes, str]]:
         def byte_len() -> int:
             """
             The number of bytes in the input
@@ -383,6 +395,9 @@ class TreeNode:
                 self.fully_explored = True
                 return results
 
+        # Denotes the generation method for each input
+        # S: constraint solving; F: fuzzing; R: random generation
+        method = "S"
         while len(results) < MAX_SAMPLES:
             try:
                 val = next(self.samples)
@@ -391,9 +406,11 @@ class TreeNode:
                     break
                 if val is None and len(results) < MIN_SAMPLES:
                     # requires constraint solving but not enough results
+                    method = "S"
                     continue
-                result = val.to_bytes(byte_len(), 'big')
+                result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
+                method = "F"
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:
@@ -435,7 +452,7 @@ class TreeNode:
         return results
 
     @staticmethod
-    def random_fuzzing() -> List[bytes]:
+    def random_fuzzing() -> List[Tuple[bytes, str]]:
         def random_bytes():
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
             # input_bytes = b''
@@ -444,7 +461,7 @@ class TreeNode:
             # return input_bytes
             # Or return end of file char?
             return os.urandom(MAX_BYTES)
-        return [random_bytes() for _ in range(MIN_SAMPLES)]
+        return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
     def add_child(self, key: str or int, new_child: 'TreeNode') -> None:
         debug_assertion((key == 'Simulation') ^ (key == new_child.addr))
@@ -484,90 +501,7 @@ class TreeNode:
             parent = parent.parent
         return path[::-1]
 
-    def pp(self, indent: int = 0, mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
-        lines, _, _, _ = self.pp_lines()
-        for line in lines:
-            print(line)
-        lines, _, _, _ = self.pp_lines()
-
-        # self.pp_lines()
-
-    def pp_lines(self, mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
-
-            kids = list(self.children.values())
-            # kids = [kid for kid in kids if kid.colour is not Colour.G]
-
-            if not kids:
-                node = repr(self)
-                width = len(node) - 11
-                height = 1
-                middle = width // 2
-                return [node], width, height, middle
-
-            if len(kids) == 1:
-                lines, n, p, x = kids[0].pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x+1) * " " + (n-x-1) * "_" + s
-                second_line = x * " " + "/" + (n-x-1+u)*" "
-                shifted_lines = [line + u*" " for line in lines]
-                return [first_line, second_line] + shifted_lines, n+u, p+2, n+u//2
-
-            if len(kids) == 2:
-                kid0 = kids[0] if kids[1].colour is Colour.G else kids[1]
-                kid1 = kids[1] if kids[1].colour is Colour.G else kids[0]
-                left, n, p, x = kid0.pp_lines()
-                right, m, q, y = kid1.pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s + y * '_' + (m - y) * ' '
-                second_line = x * ' ' + '/' + (n - x - 1 + u + y) * ' ' + '\\' + (m - y - 1) * ' '
-                if p < q:
-                    left += [n * ' '] * (q - p)
-                elif q < p:
-                    right += [m * ' '] * (p - q)
-                zipped_lines = zip(left, right)
-                lines = [first_line, second_line] + [a + u * ' ' + b for a, b in zipped_lines]
-                return lines, n+m+u, max(p, q)+2, n+u//2
-
-            if len(self.children) == 3:
-                sim = None
-                for kid in kids:
-                    if kid.colour is Colour.G:
-                        sim = kid
-                        kids.remove(kid)
-                left, n, p, x = kids[0].pp_lines()
-                middle, o, r, z = kids[1].pp_lines()
-                right, m, q, y = sim.pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s + (o+y+u) * '_' + (m - y) * ' '
-                second_line = x * ' ' + '/' + (n - x - 1 + u + z) * ' ' + '|' + (o - z-1 + u + y)*' ' + '\\' + (m - y - 1) * ' '
-
-                if max(p, r, q) == p:
-                    middle += [o*' '] * (p-r)
-                    right += [m*' '] * (p-q)
-                elif max(p, r, q) == r:
-                    left += [n*' '] * (r-p)
-                    right += [m*' '] * (r-q)
-                elif max(p, r, q) == q:
-                    left += [n*''] * (q-p)
-                    middle += [o*' '] * (q-r)
-
-                # if not len(left) == len(middle) == len(right):
-                #     pdb.set_trace()
-
-                zipped_lines = zip(left, middle, right)
-                lines = [first_line, second_line] + [a + u * ' ' + b + u*' ' + c for a, b, c in zipped_lines]
-
-                # pdb.set_trace()
-                return lines, n+m+o+u*2, max(p, r, q)+2, n + u//2
-
-            else:
-                LOGGER.error("Too many children")
-                exit(1)
-
-    def pp_tree(self, indent: int = 0,
+    def pp(self, indent: int = 0,
            mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
         if LOGGER.level > logging.INFO and not forced:
             return
@@ -591,10 +525,9 @@ class TreeNode:
             child.pp(indent=indent, mark=mark, found=found, forced=forced)
 
     def repr_node_name(self) -> str:
-        # return ("Simul: " if self.colour is Colour.G else
-        #         "Block: " if self.parent else "@Root: ") \
-        #        + (hex(self.addr)[-4:] if self.addr else "None")
-        return hex(self.addr)[-4:] if self.addr else "None"
+        return ("Simul: " if self.colour is Colour.G else
+                "Block: " if self.parent else "@Root: ") \
+               + (hex(self.addr)[-4:] if self.addr else "None")
 
     def repr_node_data(self) -> str:
         """
@@ -602,7 +535,8 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
-        return "{uct:.2f}" \
+        return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
+               "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
             .format(uct=self.score(),
                     explore=self.exploit_score(),
                     exploit=self.explore_score(),
@@ -622,7 +556,7 @@ class TreeNode:
         return "{}".format(self.sim_state()) if self.sim_state() else "NoState"
 
     def __repr__(self) -> str:
-        return '\033[1;{colour}m{name}:{data}\033[0m' \
+        return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
             .format(colour=30 if self.colour is Colour.B else
                     35 if self.phantom else
                     31 if self.colour is Colour.R else
@@ -696,7 +630,9 @@ def initialisation():
             #     argc=claripy.BVS('argc', 100*8)
             # )
             main_state = project.factory.blank_state(addr=main_addr,
-                                                     stdin=SimFileStream)
+                                                     stdin=SimFileStream,
+                                                     add_options={LAZY_SOLVES}
+                                                     )
         else:
             # Switch to random fuzzing
             main_state = None
@@ -773,6 +709,7 @@ def selection() -> TreeNode:
         LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
+    global SYMEX_TIMEOUT_COUNT
     symex_time = 0
     last_red = ROOT
     node = ROOT
@@ -811,6 +748,7 @@ def selection() -> TreeNode:
             LOGGER.info(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
+            SYMEX_TIMEOUT_COUNT += 1
             break
 
         if node.is_leaf():
@@ -1018,9 +956,12 @@ def symex(state: State) -> List[State]:
     :return: the resulting state(s) of symbolic execution
     """
     # Note: Need to keep all successors?
-    # LOGGER.debug("computing successors for {}".format(state))
+    LOGGER.debug("computing successors for {}".format(state))
+    if state is None:
+        LOGGER.debug("No corresponding state found, any dynamic array allocation in the code?")
+        return []
     successors = state.step().successors
-    # LOGGER.debug("Successors are: {}".format(successors))
+    LOGGER.debug("Successors are: {}".format(successors))
     return successors
 
 
@@ -1085,10 +1026,12 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
 
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = node.mutate() if node else \
-        [bytes("".join(mutant), 'utf-8')
+        [(bytes("".join(mutant), 'utf-8'), "D")
          # Note: Need to make sure the first binary execution must complete successfully
          #  Otherwise (e.g. timeout) the root address will be wrong
-         for mutant in SEEDS] if SEEDS else ([b'\x00'*MAX_BYTES])
+         for mutant in SEEDS] if SEEDS else ([(b'\x00'*MAX_BYTES, "D")]
+                                             + [(b'\x01\x00\x00\x00'*(MAX_BYTES//4), "D")]
+                                             + [(b'\x0a', "D")] + TreeNode.random_fuzzing())
          # for mutant in SEEDS] if SEEDS else [b'\x0a']
          # for mutant in SEEDS] if SEEDS else TreeNode.random_fuzzing()
 
@@ -1109,7 +1052,7 @@ def simulation(node: TreeNode = None) -> List[List[int]]:
     return traces
 
 
-def binary_execute_parallel(input_bytes: bytes):
+def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     """
     Execute the binary with an input in bytes
     :param input_bytes: the input to feed the binary
@@ -1123,11 +1066,14 @@ def binary_execute_parallel(input_bytes: bytes):
                 for addr in struct.unpack_from('q', output, i * 8)]
 
     def execute():
+        global CONEX_TIMEOUT_COUNT
         instr = sp.Popen(INSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                          stderr=sp.PIPE, close_fds=True)
         msg = ret = None
+        # 0: no timeout; 1: instrumented binary timeout; 2: uninstrumented binary timeout
+        timeout = False
         try:
-            msg = instr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+            msg = instr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
             ret = instr.returncode
             instr.terminate()
             del instr
@@ -1136,14 +1082,16 @@ def binary_execute_parallel(input_bytes: bytes):
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
+            CONEX_TIMEOUT_COUNT += 1
             LOGGER.error("Instrumented Binary execution time out")
             instr.kill()
             del instr
             gc.collect()
+            timeout = True
             try:
                 uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
                                    stderr=sp.PIPE, close_fds=True)
-                msg = uninstr.communicate(input_bytes, timeout=CONEX_TIMEOUT)
+                msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
                 ret = uninstr.returncode
                 LOGGER.info("Uninstrumented binary execution completed")
                 uninstr.terminate()
@@ -1155,25 +1103,35 @@ def binary_execute_parallel(input_bytes: bytes):
                 del uninstr
                 gc.collect()
                 # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
-        return msg, ret
+        return msg, ret, timeout
+
+    global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT
 
     LOGGER.info("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
-    report_msg, return_code = report
-
-    completed = report != (None, None)
+    report_msg, return_code, time_out = report
+    completed = report != (None, None, True)
     traced = completed and report_msg[1]
     found_bug = False
 
+    if input_bytes[1] == "D":
+        SEED_IN_COUNT += 1
+    elif input_bytes[1] == "S":
+        SOL_GEN_COUNT += 1
+    elif input_bytes[1] == "F":
+        FUZ_GEN_COUNT += 1
+    elif input_bytes[1] == "R":
+        RND_GEN_COUNT += 1
+
     if (SAVE_TESTCASES or SAVE_TESTINPUTS) and completed:
         curr_time = time.time() - TIME_START
-        if SAVE_TESTCASES:
+        if SAVE_TESTCASES and (not time_out or SAVE_TESTCASES_TIMEOUT):
             stdout = report_msg[0].decode('utf-8')
-            save_tests_to_file(curr_time, stdout)
+            save_tests_to_file(curr_time, stdout, ("-T" if time_out else "-C")+("-"+input_bytes[1]))
         if SAVE_TESTINPUTS:
-            save_input_to_file(curr_time, input_bytes)
+            save_input_to_file(curr_time, input_bytes[0], ("-T" if time_out else "-C")+("-"+input_bytes[1]))
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
@@ -1271,7 +1229,7 @@ def propagate_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
-        # LOGGER.info("propagate_execution_trace")
+        LOGGER.info("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, new=is_new)
@@ -1303,10 +1261,10 @@ def propagate_execution_traces(traces: List[List[int]],
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
-def save_tests_to_file(time_stamp, data):
+def save_tests_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
-    with open('tests/{}/{}_{}.xml'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wt+') as input_file:
+    with open('tests/{}/{}_{}{}.xml'.format(
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wt+') as input_file:
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
@@ -1316,12 +1274,12 @@ def save_tests_to_file(time_stamp, data):
         input_file.write('</testcase>\n')
 
 
-def save_input_to_file(time_stamp, input_bytes):
+def save_input_to_file(time_stamp, input_bytes, suffix):
     # if DIR_NAME not in os.listdir('inputs'):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
-    with open('inputs/{}/{}_{}'.format(
-            DIR_NAME, time_stamp, SOLVING_COUNT), 'wb+') as input_file:
+    with open('inputs/{}/{}_{}{}'.format(
+            DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wb+') as input_file:
         input_file.write(input_bytes)
 
 
@@ -1419,6 +1377,10 @@ if __name__ == '__main__':
                         help='Compile with -m32 (override platform default)')
     parser.add_argument("--seeds", nargs='*',
                         help='Optional input seeds')
+    parser.add_argument("--save-tests-timeout", action="store_true",
+                        help="Also save inputs that triggers instrumented binary timeout "
+                             "in TEST-COMP xml files")
+
     args = parser.parse_args()
 
     MIN_SAMPLES = args.min_samples
@@ -1433,6 +1395,7 @@ if __name__ == '__main__':
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs
     SAVE_TESTCASES = args.save_tests
+    SAVE_TESTCASES_TIMEOUT = args.save_tests_timeout
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
@@ -1523,11 +1486,18 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
-    # if args.verbose:
-    #     cProfile.run('main()', sort='cumtime')
-    # else:
-    #     print(main())
-    print(main())
+    try:
+        if args.verbose:
+            cProfile.run('main()', sort='cumtime')
+        else:
+            print(main())
+    except:
+        print("Number of inputs from seed:", SEED_IN_COUNT)
+        print("Number of inputs from random:", RND_GEN_COUNT)
+        print("Number of inputs from solving:", SOL_GEN_COUNT)
+        print("Number of inputs from fuzzing:", FUZ_GEN_COUNT)
+        print("Number of symex timeout:", SYMEX_TIMEOUT_COUNT)
+        print("Number of conex timeout:", CONEX_TIMEOUT_COUNT)
 
 #    pdb.set_trace()
 

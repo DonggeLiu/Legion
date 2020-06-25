@@ -2,11 +2,11 @@ extern int __VERIFIER_nondet_int(void);
 
 
 unsigned int test(int x) {
-	if (x > 5) {
-	    x = 6;
+	if (x ==  5) {
+	    x = 0;
 	}
 	else{
-        x = 7;
+        x = 1;
 	}
 	return x;
 }
@@ -14,6 +14,6 @@ unsigned int test(int x) {
 
 int main(int argc, char * argv[]) {
 	int x = __VERIFIER_nondet_int();
-    test(x);
+	x = test(x);
 	return x;
 }

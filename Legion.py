@@ -1524,6 +1524,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
                         help='Maximum number of samples per iteration')
     parser.add_argument("--score", default=SCORE_FUN,
+                        choices=["uct", "random", "context"],
                         help='Which score function to use [uct,random,context]')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')

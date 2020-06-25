@@ -36,7 +36,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
 # Hyper-parameters
-MIN_SAMPLES = 1
+MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
 Cp = 1 / sqrt(2)
@@ -250,7 +250,7 @@ class TreeNode:
             score = random.uniform(0, 100)
         else:
             debug_assertion(SCORE_FUN == 'uct')
-            uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
+            uct_score = self.exploit_score() + self.explore_score()
             score = uct_score - TIME_COEFF * time_penalisation() \
                 if TIME_COEFF else uct_score
 
@@ -529,90 +529,7 @@ class TreeNode:
             parent = parent.parent
         return path[::-1]
 
-    def pp(self, indent: int = 0, mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
-        lines, _, _, _ = self.pp_lines()
-        for line in lines:
-            print(line)
-        lines, _, _, _ = self.pp_lines()
-
-        # self.pp_lines()
-
-    def pp_lines(self, mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
-
-            kids = list(self.children.values())
-            # kids = [kid for kid in kids if kid.colour is not Colour.G]
-
-            if not kids:
-                node = repr(self)
-                width = len(node) - 11
-                height = 1
-                middle = width // 2
-                return [node], width, height, middle
-
-            if len(kids) == 1:
-                lines, n, p, x = kids[0].pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x+1) * " " + (n-x-1) * "_" + s
-                second_line = x * " " + "/" + (n-x-1+u)*" "
-                shifted_lines = [line + u*" " for line in lines]
-                return [first_line, second_line] + shifted_lines, n+u, p+2, n+u//2
-
-            if len(kids) == 2:
-                kid0 = kids[0] if kids[1].colour is Colour.G else kids[1]
-                kid1 = kids[1] if kids[1].colour is Colour.G else kids[0]
-                left, n, p, x = kid0.pp_lines()
-                right, m, q, y = kid1.pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s + y * '_' + (m - y) * ' '
-                second_line = x * ' ' + '/' + (n - x - 1 + u + y) * ' ' + '\\' + (m - y - 1) * ' '
-                if p < q:
-                    left += [n * ' '] * (q - p)
-                elif q < p:
-                    right += [m * ' '] * (p - q)
-                zipped_lines = zip(left, right)
-                lines = [first_line, second_line] + [a + u * ' ' + b for a, b in zipped_lines]
-                return lines, n+m+u, max(p, q)+2, n+u//2
-
-            if len(self.children) == 3:
-                sim = None
-                for kid in kids:
-                    if kid.colour is Colour.G:
-                        sim = kid
-                        kids.remove(kid)
-                left, n, p, x = kids[0].pp_lines()
-                middle, o, r, z = kids[1].pp_lines()
-                right, m, q, y = sim.pp_lines()
-                s = repr(self)
-                u = len(s) - 11
-                first_line = (x + 1) * ' ' + (n - x - 1) * '_' + s + (o+y+u) * '_' + (m - y) * ' '
-                second_line = x * ' ' + '/' + (n - x - 1 + u + z) * ' ' + '|' + (o - z-1 + u + y)*' ' + '\\' + (m - y - 1) * ' '
-
-                if max(p, r, q) == p:
-                    middle += [o*' '] * (p-r)
-                    right += [m*' '] * (p-q)
-                elif max(p, r, q) == r:
-                    left += [n*' '] * (r-p)
-                    right += [m*' '] * (r-q)
-                elif max(p, r, q) == q:
-                    left += [n*''] * (q-p)
-                    middle += [o*' '] * (q-r)
-
-                # if not len(left) == len(middle) == len(right):
-                #     pdb.set_trace()
-
-                zipped_lines = zip(left, middle, right)
-                lines = [first_line, second_line] + [a + u * ' ' + b + u*' ' + c for a, b, c in zipped_lines]
-
-                # pdb.set_trace()
-                return lines, n+m+o+u*2, max(p, r, q)+2, n + u//2
-
-            else:
-                LOGGER.error("Too many children")
-                exit(1)
-
-    def pp_tree(self, indent: int = 0,
+    def pp(self, indent: int = 0,
            mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
         if LOGGER.level > logging.INFO and not forced:
             return
@@ -647,7 +564,8 @@ class TreeNode:
             + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
-        return "{uct:.2f}" \
+        return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
+               "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
             .format(uct=self.score(),
                     explore=self.exploit_score(),
                     exploit=self.explore_score(),
@@ -667,7 +585,7 @@ class TreeNode:
         return "{}".format(self.sim_state()) if self.sim_state() else "NoState"
 
     def __repr__(self) -> str:
-        return '\033[1;{colour}m{name}:{data}\033[0m' \
+        return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
             .format(colour=30 if self.colour is Colour.B else
                     35 if self.phantom else
                     31 if self.colour is Colour.R else
@@ -817,7 +735,7 @@ def selection() -> TreeNode:
     #     # return states
 
     def reach_symex_timeout() -> bool:
-        # LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
+        LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
     global SYMEX_TIME, SYMEX_TIMEOUT_COUNT, SYMEX_SUCCESS_COUNT
@@ -1080,12 +998,12 @@ def symex(state: State) -> List[State]:
     :return: the resulting state(s) of symbolic execution
     """
     # Note: Need to keep all successors?
-    # LOGGER.debug("computing successors for {}".format(state))
+    LOGGER.debug("computing successors for {}".format(state))
     if state is None:
         LOGGER.debug("No corresponding state found, any dynamic array allocation in the code?")
         return []
     successors = state.step().successors
-    # LOGGER.debug("Successors are: {}".format(successors))
+    LOGGER.debug("Successors are: {}".format(successors))
     return successors
 
 
@@ -1395,7 +1313,7 @@ def propagate_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
-        # LOGGER.info("propagate_execution_trace")
+        LOGGER.info("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, new=is_new)

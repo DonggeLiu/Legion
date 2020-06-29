@@ -286,7 +286,7 @@ class TreeNode:
             uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
             score = uct_score - TIME_COEFF * time_penalisation() \
                 if TIME_COEFF else uct_score
-        elif SCORE_FUN == 'context':
+        elif SCORE_FUN == 'contextual':
             context = self.context()
             A_inv = np.linalg.inv(self.A)
             estimated_reward = float(A_inv.dot(self.B).dot(context))
@@ -1524,8 +1524,8 @@ if __name__ == '__main__':
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,
                         help='Maximum number of samples per iteration')
     parser.add_argument("--score", default=SCORE_FUN,
-                        choices=["uct", "random", "context"],
-                        help='Which score function to use [uct,random,context]')
+                        choices=["uct", "random", "contextual"],
+                        help='Which score function to use [uct,random,contextual]')
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,

@@ -90,14 +90,18 @@ MSGS = []  # type: List
 TIMES = []  # type: List
 
 # Context of bandits
+# # Note:
+# #  1. sim_win / sel_try
+# #  2. sel_win / sel_try
+# #  3. sim_win / sim_try
+# #  4. simulation node or not
+# #  5. phantom node or not
+# #  6. parent sel_try
+# NUM_CONTEXT = 6
 # Note:
-#  1. sim_win / sel_try
-#  2. sel_win / sel_try
-#  3. sim_win / sim_try
-#  4. simulation node or not
-#  5. phantom node or not
-#  6. parent sel_try
-NUM_CONTEXT = 6
+#   1. sim_win / sel_try
+#   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+NUM_CONTEXT = 2
 DELTA = 0.9
 
 # cache Node
@@ -208,21 +212,26 @@ class TreeNode:
             if self.sim_state() else "No SimState"
 
     def context(self) -> np.array:
+        # # Note:
+        # #  1. sim_win / sel_try
+        # #  2. sel_win / sel_try
+        # #  3. sim_win / sim_try
+        # #  4. simulation node or not
+        # #  5. phantom node or not
+        #
+        # context1 = (self.sim_win / self.sel_try) if self.sel_try else INFINITY
+        # context2 = (self.sel_win / self.sel_try) if self.sel_try else INFINITY
+        # context3 = (self.sim_win / self.sim_try) if self.sim_try else INFINITY
+        # context4 = 1 if self.colour is Colour.G else 0
+        # context5 = 1 if self.colour is Colour.P else 0
+        # context6 = self.parent.sel_try if self.parent else self.sel_try
+        #
+        # context = [context1, context2, context3, context4, context5, context6]
+
         # Note:
-        #  1. sim_win / sel_try
-        #  2. sel_win / sel_try
-        #  3. sim_win / sim_try
-        #  4. simulation node or not
-        #  5. phantom node or not
-
-        context1 = (self.sim_win / self.sel_try) if self.sel_try else INFINITY
-        context2 = (self.sel_win / self.sel_try) if self.sel_try else INFINITY
-        context3 = (self.sim_win / self.sim_try) if self.sim_try else INFINITY
-        context4 = 1 if self.colour is Colour.G else 0
-        context5 = 1 if self.colour is Colour.P else 0
-        context6 = self.parent.sel_try if self.parent else self.sel_try
-
-        context = [context1, context2, context3, context4, context5, context6]
+        #   1. sim_win / sel_try
+        #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+        context = [self.explore_score(), self.exploit_score()]
         debug_assertion(len(context) == NUM_CONTEXT)
         return np.array(context)
 

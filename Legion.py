@@ -347,14 +347,14 @@ class TreeNode:
             #       testing out at once, in case it is a phantom
             return
 
-        LOGGER.info("Mark fully explored {}".format(self))
+        LOGGER.debug("Mark fully explored {}".format(self))
         self.fully_explored = True
 
         # if self.colour is Colour.G:
         #     self.parent.is_fully_explored() = True
 
         if self.colour is Colour.R and self is not ROOT:
-            LOGGER.info("Red parent Fully explored {}".format(self.children['Simulation']))
+            LOGGER.debug("Red parent Fully explored {}".format(self.children['Simulation']))
             self.children['Simulation'].fully_explored = True
 
         if self.parent:
@@ -366,7 +366,7 @@ class TreeNode:
         :return: a tree node
         """
 
-        LOGGER.info("Selecting from children: {}".format(self.children))
+        LOGGER.debug("Selecting from children: {}".format(self.children))
         # TODO: more elegant method, if time permitted
         max_score, candidates = -INFINITY, []  # type: float, List[TreeNode]
         for child in self.children.values():
@@ -497,8 +497,8 @@ class TreeNode:
 
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
-                LOGGER.info("Exhausted {}".format(self))
-                LOGGER.info("Fully explored {}".format(self))
+                LOGGER.debug("Exhausted {}".format(self))
+                LOGGER.debug("Fully explored {}".format(self))
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
@@ -664,7 +664,7 @@ def run() -> None:
 
 def initialisation():
     def init_angr():
-        LOGGER.info("Initialising ANGR Project")
+        LOGGER.debug("Initialising ANGR Project")
         return Project(thing=INSTR_BIN,
                        ignore_functions=['printf',
                                          '__trace_jump',
@@ -718,17 +718,17 @@ def initialisation():
 
         root = TreeNode(addr=main_addr)
         root.dye(colour=Colour.R, state=main_state)
-        LOGGER.info("ROOT created")
+        LOGGER.debug("ROOT created")
         return root
 
     global ROOT
-    LOGGER.info("Simulating on the seeded inputs")
+    LOGGER.debug("Simulating on the seeded inputs")
     traces, test_cases, test_inputs = simulation(node=None)
-    LOGGER.info("Initialising the ROOT")
+    LOGGER.debug("Initialising the ROOT")
     ROOT = init_root()
-    LOGGER.info("Expanding the tree with paths taken by seeded inputs")
+    LOGGER.debug("Expanding the tree with paths taken by seeded inputs")
     are_new = expansion(traces=traces)
-    LOGGER.info("Propagating the first results")
+    LOGGER.debug("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
     save_results_to_files(test_cases, test_inputs, are_new)
@@ -784,7 +784,7 @@ def selection() -> TreeNode:
     #     # return states
 
     def reach_symex_timeout() -> bool:
-        LOGGER.info("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
+        LOGGER.debug("symex time available: {}/{}".format(symex_time, SYMEX_TIMEOUT))
         return SYMEX_TIMEOUT and symex_time >= SYMEX_TIMEOUT
 
     global SYMEX_TIME, SYMEX_TIMEOUT_COUNT, SYMEX_SUCCESS_COUNT
@@ -809,7 +809,7 @@ def selection() -> TreeNode:
             try:
                 dye_siblings(child=node)  # Upon an exception, mark this node fully explored
             except Z3Exception:
-                LOGGER.info("Z3 exception occurred in symex, any type casting in program")
+                LOGGER.debug("Z3 exception occurred in symex, any type casting in program")
                 node.fully_explored = True
                 node.exhausted = True
                 node.parent.mark_fully_explored()
@@ -825,7 +825,7 @@ def selection() -> TreeNode:
             #     node.is_fully_explored() = True
 
         if reach_symex_timeout():
-            LOGGER.info(
+            LOGGER.debug(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
             node = last_red.children['Simulation']
             SYMEX_TIMEOUT_COUNT += 1
@@ -834,8 +834,8 @@ def selection() -> TreeNode:
             break
 
         if node.is_leaf():
-            LOGGER.info("Leaf reached before tree policy: {}".format(node))
-            LOGGER.info("Fully explored {}".format(node))
+            LOGGER.debug("Leaf reached before tree policy: {}".format(node))
+            LOGGER.debug("Fully explored {}".format(node))
             node.fully_explored = True
             if node.parent:
                 # NOTE: the if condition above makes sure there is parent to set
@@ -856,8 +856,8 @@ def selection() -> TreeNode:
             #   (assuming no trace is a prefix of another)
             #   Mark the red leaf fully explored and check its parent
             #   restart the selection from ROOT
-            LOGGER.info("Leaf reached after tree policy: {}".format(node))
-            LOGGER.info("Fully explored {}".format(node))
+            LOGGER.debug("Leaf reached after tree policy: {}".format(node))
+            LOGGER.debug("Fully explored {}".format(node))
             node.fully_explored = True
             node.parent.mark_fully_explored()
 
@@ -873,7 +873,7 @@ def selection() -> TreeNode:
             return ROOT
         # the node selected by tree policy should not be None
         debug_assertion(node is not None)
-        LOGGER.info("Select: {}".format(node))
+        LOGGER.debug("Select: {}".format(node))
 
     debug_assertion(node.colour is Colour.G)
 
@@ -940,7 +940,7 @@ def dye_siblings(child: TreeNode) -> None:
         # No state is found, no way to explore deeper on this path
         # Ideally, no diverging tree node should exist beneath the parent of the child.
         # hence mark the child fully explored, and trace back to ancestors
-        LOGGER.info("No state found: {}".format(child))
+        LOGGER.debug("No state found: {}".format(child))
         # if hex(child.addr)[-4:] == '0731':
         #     pdb.set_trace()
         child.fully_explored = True
@@ -1003,7 +1003,7 @@ def symex_to_match(target: TreeNode) -> List[State]:
         child_states = symex(state=child_states[0])
 
     if not child_states:
-        LOGGER.info("Symbolic execution reached the end of the program")
+        LOGGER.debug("Symbolic execution reached the end of the program")
 
     return child_states
 
@@ -1028,7 +1028,7 @@ def symex_to_addr(target: TreeNode, addr: int) -> List[State]:
         child_states = symex(state=child_states[0])
 
     if not child_states:
-        LOGGER.info("Symbolic execution reached the end of the program")
+        LOGGER.debug("Symbolic execution reached the end of the program")
 
     return child_states
 
@@ -1094,7 +1094,7 @@ def add_phantom(parent: TreeNode, state: State) -> None:
                      new_child=TreeNode(addr=state.addr, parent=parent))
     parent.children[state.addr].dye(colour=Colour.R, state=state)
     parent.children[state.addr].phantom = True
-    LOGGER.info("Add Phantom {} to {}".format(state, parent))
+    LOGGER.debug("Add Phantom {} to {}".format(state, parent))
 
 
 def simulation(node: TreeNode = None) \
@@ -1176,7 +1176,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             CONEX_TIMEOUT_COUNT += 1
             if COLLECT_STATISTICS:
                 print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
-            LOGGER.error("Instrumented Binary execution time out")
+            LOGGER.debug("Instrumented Binary execution time out")
             instr.kill()
             del instr
             gc.collect()
@@ -1193,7 +1193,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
                     del uninstr
                     gc.collect()
                 except sp.TimeoutExpired:
-                    LOGGER.error("Uninstrumented Binary execution time out")
+                    LOGGER.debug("Uninstrumented Binary execution time out")
                     uninstr.kill()
                     del uninstr
                     gc.collect()
@@ -1203,7 +1203,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
     global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
         MIN_TREE_DEPTH, MAX_TREE_DEPTH, SUM_TREE_DEPTH, CONEX_SUCCESS_COUNT
 
-    LOGGER.info("Simulating...")
+    LOGGER.debug("Simulating...")
     report = execute()
     debug_assertion(bool(report))
 
@@ -1248,9 +1248,9 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
 
     if return_code == BUG_RET:
         found_bug = not COVERAGE_ONLY
-        LOGGER.info("\n*******************"
-                    "\n***** EUREKA! *****"
-                    "\n*******************\n")
+        LOGGER.debug("\n*******************"
+                     "\n***** EUREKA! *****"
+                     "\n*******************\n")
     trace = unpack(report_msg[1]) if traced else None
 
     if not time_out:
@@ -1268,7 +1268,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
             trace if len(trace) < 7 else trace[:3] + ['...'] + trace[-3:])] \
             if traced else []
-        LOGGER.info("{} of {} addresses".format(trace_log, len(trace) if trace else 0))
+        LOGGER.debug("{} of {} addresses".format(trace_log, len(trace) if trace else 0))
 
     return (trace if trace else [ROOT.addr]), found_bug, testcase, testinput
 
@@ -1280,7 +1280,7 @@ def expansion(traces: List[List[int]]) -> List[bool]:
     :param traces: the traces to be integrated into the tree
     :return: a list of booleans representing whether each trace contribute to a new path
     """
-    LOGGER.info("Expansion Stage")
+    LOGGER.debug("Expansion Stage")
     return [integrate_path(trace=trace) for trace in traces]
 
 
@@ -1319,7 +1319,7 @@ def propagation(node: TreeNode, traces: List[List[int]],
     :param traces: the binary execution traces
     :param are_new: whether each of the execution traces is new
     """
-    LOGGER.info("Propagation Stage")
+    LOGGER.debug("Propagation Stage")
 
     propagate_context_selection_path(node=node, are_new=are_new)
     propagate_context_execution_traces(traces=traces, are_new=are_new)
@@ -1356,7 +1356,7 @@ def propagate_context_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
-        LOGGER.info("propagate_execution_trace")
+        LOGGER.debug("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, is_new=is_new)
@@ -1421,7 +1421,7 @@ def propagate_reward_execution_traces(traces: List[List[int]],
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """
-        LOGGER.info("propagate_execution_trace")
+        LOGGER.debug("propagate_execution_trace")
         debug_assertion(trace[0] == ROOT.addr)
         node = ROOT
         record_simulation(node=node, new=is_new)
@@ -1500,7 +1500,7 @@ def run_with_timeout() -> None:
 
     def raise_timeout(signum, frame):
         LOGGER.debug("Signum: {};\nFrame: {};".format(signum, frame))
-        LOGGER.info("{} seconds time out!".format(MAX_TIME))
+        LOGGER.debug("{} seconds time out!".format(MAX_TIME))
         raise TimeoutError
 
     assert MAX_TIME
@@ -1584,8 +1584,9 @@ if __name__ == '__main__':
                              'REDUCED: Only the inputs that found new paths without timeout;'
                              'TIMEOUT: Inputs that triggered timeout;'
                              'No flag: No input;')
-    parser.add_argument('-v', '--verbose', action="store_true",
-                        help='Increase output verbosity')
+    parser.add_argument('-v', '--verbose', default="ERROR",
+                        choices=["DEBUG", "INFO", "WARN", "ERROR"],
+                        help='Increase output verbosity: [DEBUG, INFO, WARN, ERROR]')
     parser.add_argument("-o", default=None,
                         help='Binary file output location when input is a C source')
     parser.add_argument("--cc", default="cc",
@@ -1622,13 +1623,16 @@ if __name__ == '__main__':
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
     PROFILE = args.profile
 
-    LOGGER.info('score function {}'.format(SCORE_FUN))
+    LOGGER.debug('score function {}'.format(SCORE_FUN))
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
 
-    if args.verbose:
-        LOGGER.setLevel(logging.DEBUG)
+    VERBOSITY_LEVELS = {"DEBUG": logging.DEBUG,
+                        "INFO": logging.INFO,
+                        "WARN": logging.WARN,
+                        "ERROR": logging.ERROR}
+    LOGGER.setLevel(VERBOSITY_LEVELS.get(args.verbose, "ERROR"))
 
     is_c = args.file[-2:] == '.c'
     is_i = args.file[-2:] == '.i'
@@ -1651,7 +1655,7 @@ if __name__ == '__main__':
             if args.o:
                 LOGGER.warning("--compile make overrides -o INSTR_BIN")
             INSTR_BIN = stem + ".instr"
-            LOGGER.info('Making {}'.format(INSTR_BIN))
+            LOGGER.debug('Making {}'.format(INSTR_BIN))
             sp.run(["make", "-B", INSTR_BIN, "MAX_TRACE_LEN={}".format(TREE_DEPTH_LIMIT)])
         elif args.compile == "svcomp":
             if not args.o:
@@ -1675,7 +1679,7 @@ if __name__ == '__main__':
                 INSTR_BIN = args.o
             else:
                 INSTR_BIN = stem
-            LOGGER.info('Compiling {} with trace-cc'.format(INSTR_BIN))
+            LOGGER.debug('Compiling {} with trace-cc'.format(INSTR_BIN))
             sp.run(["./trace-cc", "-static", "-L.", "-legion", "-o", INSTR_BIN, source])
         else:
             LOGGER.error("Invalid compilation mode: {}".format(args.compile))

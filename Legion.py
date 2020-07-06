@@ -297,10 +297,10 @@ class TreeNode:
                 if TIME_COEFF else uct_score
         elif SCORE_FUN == 'contextual':
             context = self.context()
-            A_inv = np.linalg.inv(self.A)
-            estimated_reward = float(A_inv.dot(self.B).dot(context))
-            X = np.dot(np.dot(context, A_inv), np.array([context]).T)
-            uncertainty = float(self.alpha * np.sqrt(X))
+            a_inv = np.linalg.inv(self.A)
+            estimated_reward = float(a_inv.dot(self.B).dot(context))
+            x = np.dot(np.dot(context, a_inv), np.array([context]).T)
+            uncertainty = float(self.alpha * np.sqrt(x))
             score = estimated_reward + uncertainty
         else:
             score = -INFINITY
@@ -1232,14 +1232,14 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             print("Random count: {}".format(RND_GEN_COUNT))
 
     # Record the test case
-    testcase = testinput = None
+    test_case = test_input = None
     curr_time = time.time() - TIME_START
     if SAVE_TESTCASES and not time_out:
-        testcase = (curr_time, report_msg[0].decode('utf-8'),
-                    ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
-    if SAVE_TESTINPUTS:
-        testinput = (curr_time, input_bytes[0],
+        test_case = (curr_time, report_msg[0].decode('utf-8'),
                      ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
+    if SAVE_TESTINPUTS:
+        test_input = (curr_time, input_bytes[0],
+                      ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
     if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
         save_test_to_file(curr_time, report_msg[0].decode('utf-8'),
@@ -1272,7 +1272,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             if traced else []
         LOGGER.debug("{} of {} addresses".format(trace_log, len(trace) if trace else 0))
 
-    return (trace if trace else [ROOT.addr]), found_bug, testcase, testinput
+    return (trace if trace else [ROOT.addr]), found_bug, test_case, test_input
 
 
 def expansion(traces: List[List[int]]) -> List[bool]:
@@ -1315,7 +1315,7 @@ def integrate_path(trace: List[int]) -> bool:
 def propagation(node: TreeNode, traces: List[List[int]],
                 are_new: List[bool]) -> None:
     """
-    The propagration step of MCTS.
+    The propagation step of MCTS.
     Propagate the results to the selection path and each execution trace
     :param node: the node selected by selection step
     :param traces: the binary execution traces
@@ -1344,8 +1344,8 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
         node = node.parent
 
 
-def propagate_context_execution_traces(traces: List[List[int]],
-                                      are_new: List[bool]) -> None:
+def propagate_context_execution_traces(
+        traces: List[List[int]], are_new: List[bool]) -> None:
     """
     Forward propagate the results to all execution traces correspondingly
     :param traces: the binary execution traces
@@ -1354,7 +1354,7 @@ def propagate_context_execution_traces(traces: List[List[int]],
 
     def propagate_execution_trace(trace: List[int], is_new: bool) -> None:
         """
-        Forward propagate the results to all execution traces correspondingly
+        Forward propagate the change to matrix to all execution traces correspondingly
         :param trace: the binary execution trace
         :param is_new: whether the execution trace is new
         """

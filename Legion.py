@@ -1159,17 +1159,6 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
         try:
             msg = instr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
             ret = instr.returncode
-            instr.terminate()
-            del instr
-            gc.collect()
-            LOGGER.info("Instrumented binary execution completed")
-            end_conex = time.time()
-            CONEX_TIME += end_conex - start_conex
-            CONEX_SUCCESS_COUNT += 1
-            if COLLECT_STATISTICS:
-                print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
-                print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
-                print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         except sp.TimeoutExpired:
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
@@ -1183,21 +1172,34 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             timeout = True
 
             if "TIMEOUT" in SAVE_TESTCASES + SAVE_TESTINPUTS:
+                uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
+                                   stderr=sp.PIPE, close_fds=True)
                 try:
-                    uninstr = sp.Popen(UNINSTR_BIN, stdin=sp.PIPE, stdout=sp.PIPE,
-                                       stderr=sp.PIPE, close_fds=True)
                     msg = uninstr.communicate(input_bytes[0], timeout=CONEX_TIMEOUT)
                     ret = uninstr.returncode
-                    LOGGER.info("Uninstrumented binary execution completed")
-                    uninstr.terminate()
-                    del uninstr
-                    gc.collect()
                 except sp.TimeoutExpired:
                     LOGGER.debug("Uninstrumented Binary execution time out")
                     uninstr.kill()
                     del uninstr
                     gc.collect()
                     # print(int.from_bytes(input_bytes[:4], 'little', signed=True))
+                else:
+                    LOGGER.debug("Uninstrumented binary execution completed")
+                    uninstr.terminate()
+                    del uninstr
+                    gc.collect()
+        else:
+            instr.terminate()
+            del instr
+            gc.collect()
+            LOGGER.debug("Instrumented binary execution completed")
+            end_conex = time.time()
+            CONEX_TIME += end_conex - start_conex
+            CONEX_SUCCESS_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
+                print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
+                print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
         return msg, ret, timeout
 
     global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \

@@ -244,6 +244,17 @@ class TreeNode:
             return INFINITY
         return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
+    def estimated_score(self) -> float:
+        context = self.context()
+        a_inv = np.linalg.inv(self.A)
+        return float(a_inv.dot(self.B).dot(context))
+
+    def uncertainty(self) -> float:
+        context = self.context()
+        a_inv = np.linalg.inv(self.A)
+        x = np.dot(np.dot(context, a_inv), np.array([context]).T)
+        return float(self.alpha * np.sqrt(x))
+
     def score(self) -> float:
 
         def time_penalisation() -> float:

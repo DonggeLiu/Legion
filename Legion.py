@@ -627,8 +627,19 @@ class TreeNode:
                         selt=self.sel_try,
                         pselt=self.parent.sel_try if self.parent else None,
                         simt=self.sim_try)
-        else:
-            return "{:.2f}".format(self.score())
+
+        elif SCORE_FUN == 'contextual':
+            # bound =
+            # pdb.set_trace()
+            return "{score:.2f}: {estimate:.2f} + {uncertainty:.2f} ({bound:.2f})".format(
+                score=self.score(),
+                # coeff=float(np.linalg.inv(self.A).dot(self.B)),
+                # context=self.context(),
+                estimate=self.estimated_score(),
+                uncertainty=self.uncertainty(),
+                alpha=self.alpha,
+                bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)), np.array([self.context()]).T)))
+            ) + str(np.linalg.inv(self.A).dot(self.B)) + " " + str(self.context())
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
         #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \

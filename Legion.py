@@ -122,6 +122,15 @@ class Colour(enum.Enum):
     B = 'Black'
     P = 'Purple'
 
+    @staticmethod
+    def format_colour(node_colour: 'Colour') -> int:
+        return 30 if node_colour is Colour.B else \
+            35 if node_colour is Colour.P else \
+            31 if node_colour is Colour.R else \
+            33 if node_colour is Colour.G else \
+            37 if node_colour is Colour.W else \
+            32
+
 
 # TreeNode:
 class TreeNode:
@@ -621,15 +630,19 @@ class TreeNode:
         return "{}".format(self.sim_state()) if self.sim_state() else "NoState"
 
     def __repr__(self) -> str:
-        return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
-            .format(colour=30 if self.colour is Colour.B else
-                    35 if self.phantom else
-                    31 if self.colour is Colour.R else
-                    33 if self.colour is Colour.G else
-                    37 if self.colour is Colour.W else 32,
+        return '\033[1;{colour}m{name}: {data}\033[0m' \
+            .format(colour=Colour.format_colour(self.colour),
                     name=self.repr_node_name(),
-                    state=self.repr_node_state(),
                     data=self.repr_node_data())
+        # return '\033[1;{colour}m{name}: {data}, {state}\033[0m' \
+        #     .format(colour=30 if self.colour is Colour.B else
+        #             35 if self.phantom else
+        #             31 if self.colour is Colour.R else
+        #             33 if self.colour is Colour.G else
+        #             37 if self.colour is Colour.W else 32,
+        #             name=self.repr_node_name(),
+        #             state=self.repr_node_state(),
+        #             data=self.repr_node_data())
 
 
 ROOT = TreeNode()

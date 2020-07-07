@@ -1355,7 +1355,7 @@ def propagation(node: TreeNode, traces: List[List[int]],
     LOGGER.debug("Propagation Stage")
 
     propagate_context_selection_path(node=node, are_new=are_new)
-    propagate_context_execution_traces(traces=traces, are_new=are_new)
+    # propagate_context_execution_traces(traces=traces, are_new=are_new)
     propagate_reward_selection_path(node=node, are_new=are_new)
     propagate_reward_execution_traces(traces=traces, are_new=are_new)
 

@@ -1473,7 +1473,7 @@ def propagate_reward_execution_traces(traces: List[List[int]],
     def record_simulation(node: TreeNode, new: bool) -> None:
         """
         Record a node has been traversed in simulation
-        NOTE: increment the statistics of its simulation child as welll
+        NOTE: increment the statistics of its simulation child as well
             otherwise it will always have sim_try = 0
         :param node: the node to record
         :param new: whether the node contributes to the discovery of a new path

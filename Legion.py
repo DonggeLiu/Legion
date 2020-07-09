@@ -101,7 +101,8 @@ TIMES = []  # type: List
 # Note:
 #   1. sim_win / sel_try
 #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
-NUM_CONTEXT = 2
+#   3. offset, which always equals to 1
+NUM_CONTEXT = 3
 DELTA = 0.9
 
 # cache Node
@@ -231,7 +232,8 @@ class TreeNode:
         # Note:
         #   1. sim_win / sel_try
         #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
-        context = [self.explore_score(), self.exploit_score()]
+        #   3. offset, which always equals to 1
+        context = [self.explore_score(), self.exploit_score(), 1]
         debug_assertion(len(context) == NUM_CONTEXT)
         return np.array(context)
 

@@ -1389,7 +1389,7 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     # Reward the simulation node selected for findings as well
     while node:
         for is_new in are_new:
-            node.A += node.context().T.dot(node.context())
+            node.A += np.outer(node.context(), node.context())
             node.B += np.array(is_new).dot(node.context())[0]
         node = node.parent
 

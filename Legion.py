@@ -234,7 +234,7 @@ class TreeNode:
         #   1. sim_win / sel_try
         #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
         #   3. offset, which always equals to 1
-        context = [self.explore_score(), self.exploit_score(), 1]
+        context = [1, self.exploit_score(), self.explore_score()]
         debug_assertion(len(context) == NUM_CONTEXT)
         return np.array(context)
 
@@ -319,11 +319,8 @@ class TreeNode:
             score = uct_score - TIME_COEFF * time_penalisation() \
                 if TIME_COEFF else uct_score
         elif SCORE_FUN == 'contextual':
-            context = self.context()
-            a_inv = np.linalg.inv(self.A)
-            estimated_reward = float(a_inv.dot(self.B).dot(context))
-            x = np.dot(np.dot(context, a_inv), np.array([context]).T)
-            uncertainty = float(self.alpha * np.sqrt(x))
+            estimated_reward = self.estimated_score()
+            uncertainty = self.uncertainty()
             score = estimated_reward + uncertainty
         else:
             score = -INFINITY

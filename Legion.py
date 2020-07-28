@@ -104,7 +104,7 @@ TIMES = []  # type: List
 #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 #   3. offset, which always equals to 1
 NUM_CONTEXT = 3
-DELTA = 0.9
+DELTA = 0.1
 
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None

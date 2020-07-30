@@ -2,8 +2,8 @@
 .global __trace_jump_set
 
 __trace_jump_set:
-    mov    _state@GOTPCREL(%rip), %rax   # rax = &state
-	movl   $0, (%rax)                    # *rax = 0
+    mov    _state@GOTPCREL(%rip), %rax  # rax = &state
+	movl   $0, (%rax)                   # *rax = 0
 	retq
        
 __trace_jump:

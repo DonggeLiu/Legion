@@ -32,7 +32,7 @@ Legion relies on Approximate-path-preserving fuzzing, which is implemented withi
 
 ### Command
 
-```python3
+```shell
 python3 Legion.py <program_under_test.c>
 ````
 

@@ -19,6 +19,24 @@ During the recent years, a main open challenge that have ben studied in coverage
 ### Third contribution
 Moreover, while most existing fuzzing frameworks are designed for specific metrics, Legion adopts a modularised score function to avoid suffering from degraded performance on other metrics of interests.
 
+## How to run
+
+```python3
+python3 Legion.py <program_under_test.c>
+````
+
+### Hyper-parameters & Optional flags
+
+1. Tree depth, e.g. `--tree-depth-limit 100`;
+2. Exploration factor (rho), e.g. `--rho 0.0025`;
+3. Number of cores, e.g. `--core 1`;
+4. Symbolic execution timeout (in seconds, 0 means no limitation), e.g. `--symex-timeout 0`;
+5. Concrete execution timeout (in seconds, 0 means no limitation), e.g. `--conex-timeout 0`;
+6. Minimum number of simulations in each iteration, e.g. `--min-samples`;
+6. Keep running after finding bugs, `--coverage-only`;
+7. Keep running after the tree is fully explored (in case of symbolic execution error, such as eager concretisation), e.g. `--persistent`;
+8. Score function, e.g. `--score=uct`
+
 
 ## Collaborators
 

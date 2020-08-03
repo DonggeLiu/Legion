@@ -21,11 +21,22 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 
 ## How to run
 
+### Dependencies
+
+Legion relies on Approximate-path-preserving fuzzing, which is implemented within the following two `pip3` pacakges:
+
+[Our fork of angr](https://github.com/Alan32Liu/angr)
+
+[Our fork of claripy](https://github.com/Alan32Liu/claripy)
+
+
+### Command
+
 ```python3
 python3 Legion.py <program_under_test.c>
 ````
 
-### Hyper-parameters & Optional flags
+#### Hyper-parameters & Optional flags
 
 1. Tree depth, e.g. `--tree-depth-limit 100`;
 2. Exploration factor (rho), e.g. `--rho 0.0025`;

@@ -35,7 +35,7 @@ Note that `claripy` should be installed before `angr` to avoid conflicts.
 ### Command
 
 ```shell
-python3 Legion.py <program_under_test.c>
+python3 Legion.py <flags> <program_under_test.c> 
 ````
 
 #### Hyper-parameters & Optional flags

@@ -25,9 +25,11 @@ Moreover, while most existing fuzzing frameworks are designed for specific metri
 
 Legion relies on Approximate-path-preserving fuzzing, which is implemented within the following two `pip3` pacakges:
 
+[Our fork of claripy](https://github.com/Alan32Liu/claripy)
+
 [Our fork of angr](https://github.com/Alan32Liu/angr)
 
-[Our fork of claripy](https://github.com/Alan32Liu/claripy)
+Note that `claripy` should be installed before `angr` to avoid conflicts.
 
 
 ### Command

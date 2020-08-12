@@ -1,0 +1,2 @@
+#!/bin/sh
+sed "s/RUNDATE/$1/g" testcov.xml.template > testcov.xml

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for a in test/results/$1.files/*/
+do
+	(cd $a; mv *.zip test-suite.zip)
+done

@@ -1,5 +1,13 @@
 #!/bin/sh
 
-# make zips
-sed "s/RUNDATE/$1/g" tbf.xml.template > tbf.xml
-/home/ernst/workspace/cpachecker/scripts/benchmark.py --cloudPriority URGENT --read-only-dir / --cloud --cloudMaster localhost --cloudClientHeap 8000 tbf.xml
+SRC=$1
+shift
+
+./rename $SRC
+./fix-testcov $SRC
+
+cd ../testcov
+echo ../cpachecker/scripts/benchmark.py --zipResultFiles --cloudClientHeap 8000 --read-only-dir / --no-container --cloud --cloudMaster vcloud-master.sosy-lab.org -r test-comp20_prop-coverage-branches $@ ../legion/testcov.xml
+../cpachecker/scripts/benchmark.py --zipResultFiles --cloudClientHeap 8000 --read-only-dir / --no-container --cloud --cloudMaster vcloud-master.sosy-lab.org -r test-comp20_prop-coverage-branches $@ ../legion/testcov.xml
+
+ls ../legion/test/results/$SRC*.xml.bz2

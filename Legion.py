@@ -9,7 +9,7 @@ import gc
 import logging
 import numpy as np
 import os
-# import pdb
+import pdb
 import random
 import signal
 import struct
@@ -1422,7 +1422,7 @@ def propagate_context_execution_traces(
     def record_simulation(node: TreeNode, is_new: bool) -> None:
         """
         Record a node has been traversed in simulation
-        NOTE: increment the statistics of its simulation child as welll
+        NOTE: increment the statistics of its simulation child as well
             otherwise it will always have sim_try = 0
         :param node: the node to record
         :param is_new: whether the node contributes to the discovery of a new path

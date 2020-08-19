@@ -447,15 +447,17 @@ class TreeNode:
                 result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
                 method = "F"
-            except Z3Exception:
+            except Z3Exception as e:
                 # NOTE: In case of z3.z3types.Z3Exception: b'maximization suspended'
                 # TODO: May have a better way to solve this, e.g. redo sampling?
-                LOGGER.info("Exhausted {}".format(self))
-                LOGGER.info("Fully explored {}".format(self))
-                self.fully_explored = True
-                self.exhausted = True
-                self.parent.exhausted = True
-                break
+                LOGGER.warning("Z3Exception in APPF: {}".format(e))
+                LOGGER.info("Redo APPF sampling")
+                # LOGGER.info("Exhausted {}".format(self))
+                # LOGGER.info("Fully explored {}".format(self))
+                # self.fully_explored = True
+                # self.exhausted = True
+                # self.parent.exhausted = True
+                # break
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:

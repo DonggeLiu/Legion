@@ -74,6 +74,13 @@ MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
 CONSTRAINT_SOLVING_TIME = 0
 CONSTRAINT_SOLVING_COUNT = 0
+APPF_1 = 0
+APPF_2 = 0
+APPF_3 = 0
+APPF_4 = 0
+APPF_5 = 0
+APPF_NEW = 0
+SOLV_NEW = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -683,13 +690,31 @@ def initialisation():
         LOGGER.info("ROOT created")
         return root
 
-    global ROOT
+    global ROOT, APPF_1, APPF_2, APPF_3, APPF_4, APPF_5, APPF_NEW, SOLV_NEW
     LOGGER.info("Simulating on the seeded inputs")
     traces, test_cases, test_inputs = simulation(node=None)
     LOGGER.info("Initialising the ROOT")
     ROOT = init_root()
     LOGGER.info("Expanding the tree with paths taken by seeded inputs")
     are_new = expansion(traces=traces)
+    if COLLECT_STATISTICS:
+        # NOTE: Only accurate when using 1 sample per simulation
+        #   A better/more sophisticated way is to label each input at generation
+        #   and check if they are new at here
+        APPF_1 += 1 if len(are_new) == 1 else 0
+        APPF_2 += 1 if len(are_new) == 2 else 0
+        APPF_3 += 1 if len(are_new) == 3 else 0
+        APPF_4 += 1 if len(are_new) == 4 else 0
+        APPF_5 += 1 if len(are_new) == 5 else 0
+        APPF_NEW += sum(are_new[1:])
+        SOLV_NEW += are_new[0]
+        print("APPF_1: {}".format(APPF_1))
+        print("APPF_2: {}".format(APPF_2))
+        print("APPF_3: {}".format(APPF_3))
+        print("APPF_4: {}".format(APPF_4))
+        print("APPF_5: {}".format(APPF_5))
+        print("APPF_NEW: {}".format(APPF_NEW))
+        print("SOLV_NEW: {}".format(SOLV_NEW))
     LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)

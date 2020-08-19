@@ -72,6 +72,8 @@ CONEX_SUCCESS_COUNT = 0
 MIN_TREE_DEPTH = inf
 MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
+CONSTRAINT_SOLVING_TIME = 0
+CONSTRAINT_SOLVING_COUNT = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -382,8 +384,17 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
+        global CONSTRAINT_SOLVING_TIME, CONSTRAINT_SOLVING_COUNT
         if self.state and self.state.solver.constraints:
+            constraint_solving_start = time.time()
             results = self.app_fuzzing()
+            constraint_solving_end = time.time()
+            CONSTRAINT_SOLVING_TIME += \
+                constraint_solving_end - constraint_solving_start
+            CONSTRAINT_SOLVING_COUNT += 1
+            if COLLECT_STATISTICS:
+                print("AVERAGE CONSTRAINT SOLVING TIME: {}".format(
+                    CONSTRAINT_SOLVING_TIME/CONSTRAINT_SOLVING_COUNT))
             return results
         return self.random_fuzzing()
 

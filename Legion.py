@@ -452,6 +452,7 @@ class TreeNode:
                 # TODO: May have a better way to solve this, e.g. redo sampling?
                 LOGGER.info("Exhausted {}".format(self))
                 LOGGER.info("Fully explored {}".format(self))
+                #import pdb; pdb.set_trace()
                 self.fully_explored = True
                 self.exhausted = True
                 self.parent.exhausted = True
@@ -736,11 +737,31 @@ def mcts():
     """
     The four steps of MCTS
     """
+    global APPF_1, APPF_2, APPF_3, APPF_4, APPF_5, APPF_NEW, SOLV_NEW
     node = selection()
     if node is ROOT:
         return
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
+    if COLLECT_STATISTICS:
+        # NOTE: Only accurate when using 1 sample per simulation
+        #   A better/more sophisticated way is to label each input at generation
+        #   and check if they are new at here
+        APPF_1 += 1 if len(are_new) == 1 else 0
+        APPF_2 += 1 if len(are_new) == 2 else 0
+        APPF_3 += 1 if len(are_new) == 3 else 0
+        APPF_4 += 1 if len(are_new) == 4 else 0
+        APPF_5 += 1 if len(are_new) == 5 else 0
+        APPF_NEW += sum(are_new[1:])
+        SOLV_NEW += are_new[0]
+        print("APPF_1: {}".format(APPF_1))
+        print("APPF_2: {}".format(APPF_2))
+        print("APPF_3: {}".format(APPF_3))
+        print("APPF_4: {}".format(APPF_4))
+        print("APPF_5: {}".format(APPF_5))
+        print("APPF_NEW: {}".format(APPF_NEW))
+        print("SOLV_NEW: {}".format(SOLV_NEW))
+
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))

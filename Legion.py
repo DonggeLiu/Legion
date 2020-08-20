@@ -72,15 +72,16 @@ CONEX_SUCCESS_COUNT = 0
 MIN_TREE_DEPTH = inf
 MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
-CONSTRAINT_SOLVING_TIME = 0
-CONSTRAINT_SOLVING_COUNT = 0
-APPF_1 = 0
-APPF_2 = 0
-APPF_3 = 0
-APPF_4 = 0
-APPF_5 = 0
-APPF_NEW = 0
+SOLV_TIME = 0
+APPF_TIME = 0
+RAND_TIME = 0
+SOLV_COUNT = 0
+APPF_COUNT = 0
+RAND_COUNT = 0
 SOLV_NEW = 0
+APPF_NEW = 0
+RAND_NEW = 0
+SOLV_EXP = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -391,17 +392,8 @@ class TreeNode:
         return len(self.children) > ('Simulation' in self.children) + 1
 
     def mutate(self):
-        global CONSTRAINT_SOLVING_TIME, CONSTRAINT_SOLVING_COUNT
         if self.state and self.state.solver.constraints:
-            constraint_solving_start = time.time()
             results = self.app_fuzzing()
-            constraint_solving_end = time.time()
-            CONSTRAINT_SOLVING_TIME += \
-                constraint_solving_end - constraint_solving_start
-            CONSTRAINT_SOLVING_COUNT += 1
-            if COLLECT_STATISTICS:
-                print("AVERAGE CONSTRAINT SOLVING TIME: {}".format(
-                    CONSTRAINT_SOLVING_TIME/CONSTRAINT_SOLVING_COUNT))
             return results
         return self.random_fuzzing()
 
@@ -413,6 +405,7 @@ class TreeNode:
             """
             return (target.size() + 7) // 8
 
+        global SOLV_EXP, SOLV_TIME, SOLV_COUNT, APPF_EXP, APPF_TIME, APPF_COUNT
         # Note: Once we fuzz a simulation child,
         #   its parent is no longer a phantom
         #   This is important as we do not mark phantom fully explored
@@ -436,7 +429,22 @@ class TreeNode:
         method = "S"
         while len(results) < MAX_SAMPLES:
             try:
+                start = time.time()
+
                 val = next(self.samples)
+
+                end = time.time()
+                if method == "S":
+                    SOLV_COUNT += 1
+                    SOLV_TIME += (end-start)
+                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT))
+                    print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                elif method == "F":
+                    APPF_COUNT += 1
+                    APPF_TIME += (end-start)
+                    print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
+                    print("APPF_COUNT: {}".format(APPF_COUNT))
+
                 if val is None and len(results) >= MIN_SAMPLES:
                     # next val requires constraint solving and enough results
                     break
@@ -452,6 +460,19 @@ class TreeNode:
                 # TODO: May have a better way to solve this, e.g. redo sampling?
                 LOGGER.warning("Z3Exception in APPF: {}".format(e))
                 LOGGER.info("Redo APPF sampling")
+
+                end = time.time()
+                if method == "S":
+                    SOLV_EXCEPTION += 1
+                    SOLV_TIME += (end-start)
+                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                    print("SOLV_EXCPTION: {}".format(SOLV_EXCEPTION))
+                elif method == "F":
+                    APPF_EXCEPTION += 1
+                    APPF_TIME += (end-start)
+                    print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                    print("APPF_EXCPTION: {}".format(APPF_EXCEPTION))
+
                 # LOGGER.info("Exhausted {}".format(self))
                 # LOGGER.info("Fully explored {}".format(self))
                 # self.fully_explored = True
@@ -472,6 +493,18 @@ class TreeNode:
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
 
+                end = time.time()
+                if method == "S":
+                    SOLV_COUNT += 1
+                    SOLV_TIME += (end-start)
+                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                    print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                elif method == "F":
+                    APOF_COUNT += 1
+                    APPF_TIME += (end-start)
+                    print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                    print("APPF_COUNT: {}".format(SOLV_COUNT))
+ 
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
                 LOGGER.info("Exhausted {}".format(self))
@@ -501,12 +534,20 @@ class TreeNode:
     @staticmethod
     def random_fuzzing() -> List[Tuple[bytes, str]]:
         def random_bytes():
+            global RAND_TIME, RAND_COUNT
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
             # input_bytes = b''
             # for _ in range(MAX_BYTES):
             #     input_bytes += os.urandom(1)
             # return input_bytes
             # Or return end of file char?
+            start = time.time()
+            random_bytes = os.urandom(MAX_BYTES)
+            end = time.time()
+            RAND_COUNT += 1
+            RAND_TIME += (end-start)
+            print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
+            print("RAND_COUNT: {}".format(RAND_COUNT))
             return os.urandom(MAX_BYTES)
 
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
@@ -692,31 +733,13 @@ def initialisation():
         LOGGER.info("ROOT created")
         return root
 
-    global ROOT, APPF_1, APPF_2, APPF_3, APPF_4, APPF_5, APPF_NEW, SOLV_NEW
+    global ROOT
     LOGGER.info("Simulating on the seeded inputs")
     traces, test_cases, test_inputs = simulation(node=None)
     LOGGER.info("Initialising the ROOT")
     ROOT = init_root()
     LOGGER.info("Expanding the tree with paths taken by seeded inputs")
     are_new = expansion(traces=traces)
-    if COLLECT_STATISTICS:
-        # NOTE: Only accurate when using 1 sample per simulation
-        #   A better/more sophisticated way is to label each input at generation
-        #   and check if they are new at here
-        APPF_1 += 1 if len(are_new) == 1 else 0
-        APPF_2 += 1 if len(are_new) == 2 else 0
-        APPF_3 += 1 if len(are_new) == 3 else 0
-        APPF_4 += 1 if len(are_new) == 4 else 0
-        APPF_5 += 1 if len(are_new) == 5 else 0
-        APPF_NEW += sum(are_new[1:])
-        SOLV_NEW += are_new[0]
-        print("APPF_1: {}".format(APPF_1))
-        print("APPF_2: {}".format(APPF_2))
-        print("APPF_3: {}".format(APPF_3))
-        print("APPF_4: {}".format(APPF_4))
-        print("APPF_5: {}".format(APPF_5))
-        print("APPF_NEW: {}".format(APPF_NEW))
-        print("SOLV_NEW: {}".format(SOLV_NEW))
     LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
@@ -738,30 +761,27 @@ def mcts():
     """
     The four steps of MCTS
     """
-    global APPF_1, APPF_2, APPF_3, APPF_4, APPF_5, APPF_NEW, SOLV_NEW
+    global SOLV_NEW, APPF_NEW, RAND_NEW
     node = selection()
     if node is ROOT:
         return
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
     if COLLECT_STATISTICS:
+        for i in range(len(are_new)):
+            if test_cases[i][-1][-1] == "R":
+                RAND_NEW += are_new[i]
+            if test_cases[i][-1][-1] == "S":
+                SOLV_NEW += are_new[i]
+            if test_cases[i][-1][-1] == "F":
+                APPF_NEW += are_new[i]
+
         # NOTE: Only accurate when using 1 sample per simulation
         #   A better/more sophisticated way is to label each input at generation
         #   and check if they are new at here
-        APPF_1 += 1 if len(are_new) == 1 else 0
-        APPF_2 += 1 if len(are_new) == 2 else 0
-        APPF_3 += 1 if len(are_new) == 3 else 0
-        APPF_4 += 1 if len(are_new) == 4 else 0
-        APPF_5 += 1 if len(are_new) == 5 else 0
-        APPF_NEW += sum(are_new[1:])
-        SOLV_NEW += are_new[0]
-        print("APPF_1: {}".format(APPF_1))
-        print("APPF_2: {}".format(APPF_2))
-        print("APPF_3: {}".format(APPF_3))
-        print("APPF_4: {}".format(APPF_4))
-        print("APPF_5: {}".format(APPF_5))
-        print("APPF_NEW: {}".format(APPF_NEW))
+        print("RAND_NEW: {}".format(RAND_NEW))
         print("SOLV_NEW: {}".format(SOLV_NEW))
+        print("APPF_NEW: {}".format(APPF_NEW))
 
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)

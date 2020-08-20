@@ -82,6 +82,7 @@ SOLV_NEW = 0
 APPF_NEW = 0
 RAND_NEW = 0
 SOLV_EXP = 0
+APPF_EXP = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -429,21 +430,23 @@ class TreeNode:
         method = "S"
         while len(results) < MAX_SAMPLES:
             try:
-                start = time.time()
+                if COLLECT_STATISTICS:
+                    start = time.time()
 
                 val = next(self.samples)
 
-                end = time.time()
-                if method == "S":
-                    SOLV_COUNT += 1
-                    SOLV_TIME += (end-start)
-                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT))
-                    print("SOLV_COUNT: {}".format(SOLV_COUNT))
-                elif method == "F":
-                    APPF_COUNT += 1
-                    APPF_TIME += (end-start)
-                    print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
-                    print("APPF_COUNT: {}".format(APPF_COUNT))
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_COUNT += 1
+                        SOLV_TIME += (end - start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT))
+                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                    elif method == "F":
+                        APPF_COUNT += 1
+                        APPF_TIME += (end-start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
+                        print("APPF_COUNT: {}".format(APPF_COUNT))
 
                 if val is None and len(results) >= MIN_SAMPLES:
                     # next val requires constraint solving and enough results
@@ -460,18 +463,18 @@ class TreeNode:
                 # TODO: May have a better way to solve this, e.g. redo sampling?
                 LOGGER.warning("Z3Exception in APPF: {}".format(e))
                 LOGGER.info("Redo APPF sampling")
-
-                end = time.time()
-                if method == "S":
-                    SOLV_EXCEPTION += 1
-                    SOLV_TIME += (end-start)
-                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
-                    print("SOLV_EXCPTION: {}".format(SOLV_EXCEPTION))
-                elif method == "F":
-                    APPF_EXCEPTION += 1
-                    APPF_TIME += (end-start)
-                    print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
-                    print("APPF_EXCPTION: {}".format(APPF_EXCEPTION))
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_EXP += 1
+                        SOLV_TIME += (end-start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                        print("SOLV_EXCPTION: {}".format(SOLV_EXP))
+                    elif method == "F":
+                        APPF_EXP += 1
+                        APPF_TIME += (end-start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                        print("APPF_EXCPTION: {}".format(APPF_EXP))
 
                 # LOGGER.info("Exhausted {}".format(self))
                 # LOGGER.info("Fully explored {}".format(self))
@@ -492,18 +495,18 @@ class TreeNode:
                 #       even if not, the next constraint solving will take long
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
-
-                end = time.time()
-                if method == "S":
-                    SOLV_COUNT += 1
-                    SOLV_TIME += (end-start)
-                    print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
-                    print("SOLV_COUNT: {}".format(SOLV_COUNT))
-                elif method == "F":
-                    APOF_COUNT += 1
-                    APPF_TIME += (end-start)
-                    print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
-                    print("APPF_COUNT: {}".format(SOLV_COUNT))
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_COUNT += 1
+                        SOLV_TIME += (end-start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                    elif method == "F":
+                        APPF_COUNT += 1
+                        APPF_TIME += (end-start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                        print("APPF_COUNT: {}".format(SOLV_COUNT))
  
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
@@ -541,14 +544,18 @@ class TreeNode:
             #     input_bytes += os.urandom(1)
             # return input_bytes
             # Or return end of file char?
-            start = time.time()
+            if COLLECT_STATISTICS:
+                start = time.time()
+
             random_bytes = os.urandom(MAX_BYTES)
-            end = time.time()
-            RAND_COUNT += 1
-            RAND_TIME += (end-start)
-            print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
-            print("RAND_COUNT: {}".format(RAND_COUNT))
-            return os.urandom(MAX_BYTES)
+
+            if COLLECT_STATISTICS:
+                end = time.time()
+                RAND_COUNT += 1
+                RAND_TIME += (end-start)
+                print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
+                print("RAND_COUNT: {}".format(RAND_COUNT))
+            return random_bytes
 
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
@@ -776,9 +783,6 @@ def mcts():
             if test_cases[i][-1][-1] == "F":
                 APPF_NEW += are_new[i]
 
-        # NOTE: Only accurate when using 1 sample per simulation
-        #   A better/more sophisticated way is to label each input at generation
-        #   and check if they are new at here
         print("RAND_NEW: {}".format(RAND_NEW))
         print("SOLV_NEW: {}".format(SOLV_NEW))
         print("APPF_NEW: {}".format(APPF_NEW))

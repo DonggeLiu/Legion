@@ -1,5 +1,0 @@
-#!/bin/bash
-
-#export PYTHONPATH=lib
-export PYTHONPATH="/home/donggel/.local/lib/python3.6/site-packages:/home/donggel/Dependencies/angr:/home/donggel/Dependencies/claripy"
-python3 ./DFS.py $@

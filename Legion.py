@@ -444,7 +444,7 @@ class TreeNode:
                         print("SOLV_COUNT: {}".format(SOLV_COUNT))
                     elif method == "F":
                         APPF_COUNT += 1
-                        APPF_TIME += (end-start)
+                        APPF_TIME += (end - start)
                         print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
                         print("APPF_COUNT: {}".format(APPF_COUNT))
 
@@ -500,7 +500,7 @@ class TreeNode:
                     if method == "S":
                         SOLV_COUNT += 1
                         SOLV_TIME += (end-start)
-                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT)))
                         print("SOLV_COUNT: {}".format(SOLV_COUNT))
                     elif method == "F":
                         APPF_COUNT += 1
@@ -547,15 +547,15 @@ class TreeNode:
             if COLLECT_STATISTICS:
                 start = time.time()
 
-            random_bytes = os.urandom(MAX_BYTES)
+            random_input_bytes = os.urandom(MAX_BYTES)
 
             if COLLECT_STATISTICS:
                 end = time.time()
                 RAND_COUNT += 1
-                RAND_TIME += (end-start)
+                RAND_TIME += (end - start)
                 print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
                 print("RAND_COUNT: {}".format(RAND_COUNT))
-            return random_bytes
+            return random_input_bytes
 
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 

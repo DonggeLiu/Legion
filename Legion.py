@@ -53,7 +53,7 @@ MAX_ROUNDS = float('inf')
 CORE = 1
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
-COVERAGE_ONLY = False
+COVERAGE_ONLY = True
 PERSISTENT = False
 
 # Statistics

@@ -629,7 +629,7 @@ class TreeNode:
     def repr_node_data(self) -> str:
         """
         UCT = sim_win / sel_try
-            + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
+            + RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
         return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
@@ -1515,7 +1515,7 @@ if __name__ == '__main__':
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,
-                        help='Exploration factor (default: 1/sqrt(2))')
+                        help='Exploration factor (default: sqrt(2))')
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,

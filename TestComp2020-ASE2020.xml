@@ -4,7 +4,6 @@
 
   <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="8" />
 
-  <option name="--rho">0.0025</option>
   <option name="--score">uct</option>
   <option name="--core">8</option>
   <option name="--tree-depth-limit">100000</option>

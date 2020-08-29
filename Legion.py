@@ -83,6 +83,7 @@ APPF_NEW = 0
 RAND_NEW = 0
 SOLV_EXP = 0
 APPF_EXP = 0
+APPF_EQL = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -768,13 +769,18 @@ def mcts():
     """
     The four steps of MCTS
     """
-    global SOLV_NEW, APPF_NEW, RAND_NEW
+    global SOLV_NEW, APPF_NEW, RAND_NEW, APPF_EQL
     node = selection()
     if node is ROOT:
         return
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
     if COLLECT_STATISTICS:
+        get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
+        selection_path = get_trace(node)[:-1][::-1]
+        if traces[:len(selection_path)] == selection_path:
+            APPF_EQL += 1
+            print("APPF_EQL: {}".format(APPF_EQL))
         for i in range(len(are_new)):
             if test_cases[i][-1][-1] == "R":
                 RAND_NEW += are_new[i]

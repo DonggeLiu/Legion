@@ -31,7 +31,7 @@ SIMPOOL = None
 RAN_SEED = 0
 
 # Logging
-LOGGER = logging.getLogger("Legion")
+LOGGER = logging.getLogger("SymbolicExecution")
 LOGGER.setLevel(logging.ERROR)
 sthl = logging.StreamHandler()
 sthl.setFormatter(fmt=logging.Formatter('%(message)s'))
@@ -200,7 +200,8 @@ def save_tests_to_file(time_stamp, data):
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
-            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" '
+            '"https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         input_file.write('<testcase>\n')
         input_file.write(data)
         input_file.write('</testcase>\n')
@@ -340,7 +341,8 @@ if __name__ == '__main__':
     #     with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
     #         md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
     #         md.write(
-    #             '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+    #             '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN"
+    #             "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
     #         md.write('<test-metadata>\n')
     #         md.write('<sourcecodelang>C</sourcecodelang>\n')
     #         md.write('<producer>Legion</producer>\n')

@@ -41,9 +41,10 @@ if __name__ == '__main__':
 MIN_SAMPLES = 3
 MAX_SAMPLES = 100
 TIME_COEFF = 0
-RHO = 1 / sqrt(2)
+Cp = 1 / sqrt(2)
+RHO = 2 * Cp
 RAN_SEED = None
-SYMEX_TIMEOUT = 0  # in secs
+SYMEX_TIMEOUT = None  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
@@ -55,7 +56,7 @@ MAX_ROUNDS = float('inf')
 CORE = 1
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
-COVERAGE_ONLY = False
+COVERAGE_ONLY = True
 PERSISTENT = False
 
 # Statistics
@@ -74,6 +75,19 @@ CONEX_SUCCESS_COUNT = 0
 MIN_TREE_DEPTH = inf
 MAX_TREE_DEPTH = 0
 SUM_TREE_DEPTH = 0
+SOLV_TIME = 0
+APPF_TIME = 0
+RAND_TIME = 0
+SOLV_COUNT = 0
+APPF_COUNT = 0
+RAND_COUNT = 0
+SOLV_NEW = 0
+APPF_NEW = 0
+RAND_NEW = 0
+SOLV_EXP = 0
+APPF_EXP = 0
+APPF_EQL = 0
+
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -246,6 +260,7 @@ class TreeNode:
 
     def explore_score(self) -> float:
         # If the exploration ratio rho is 0, then return 0
+        # This is to avoid 0 * inf = nan
         if RHO == 0:
             return 0
         # Evaluate to maximum value if is root
@@ -254,7 +269,8 @@ class TreeNode:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
             return INFINITY
-        return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+
+        return RHO * sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
     def estimated_score(self) -> float:
         context = self.context()
@@ -273,7 +289,10 @@ class TreeNode:
             """
             :return: Average constraint solving time / Expected sample number
             """
-            return average_constraint_solving_time() / expected_sample_num()
+            if not TIME_COEFF:
+                return 0
+
+            return TIME_COEFF * average_constraint_solving_time() / expected_sample_num()
 
         def average_constraint_solving_time() -> float:
             """
@@ -315,9 +334,8 @@ class TreeNode:
         if SCORE_FUN == 'random':
             score = random.uniform(0, 100)
         elif SCORE_FUN == 'uct':
-            uct_score = self.exploit_score() + 2 * RHO * self.explore_score()
-            score = uct_score - TIME_COEFF * time_penalisation() \
-                if TIME_COEFF else uct_score
+            uct_score = self.exploit_score() + self.explore_score()
+            score = uct_score - time_penalisation()
         elif SCORE_FUN == 'contextual':
             estimated_reward = self.estimated_score()
             uncertainty = self.uncertainty()
@@ -386,7 +404,8 @@ class TreeNode:
         :return: a tree node
         """
 
-        LOGGER.debug("Selecting from children: {}".format(self.children))
+
+        LOGGER.info("Selecting from children: {}".format(self.children.values()))
         # TODO: more elegant method, if time permitted
         max_score, candidates = -INFINITY, []  # type: float, List[TreeNode]
         for child in self.children.values():
@@ -467,6 +486,7 @@ class TreeNode:
             """
             return (target.size() + 7) // 8
 
+        global SOLV_EXP, SOLV_TIME, SOLV_COUNT, APPF_EXP, APPF_TIME, APPF_COUNT
         # Note: Once we fuzz a simulation child,
         #   its parent is no longer a phantom
         #   This is important as we do not mark phantom fully explored
@@ -490,7 +510,24 @@ class TreeNode:
         method = "S"
         while len(results) < MAX_SAMPLES:
             try:
+                if COLLECT_STATISTICS:
+                    start = time.time()
+
                 val = next(self.samples)
+
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_COUNT += 1
+                        SOLV_TIME += (end - start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT))
+                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                    elif method == "F":
+                        APPF_COUNT += 1
+                        APPF_TIME += (end - start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
+                        print("APPF_COUNT: {}".format(APPF_COUNT))
+
                 if val is None and len(results) >= MIN_SAMPLES:
                     # next val requires constraint solving and enough results
                     break
@@ -501,15 +538,32 @@ class TreeNode:
                 result = (val.to_bytes(byte_len(), 'big'), method)
                 results.append(result)
                 method = "F"
-            except Z3Exception:
+
+            except Z3Exception as e:
                 # NOTE: In case of z3.z3types.Z3Exception: b'maximization suspended'
                 # TODO: May have a better way to solve this, e.g. redo sampling?
-                LOGGER.info("Exhausted {}".format(self))
-                LOGGER.info("Fully explored {}".format(self))
-                self.fully_explored = True
-                self.exhausted = True
-                self.parent.exhausted = True
-                break
+                LOGGER.warning("Z3Exception in APPF: {}".format(e))
+                LOGGER.info("Redo APPF sampling")
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_EXP += 1
+                        SOLV_TIME += (end-start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
+                        print("SOLV_EXCPTION: {}".format(SOLV_EXP))
+                    elif method == "F":
+                        APPF_EXP += 1
+                        APPF_TIME += (end-start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                        print("APPF_EXCPTION: {}".format(APPF_EXP))
+
+                # LOGGER.info("Exhausted {}".format(self))
+                # LOGGER.info("Fully explored {}".format(self))
+                # self.fully_explored = True
+                # self.exhausted = True
+                # self.parent.exhausted = True
+                # break
+
             except StopIteration:
                 # NOTE: Insufficient results from APPFuzzing:
                 #  Case 1: break in the outside while:
@@ -523,7 +577,19 @@ class TreeNode:
                 #       even if not, the next constraint solving will take long
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
-
+                if COLLECT_STATISTICS:
+                    end = time.time()
+                    if method == "S":
+                        SOLV_COUNT += 1
+                        SOLV_TIME += (end-start)
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT)))
+                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
+                    elif method == "F":
+                        APPF_COUNT += 1
+                        APPF_TIME += (end-start)
+                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
+                        print("APPF_COUNT: {}".format(SOLV_COUNT))
+ 
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
                 LOGGER.debug("Exhausted {}".format(self))
@@ -553,13 +619,25 @@ class TreeNode:
     @staticmethod
     def random_fuzzing() -> List[Tuple[bytes, str]]:
         def random_bytes():
+            global RAND_TIME, RAND_COUNT
             LOGGER.debug("Generating random {} bytes".format(MAX_BYTES))
             # input_bytes = b''
             # for _ in range(MAX_BYTES):
             #     input_bytes += os.urandom(1)
             # return input_bytes
             # Or return end of file char?
-            return os.urandom(MAX_BYTES)
+            if COLLECT_STATISTICS:
+                start = time.time()
+
+            random_input_bytes = os.urandom(MAX_BYTES)
+
+            if COLLECT_STATISTICS:
+                end = time.time()
+                RAND_COUNT += 1
+                RAND_TIME += (end - start)
+                print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
+                print("RAND_COUNT: {}".format(RAND_COUNT))
+            return random_input_bytes
 
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
 
@@ -625,14 +703,15 @@ class TreeNode:
             child.pp(indent=indent, mark=mark, found=found, forced=forced)
 
     def repr_node_name(self) -> str:
-        return ("Simul: " if self.colour is Colour.G else
-                "Block: " if self.parent else "@Root: ") \
-               + (hex(self.addr)[-4:] if self.addr else "None")
+        # return ("Simul: " if self.colour is Colour.G else
+        #         "Block: " if self.parent else "@Root: ") \
+        #        + (hex(self.addr)[-4:] if self.addr else "None")
+        return hex(self.addr)[-4:] if self.addr else "None"
 
     def repr_node_data(self) -> str:
         """
         UCT = sim_win / sel_try
-            + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
+            + RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
         if SCORE_FUN == 'uct':
@@ -789,11 +868,30 @@ def mcts():
     """
     The four steps of MCTS
     """
+    global SOLV_NEW, APPF_NEW, RAND_NEW, APPF_EQL
     node = selection()
     if node is ROOT:
         return
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
+    if COLLECT_STATISTICS:
+        get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
+        selection_path = get_trace(node)[:-1][::-1]
+        if traces[:len(selection_path)] == selection_path:
+            APPF_EQL += 1
+            print("APPF_EQL: {}".format(APPF_EQL))
+        for i in range(len(are_new)):
+            if test_cases[i][-1][-1] == "R":
+                RAND_NEW += are_new[i]
+            if test_cases[i][-1][-1] == "S":
+                SOLV_NEW += are_new[i]
+            if test_cases[i][-1][-1] == "F":
+                APPF_NEW += are_new[i]
+
+        print("RAND_NEW: {}".format(RAND_NEW))
+        print("SOLV_NEW: {}".format(SOLV_NEW))
+        print("APPF_NEW: {}".format(APPF_NEW))
+
     debug_assertion(len(traces) == len(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
@@ -850,6 +948,13 @@ def selection() -> TreeNode:
                 dye_siblings(child=node)  # Upon an exception, mark this node fully explored
             except Z3Exception:
                 LOGGER.debug("Z3 exception occurred in symex, any type casting in program")
+                node.fully_explored = True
+                node.exhausted = True
+                node.parent.mark_fully_explored()
+            except SimUnsatError:
+                # NOTE: angr.errors.SimUnsatError: Got an unsat result, caused by
+                #  claripy.errors.UnsatError: CompositeSolver is already unsat
+                LOGGER.info("claripy.errors.UnsatError: CompositeSolver is already unsat")
                 node.fully_explored = True
                 node.exhausted = True
                 node.parent.mark_fully_explored()
@@ -1591,7 +1696,7 @@ if __name__ == '__main__':
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,
-                        help='Exploration factor (default: 1/sqrt(2))')
+                        help='Exploration factor (default: sqrt(2))')
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1659,8 +1764,8 @@ if __name__ == '__main__':
     MAX_SAMPLES = args.max_samples
     CORE = args.core
     RAN_SEED = args.random_seed
-    SYMEX_TIMEOUT = args.symex_timeout
-    CONEX_TIMEOUT = args.conex_timeout
+    SYMEX_TIMEOUT = args.symex_timeout if args.symex_timeout else None
+    CONEX_TIMEOUT = args.conex_timeout if args.conex_timeout else None
     TREE_DEPTH_LIMIT = args.tree_depth_limit
     COVERAGE_ONLY = args.coverage_only
     PERSISTENT = args.persistent
@@ -1672,7 +1777,6 @@ if __name__ == '__main__':
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
     PROFILE = args.profile
 
-    LOGGER.debug('score function {}'.format(SCORE_FUN))
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

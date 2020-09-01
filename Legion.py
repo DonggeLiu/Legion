@@ -419,7 +419,6 @@ class TreeNode:
         :return: a tree node
         """
 
-
         LOGGER.info("Selecting from children: {}".format(self.children.values()))
         # TODO: more elegant method, if time permitted
         max_score, candidates = -INFINITY, []  # type: float, List[TreeNode]
@@ -564,13 +563,13 @@ class TreeNode:
                     if method == "S":
                         SOLV_EXP += 1
                         SOLV_TIME += (end-start)
-                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT) ))
-                        print("SOLV_EXCPTION: {}".format(SOLV_EXP))
+                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT)))
+                        print("SOLV_EXCEPTION: {}".format(SOLV_EXP))
                     elif method == "F":
                         APPF_EXP += 1
                         APPF_TIME += (end-start)
                         print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
-                        print("APPF_EXCPTION: {}".format(APPF_EXP))
+                        print("APPF_EXCEPTION: {}".format(APPF_EXP))
 
                 # LOGGER.info("Exhausted {}".format(self))
                 # LOGGER.info("Fully explored {}".format(self))
@@ -750,7 +749,8 @@ class TreeNode:
                 estimate=self.estimated_score(),
                 uncertainty=self.uncertainty(),
                 alpha=self.alpha,
-                bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)), np.array([self.context()]).T)))
+                bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)),
+                                           np.array([self.context()]).T)))
             ) + str(np.linalg.inv(self.A).dot(self.B)) + " " + str(self.context())
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
@@ -1640,7 +1640,8 @@ def save_test_to_file(time_stamp, data, suffix):
         input_file.write(
             '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
         input_file.write(
-            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" "https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
+            '<!DOCTYPE testcase PUBLIC "+//IDN sosy-lab.org//DTD test-format testcase 1.1//EN" '
+            '"https://sosy-lab.org/test-format/testcase-1.1.dtd">\n')
         input_file.write('<testcase>\n')
         input_file.write(data)
         input_file.write('</testcase>\n')
@@ -1792,7 +1793,6 @@ if __name__ == '__main__':
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
     PROFILE = args.profile
 
-
     if RAN_SEED is not None:
         random.seed(RAN_SEED)
 
@@ -1870,7 +1870,8 @@ if __name__ == '__main__':
         with open("tests/{}/metadata.xml".format(DIR_NAME), "wt+") as md:
             md.write('<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n')
             md.write(
-                '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" "https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
+                '<!DOCTYPE test-metadata PUBLIC "+//IDN sosy-lab.org//DTD test-format test-metadata 1.1//EN" '
+                '"https://sosy-lab.org/test-format/test-metadata-1.1.dtd">\n')
             md.write('<test-metadata>\n')
             md.write('<sourcecodelang>C</sourcecodelang>\n')
             md.write('<producer>Legion</producer>\n')

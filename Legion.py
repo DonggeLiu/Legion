@@ -227,6 +227,21 @@ class TreeNode:
         return self.sim_state().solver.constraints \
             if self.sim_state() else "No SimState"
 
+    def path_trace(self) -> List[int]:
+        """
+        Return the path trace of a node, which consists of two parts:
+            1. the addresses from root to its parent
+            2. the address of itself, if it is not a simulation child
+        """
+        return (self.parent.path_trace() if self.parent else []) + ([] if self.colour is Colour.G else [self.addr])
+
+    def preserved_path(self, execution_trace: List[int]) -> bool:
+        """
+        Check if the given execution trace preserves the path trace of the node
+        """
+        path_trace = self.path_trace()
+        return execution_trace[:len(path_trace)] == path_trace
+
     def context(self) -> np.array:
         # # Note:
         # #  1. sim_win / sel_try
@@ -875,9 +890,9 @@ def mcts():
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
     if COLLECT_STATISTICS:
-        get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
-        selection_path = get_trace(node)[:-1][::-1]
-        if traces[:len(selection_path)] == selection_path:
+        # get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
+        # selection_path = get_trace(node)[:-1][::-1]
+        if node.preserved_path():
             APPF_EQL += 1
             print("APPF_EQL: {}".format(APPF_EQL))
         for i in range(len(are_new)):

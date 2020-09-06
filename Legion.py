@@ -112,7 +112,8 @@ TIMES = []  # type: List
 #   1. sim_win / sel_try
 #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 #   3. offset, which always equals to 1
-NUM_CONTEXT = 3
+CONTEXTS = []
+NUM_CONTEXT = None
 DELTA = 0.1
 
 # cache Node
@@ -258,11 +259,22 @@ class TreeNode:
         #   1. sim_win / sel_try
         #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
         #   3. offset, which always equals to 1
-        context = [1, self.exploit_score(), self.explore_score()]
-        debug_assertion(len(context) == NUM_CONTEXT)
-        return np.array(context)
+        contexts = []
+        for context in CONTEXTS:
+            if context == "CONST_ONE":
+                contexts.append(1)
+            elif context == "AVG_NEW_PATH":
+                contexts.append(self.avg_new_path())
+            elif context == "EXPLORE_SCORE":
+                contexts.append(self.explore_score())
+            else:
+                LOGGER.error("Unidentified Contextual Feature")
+                exit(1)
 
-    def exploit_score(self) -> float:
+        debug_assertion(len(contexts) == NUM_CONTEXT)
+        return np.array(contexts)
+
+    def avg_new_path(self) -> float:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
             return INFINITY
@@ -344,7 +356,7 @@ class TreeNode:
         if SCORE_FUN == 'random':
             score = random.uniform(0, 100)
         elif SCORE_FUN == 'uct':
-            uct_score = self.exploit_score() + self.explore_score()
+            uct_score = self.avg_new_path() + self.explore_score()
             score = uct_score - time_penalisation()
         elif SCORE_FUN == 'contextual':
             estimated_reward = self.estimated_score()
@@ -727,7 +739,7 @@ class TreeNode:
             return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
                    "+ {exploit:.2f}(sqrt(log({pselt})/{selt})" \
                 .format(uct=self.score(),
-                        explore=self.exploit_score(),
+                        explore=self.avg_new_path(),
                         exploit=self.explore_score(),
                         simw=self.sim_win,
                         selt=self.sel_try,
@@ -1710,6 +1722,8 @@ if __name__ == '__main__':
                         help='Exploration factor (default: sqrt(2))')
     parser.add_argument('--delta', type=float, default=DELTA,
                         help="The error allowed (i.e. 1 - confidence level")
+    parser.add_argument("--contexts", action="extend", nargs="+", type=str, required=('contextual' in sys.argv),
+                        choices=["CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1790,6 +1804,8 @@ if __name__ == '__main__':
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
     PROFILE = args.profile
+    CONTEXTS = args.contexts
+    NUM_CONTEXT = len(CONTEXTS)
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

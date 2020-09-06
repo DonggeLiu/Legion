@@ -786,7 +786,6 @@ class TreeNode:
         #             data=self.repr_node_data())
 
 
-ROOT = TreeNode()
 
 
 def consider_tree_fully_explored() -> bool:
@@ -1722,7 +1721,7 @@ if __name__ == '__main__':
                         help='Exploration factor (default: sqrt(2))')
     parser.add_argument('--delta', type=float, default=DELTA,
                         help="The error allowed (i.e. 1 - confidence level")
-    parser.add_argument("--contexts", action="extend", nargs="+", type=str, required=('contextual' in sys.argv),
+    parser.add_argument("--contexts", nargs="+", type=str, required=('contextual' in sys.argv),
                         choices=["CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
@@ -1902,6 +1901,7 @@ if __name__ == '__main__':
 
     SEEDS = args.seeds
 
+    ROOT = TreeNode()
     try:
         if PROFILE:
             cProfile.run('main()', sort='cumtime')

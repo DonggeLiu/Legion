@@ -1712,6 +1712,8 @@ if __name__ == '__main__':
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,
                         help='Exploration factor (default: sqrt(2))')
+    parser.add_argument('--delta', type=float, default=DELTA,
+                        help="The error allowed (i.e. 1 - confidence level")
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1787,6 +1789,7 @@ if __name__ == '__main__':
     TIME_COEFF = args.time_penalty
     SCORE_FUN = args.score
     RHO = args.rho
+    DELTA = args.delta
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
     SAVE_TESTCASES = args.save_tests if args.save_tests else []

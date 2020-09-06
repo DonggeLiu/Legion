@@ -32,11 +32,6 @@ from z3.z3types import Z3Exception
 
 VERSION = "0.1-testcomp2020"
 
-if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == '--version':
-        print(VERSION)
-        sys.exit(0)
-
 # Hyper-parameters
 MIN_SAMPLES = 3
 MAX_SAMPLES = 100
@@ -1701,6 +1696,7 @@ if __name__ == '__main__':
     sys.setrecursionlimit(1000000)
 
     parser = argparse.ArgumentParser(description='Legion')
+    parser.add_argument('--version', action='version', version=VERSION)
     parser.add_argument('--min-samples', type=int, default=MIN_SAMPLES,
                         help='Minimum number of samples per iteration')
     parser.add_argument('--max-samples', type=int, default=MAX_SAMPLES,

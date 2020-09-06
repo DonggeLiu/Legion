@@ -892,9 +892,8 @@ def mcts():
     if COLLECT_STATISTICS:
         # get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
         # selection_path = get_trace(node)[:-1][::-1]
-        if node.preserved_path():
-            APPF_EQL += 1
-            print("APPF_EQL: {}".format(APPF_EQL))
+        APPF_EQL += sum([node.preserved_path(trace) for trace in traces])
+        print("APPF_EQL: {}".format(APPF_EQL))
         for i in range(len(are_new)):
             if test_cases[i][-1][-1] == "R":
                 RAND_NEW += are_new[i]

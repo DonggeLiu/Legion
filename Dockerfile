@@ -1,7 +1,7 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 WORKDIR /root
-COPY Legion.py Makefile tracejump.py __trace_jump.s __VERIFIER.c /root/
+COPY Legion.py Makefile tracejump.py __trace_jump.s __VERIFIER.c __VERIFIER_assume.c __trace_buffered.c  /root/
 
 RUN apt-get update \
     && apt-get install git -y \

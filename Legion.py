@@ -43,7 +43,7 @@ SYMEX_TIMEOUT = None  # in secs
 CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
-INFINITY = 9999  # using inf will incur nan values, this is temporary workaround
+INFINITY = inf  # using inf will incur nan values, this is temporary workaround
 
 # Budget
 MAX_PATHS = float('inf')
@@ -277,7 +277,7 @@ class TreeNode:
     def avg_new_path(self) -> float:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
-            return INFINITY
+            return 0
         return self.sim_win / self.sel_try
 
     def explore_score(self) -> float:
@@ -287,10 +287,10 @@ class TreeNode:
             return 0
         # Evaluate to maximum value if is root
         if self.is_root():
-            return INFINITY
+            return 0
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
-            return INFINITY
+            return 0
 
         return RHO * sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
@@ -359,9 +359,7 @@ class TreeNode:
             uct_score = self.avg_new_path() + self.explore_score()
             score = uct_score - time_penalisation()
         elif SCORE_FUN == 'contextual':
-            estimated_reward = self.estimated_score()
-            uncertainty = self.uncertainty()
-            score = estimated_reward + uncertainty
+            score = (self.estimated_score() + self.uncertainty()) if self.sel_try else INFINITY
         else:
             score = -INFINITY
             debug_assertion(False)
@@ -784,8 +782,6 @@ class TreeNode:
         #             name=self.repr_node_name(),
         #             state=self.repr_node_state(),
         #             data=self.repr_node_data())
-
-
 
 
 def consider_tree_fully_explored() -> bool:

@@ -292,7 +292,7 @@ class TreeNode:
         if not self.sel_try:
             return 0
 
-        return RHO * sqrt(2 * log(self.parent.sel_try) / self.sel_try)
+        return sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 
     def estimated_score(self) -> float:
         context = self.context()

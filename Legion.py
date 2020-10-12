@@ -112,9 +112,12 @@ TIMES = []  # type: List
 #   1. sim_win / sel_try
 #   2. sqrt(2 * log(self.parent.sel_try) / self.sel_try)
 #   3. offset, which always equals to 1
+HYBRID = True
+DELTA = 0.1
 CONTEXTS = []
 NUM_CONTEXT = None
-DELTA = 0.1
+SHARED_CONTEXTS = []
+NUM_SHARED_CONTEXTS = None
 
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
@@ -193,6 +196,8 @@ class TreeNode:
         self.num_arms = len(self.children)
         self.A = np.identity(NUM_CONTEXT)
         self.b = np.zeros(NUM_CONTEXT)
+        if HYBRID:
+            self.B = np.zeros((NUM_CONTEXT, NUM_SHARED_CONTEXTS))
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -274,6 +279,32 @@ class TreeNode:
         debug_assertion(len(contexts) == NUM_CONTEXT)
         return np.array(contexts)
 
+    def shared_context(self) -> np.array:
+
+        shared_contexts = []
+        for context in SHARED_CONTEXTS:
+            if context == "CONST_ONE":
+                shared_contexts.append(1)
+            elif context == "AVG_NEW_PATH":
+                shared_contexts.append(self.avg_new_path())
+            elif context == "EXPLORE_SCORE":
+                shared_contexts.append(self.explore_score())
+            elif context == "COLOUR_RED":
+                shared_contexts.append(int(self.colour == Colour.R))
+            elif context == "COLOUR_GOLD":
+                shared_contexts.append(int(self.colour == Colour.G))
+            elif context == "COLOUR_WHITE":
+                shared_contexts.append(int(self.colour == Colour.W))
+            elif context == "COLOUR_BLACK":
+                shared_contexts.append(int(self.colour == Colour.B))
+            elif context == "COLOUR_PURPLE":
+                shared_contexts.append(int(self.colour == Colour.P))
+            else:
+                LOGGER.error("Unidentified Contextual Feature")
+                exit(1)
+        debug_assertion(len(shared_contexts) == NUM_SHARED_CONTEXTS)
+        return np.array(shared_contexts)
+
     def avg_new_path(self) -> float:
         # Evaluate to maximum value if not tried before
         if not self.sel_try:
@@ -297,12 +328,28 @@ class TreeNode:
     def estimated_score(self) -> float:
         context = self.context()
         a_inv = np.linalg.inv(self.A)
-        return float(a_inv.dot(self.b).dot(context))
+        if HYBRID:
+            shared_context = self.shared_context()
+            a0_inv = np.linalg.inv(A0)
+            beta_hat = a0_inv.dot(b0)
+            theta_hat = a_inv.dot(self.b - self.B.dot(beta_hat))
+            return shared_context.T.dot(beta_hat) + context.T.dot(theta_hat)
+        else:
+            return float(a_inv.dot(self.b).dot(context))
 
     def uncertainty(self) -> float:
         context = self.context()
         a_inv = np.linalg.inv(self.A)
-        x = np.dot(np.dot(context, a_inv), np.array([context]).T)
+
+        if HYBRID:
+            shared_context = self.shared_context()
+            a0_inv = np.linalg.inv(A0)
+            x = shared_context.T.dot(a0_inv).dot(shared_context) \
+                - 2 * shared_context.T.dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context) \
+                + context.T.dot(a_inv).dot(context) \
+                + context.T.dot(a_inv).dot(self.B).dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context)
+        else:
+            x = np.dot(np.dot(context, a_inv), np.array([context]).T)
         return float(self.alpha * np.sqrt(x))
 
     def score(self) -> float:
@@ -755,8 +802,12 @@ class TreeNode:
                 uncertainty=self.uncertainty(),
                 alpha=self.alpha,
                 bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)),
-                                           np.array([self.context()]).T)))
-            ) + str(np.linalg.inv(self.A).dot(self.b)) + " " + str(self.context())
+                                           np.array([self.context()]).T)))) \
+                   + (str(np.linalg.inv(self.A).dot(self.b-self.B.dot(np.linalg.inv(A0).dot(b0)))) + " "
+                      + str(self.context()) + "; "
+                      + str(np.linalg.inv(A0).dot(b0)) + " " + str(self.shared_context())
+                      if HYBRID else str(np.linalg.inv(self.A).dot(self.b)) + " " + str(self.context()))
+
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
         #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
@@ -796,7 +847,7 @@ def run() -> None:
     ROOT.pp()
     while has_budget():
         mcts()
-        import pdb;pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
 
 def initialisation():
@@ -1506,10 +1557,27 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     :return:
     """
     # Reward the simulation node selected for findings as well
+    global A0, b0
+    updated_red = False  # When a trace has multiple red node, only update once.
     while node:
         for is_new in are_new:
+            # if HYBRID and not updated_red:
+            if HYBRID:
+                a_inv = np.linalg.inv(node.A)
+                A0 += node.B.T.dot(a_inv).dot(node.B)
+                b0 += node.B.T.dot(a_inv).dot(node.b)
+                node.B += node.shared_context().dot(node.shared_context().T)
+
             node.A += np.outer(node.context(), node.context())
             node.b += np.array(is_new).dot(node.context())[0]
+
+            # if HYBRID and not updated_red:
+            if HYBRID:
+                a_inv = np.linalg.inv(node.A)
+                A0 += node.shared_context().dot(node.shared_context().T) - node.B.T.dot(a_inv).dot(node.B)
+                b0 += np.array(is_new).dot(node.shared_context()) - node.B.T.dot(a_inv).dot(node.b)
+
+        updated_red = node.colour == Colour.R
         node = node.parent
 
 
@@ -1702,6 +1770,7 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.setrecursionlimit(1000000)
+    print(sys.argv)
 
     parser = argparse.ArgumentParser(description='Legion')
     parser.add_argument('--version', action='version', version=VERSION)
@@ -1718,8 +1787,14 @@ if __name__ == '__main__':
                         help='Exploration factor (default: sqrt(2))')
     parser.add_argument('--delta', type=float, default=DELTA,
                         help="The error allowed (i.e. 1 - confidence level")
-    parser.add_argument("--contexts", nargs="+", type=str, required=('contextual' in sys.argv),
+    parser.add_argument("--non-hybrid", action="store_false",
+                        help="Disable hybrid model with shared features")
+    parser.add_argument("--contexts", nargs="+", type=str,
+                        required=(('contextual' in sys.argv) and ('--shared-contexts' not in sys.argv)),
                         choices=["CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
+    parser.add_argument("--shared-contexts", nargs="+", type=str,
+                        required=('contextual' in sys.argv) and ('--contexts' not in sys.argv),
+                        choices=['COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK'])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1801,7 +1876,13 @@ if __name__ == '__main__':
     SAVE_TESTCASES = args.save_tests if args.save_tests else []
     PROFILE = args.profile
     CONTEXTS = args.contexts
+    SHARED_CONTEXTS = args.shared_contexts
     NUM_CONTEXT = len(CONTEXTS)
+    HYBRID = args.non_hybrid
+    if HYBRID:
+        NUM_SHARED_CONTEXTS = len(SHARED_CONTEXTS) if HYBRID else []
+        A0 = np.identity(NUM_SHARED_CONTEXTS)
+        b0 = np.zeros(NUM_SHARED_CONTEXTS)
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

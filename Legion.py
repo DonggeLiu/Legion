@@ -192,7 +192,7 @@ class TreeNode:
         self.arms = []
         self.num_arms = len(self.children)
         self.A = np.identity(NUM_CONTEXT)
-        self.B = np.zeros(NUM_CONTEXT)
+        self.b = np.zeros(NUM_CONTEXT)
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -297,7 +297,7 @@ class TreeNode:
     def estimated_score(self) -> float:
         context = self.context()
         a_inv = np.linalg.inv(self.A)
-        return float(a_inv.dot(self.B).dot(context))
+        return float(a_inv.dot(self.b).dot(context))
 
     def uncertainty(self) -> float:
         context = self.context()
@@ -749,14 +749,14 @@ class TreeNode:
             # pdb.set_trace()
             return "{score:.2f}: {estimate:.2f} + {uncertainty:.2f} ({bound:.2f})".format(
                 score=self.score(),
-                # coeff=float(np.linalg.inv(self.A).dot(self.B)),
+                # coeff=float(np.linalg.inv(self.A).dot(self.b)),
                 # context=self.context(),
                 estimate=self.estimated_score(),
                 uncertainty=self.uncertainty(),
                 alpha=self.alpha,
                 bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)),
                                            np.array([self.context()]).T)))
-            ) + str(np.linalg.inv(self.A).dot(self.B)) + " " + str(self.context())
+            ) + str(np.linalg.inv(self.A).dot(self.b)) + " " + str(self.context())
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
         #        "- {t:.2f}*{at:.2f}/({selt}+log({MS}, 2)-1)/{MS}*2^{selt})" \
@@ -796,6 +796,7 @@ def run() -> None:
     ROOT.pp()
     while has_budget():
         mcts()
+        import pdb;pdb.set_trace()
 
 
 def initialisation():
@@ -1508,7 +1509,7 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     while node:
         for is_new in are_new:
             node.A += np.outer(node.context(), node.context())
-            node.B += np.array(is_new).dot(node.context())[0]
+            node.b += np.array(is_new).dot(node.context())[0]
         node = node.parent
 
 
@@ -1549,11 +1550,11 @@ def propagate_context_execution_traces(
         :param is_new: whether the node contributes to the discovery of a new path
         """
         node.A += node.context().T.dot(node.context())
-        node.B += np.array(is_new).dot(node.context())[0]
+        node.b += np.array(is_new).dot(node.context())[0]
         if 'Simulation' in node.children:
             node = node.children['Simulation']
             node.A += node.context().T.dot(node.context())
-            node.B += np.array(is_new).dot(node.context())[0]
+            node.b += np.array(is_new).dot(node.context())[0]
 
     debug_assertion(len(traces) == len(are_new))
     for i in range(len(traces)):

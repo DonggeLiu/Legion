@@ -1561,8 +1561,8 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     updated_red = False  # When a trace has multiple red node, only update once.
     while node:
         for is_new in are_new:
-            # if HYBRID and not updated_red:
-            if HYBRID:
+            if HYBRID and not updated_red:
+            # if HYBRID:
                 a_inv = np.linalg.inv(node.A)
                 A0 += node.B.T.dot(a_inv).dot(node.B)
                 b0 += node.B.T.dot(a_inv).dot(node.b)
@@ -1571,8 +1571,8 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
             node.A += np.outer(node.context(), node.context())
             node.b += np.array(is_new).dot(node.context())[0]
 
-            # if HYBRID and not updated_red:
-            if HYBRID:
+            if HYBRID and not updated_red:
+            # if HYBRID:
                 a_inv = np.linalg.inv(node.A)
                 A0 += node.shared_context().dot(node.shared_context().T) - node.B.T.dot(a_inv).dot(node.B)
                 b0 += np.array(is_new).dot(node.shared_context()) - node.B.T.dot(a_inv).dot(node.b)

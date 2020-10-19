@@ -299,6 +299,8 @@ class TreeNode:
                 shared_contexts.append(int(self.colour == Colour.B))
             elif context == "COLOUR_PURPLE":
                 shared_contexts.append(int(self.colour == Colour.P))
+            elif context == 'DEPTH':
+                shared_contexts.append(self.depth())
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -744,6 +746,18 @@ class TreeNode:
             path.append(parent.addr)
             parent = parent.parent
         return path[::-1]
+
+    def depth(self) -> int:
+        """
+        return the depth of the current node.
+        Golden nodes are considered as the same depth as their parents
+            otherwise all nodes in each selection step have the same depth
+        """
+        node_depth, parent = 0, self
+        while parent:
+            node_depth += 1
+            parent = parent.parent
+        return node_depth - (self.colour == Colour.G)
 
     def pp(self, indent: int = 0,
            mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
@@ -1794,7 +1808,9 @@ if __name__ == '__main__':
                         choices=["CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
     parser.add_argument("--shared-contexts", nargs="+", type=str,
                         required=('contextual' in sys.argv) and ('--contexts' not in sys.argv),
-                        choices=['COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK'])
+                        choices=['CONST_ONE',
+                                 'COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK',
+                                 'DEPTH'])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,

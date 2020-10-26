@@ -301,6 +301,8 @@ class TreeNode:
                 shared_contexts.append(int(self.colour == Colour.P))
             elif context == 'DEPTH':
                 shared_contexts.append(self.depth())
+            elif context == 'FISH_BONE':
+                shared_contexts.append(int(self.is_fish_bone()))
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -389,17 +391,6 @@ class TreeNode:
 
         # Evaluate to minimum value if fully explored
         if self.is_fully_explored():
-            return -INFINITY
-
-        # Fish bone optimisation: if a simulation child
-        #   has only one sibling X who is not fully explored,
-        #   and X is not white (so that all siblings are found)
-        #   then do not simulate from that simulation child but only from X
-        #   as all new paths can only come from X
-        if self.colour is Colour.G and len(self.parent.children) > 1 \
-                and len([child for child in self.parent.children.values() if
-                         child is not self and child.score() > -INFINITY
-                         and child.colour is not Colour.W]) == 1:
             return -INFINITY
 
         if SCORE_FUN == 'random':
@@ -758,6 +749,17 @@ class TreeNode:
             node_depth += 1
             parent = parent.parent
         return node_depth - (self.colour == Colour.G)
+
+    def is_fish_bone(self) -> bool:
+        # Fish bone optimisation: if a simulation child
+        #   has only one sibling X who is not fully explored,
+        #   and X is not white (so that all siblings are found)
+        #   then do not simulate from that simulation child but only from X
+        #   as all new paths can only come from X
+        return self.colour is Colour.G and len(self.parent.children) > 1 \
+                and len([child for child in self.parent.children.values() if
+                         child is not self and child.score() > -INFINITY
+                         and child.colour is not Colour.W]) == 1
 
     def pp(self, indent: int = 0,
            mark: 'TreeNode' = None, found: int = 0, forced: bool = False):
@@ -1818,6 +1820,7 @@ if __name__ == '__main__':
                         choices=['CONST_ONE',
                                  "AVG_NEW_PATH", "EXPLORE_SCORE",
                                  'COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK',
+                                 'FISH_BONE',
                                  'DEPTH'])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')

@@ -1061,6 +1061,13 @@ def selection() -> TreeNode:
         if reach_symex_timeout():
             LOGGER.debug(
                 "Symex timeout, choose the simulation child of the last red {}".format(last_red))
+
+            # NOTE: When symex timeout, increase the sel_try of the nodes selected by 1
+            #   Otherwise the the same nodes will be selected again next time
+            #   For example, if a node has not been selected before (inf score) and symex occurred on it
+            while node:
+                node.sel_try += 1
+                node = node.parent
             node = last_red.children['Simulation']
             SYMEX_TIMEOUT_COUNT += 1
             if COLLECT_STATISTICS:

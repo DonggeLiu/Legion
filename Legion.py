@@ -1120,7 +1120,7 @@ def selection() -> TreeNode:
 
     selection_end_time = time.time()
     SYMEX_TIME += (selection_end_time - selection_start_time)
-    SYMEX_SUCCESS_COUNT += 1
+    SYMEX_SUCCESS_COUNT += not reach_symex_timeout()
     if COLLECT_STATISTICS:
         print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
         print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))

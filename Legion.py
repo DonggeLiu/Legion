@@ -1816,6 +1816,7 @@ if __name__ == '__main__':
     parser.add_argument("--shared-contexts", nargs="+", type=str,
                         required=('contextual' in sys.argv) and ('--contexts' not in sys.argv),
                         choices=['CONST_ONE',
+                                 "AVG_NEW_PATH", "EXPLORE_SCORE",
                                  'COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK',
                                  'DEPTH'])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,

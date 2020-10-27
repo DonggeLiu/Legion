@@ -1592,7 +1592,7 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
                 node.B += node.shared_context().dot(node.shared_context().T)
 
             node.A += np.outer(node.context(), node.context())
-            node.b += np.array(is_new).dot(node.context())[0]
+            node.b += np.array(is_new).dot(node.context())
 
             if HYBRID and not updated_red:
             # if HYBRID:

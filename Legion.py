@@ -191,11 +191,10 @@ class TreeNode:
         self.exhausted = False
 
         # Context of bandits
-        self.alpha = 1 + sqrt(log(2/DELTA)/2)
-        self.arms = []
-        self.num_arms = len(self.children)
+        # self.arms = []
+        # self.num_arms = len(self.children)
         self.A = np.identity(NUM_CONTEXT)
-        self.b = np.zeros(NUM_CONTEXT)
+        self.b = np.array([np.zeros(NUM_CONTEXT)]).T
         if HYBRID:
             self.B = np.zeros((NUM_CONTEXT, NUM_SHARED_CONTEXTS))
 
@@ -277,7 +276,7 @@ class TreeNode:
                 exit(1)
 
         debug_assertion(len(contexts) == NUM_CONTEXT)
-        return np.array(contexts)
+        return np.array([np.array(contexts)]).T
 
     def shared_context(self) -> np.array:
 
@@ -307,7 +306,7 @@ class TreeNode:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
         debug_assertion(len(shared_contexts) == NUM_SHARED_CONTEXTS)
-        return np.array(shared_contexts)
+        return np.array([np.array(shared_contexts)]).T
 
     def avg_new_path(self) -> float:
         # Evaluate to maximum value if not tried before
@@ -337,9 +336,23 @@ class TreeNode:
             a0_inv = np.linalg.inv(A0)
             beta_hat = a0_inv.dot(b0)
             theta_hat = a_inv.dot(self.b - self.B.dot(beta_hat))
-            return shared_context.T.dot(beta_hat) + context.T.dot(theta_hat)
+            LOGGER.debug("Expectation: {}\n"
+                         "=\n {}\n +\n {}\n"
+                         "=\n {}\n .\n {}\n +\n {}\n .\n {}\n"
+                         .format(float(shared_context.T.dot(beta_hat) + context.T.dot(theta_hat)),
+                                 shared_context.T.dot(beta_hat), context.T.dot(theta_hat),
+                                 shared_context.T, beta_hat, context.T, theta_hat))
+            # pdb.set_trace()
+            return float(shared_context.T.dot(beta_hat) + context.T.dot(theta_hat))
         else:
-            return float(a_inv.dot(self.b).dot(context))
+            LOGGER.debug("Expectation: {}\n"
+                         "=\n {}\n .\n {}\n .\n {}\n"
+                         .format(float(a_inv.dot(self.b).T.dot(context)),
+                                 a_inv, self.b, context))
+            # pdb.set_trace()
+            #TODO: assert
+            theta_hat = a_inv.dot(self.b)
+            return float(theta_hat.T.dot(context))
 
     def uncertainty(self) -> float:
         context = self.context()
@@ -348,13 +361,37 @@ class TreeNode:
         if HYBRID:
             shared_context = self.shared_context()
             a0_inv = np.linalg.inv(A0)
+            LOGGER.debug(
+                "Uncertainty = {}\n"
+                "=\n {shared_context_T}\n .\n {a0_inv}\n .\n {shared_context}\n"
+                "-\n 2 * {shared_context_T}\n .\n {a0_inv}\n .\n {B_T}\n .\n {a_inv}\n .\n {context}\n"
+                "+\n {context_T}\n .\n {a_inv}\n .\n {context}\n"
+                "+\n {context_T}\n .\n {a_inv}\n .\n {B}\n .\n {a0_inv}\n .\n {B_T}\n .\n {a_inv} .\n {context}\n"
+                "".format(
+                    shared_context.T.dot(a0_inv).dot(shared_context) \
+                    - 2 * shared_context.T.dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context) \
+                    + context.T.dot(a_inv).dot(context) \
+                    + context.T.dot(a_inv).dot(self.B).dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context),
+                    shared_context_T=shared_context.T, a0_inv=a0_inv, shared_context=shared_context,
+                    B_T=self.B.T, a_inv=a_inv, context=context,
+                    context_T=context.T,
+                    B=self.B
+            ))
             x = shared_context.T.dot(a0_inv).dot(shared_context) \
                 - 2 * shared_context.T.dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context) \
                 + context.T.dot(a_inv).dot(context) \
                 + context.T.dot(a_inv).dot(self.B).dot(a0_inv).dot(self.B.T).dot(a_inv).dot(context)
         else:
-            x = np.dot(np.dot(context, a_inv), np.array([context]).T)
-        return float(self.alpha * np.sqrt(x))
+            LOGGER.debug(
+                "Uncertainty = np.dot(np.dot(context, a_inv), np.array([context]).T):\n"
+                "{}\n"
+                "=\n {}\n .\n {}\n .\n {}\n".format(
+                    np.dot(np.dot(context.T, a_inv), np.array([context])),
+                    context, a_inv, np.array([context]).T))
+            x = context.T.dot(a_inv).dot(context)
+            # x = np.dot(np.dot(context, a_inv), np.array([context]).T)
+        # pdb.set_trace()
+        return float(ALPHA * np.sqrt(x))
 
     def score(self) -> float:
 
@@ -392,6 +429,17 @@ class TreeNode:
         # Evaluate to minimum value if fully explored
         if self.is_fully_explored():
             return -INFINITY
+
+        # Fish bone optimisation: if a simulation child
+        #   has only one sibling X who is not fully explored,
+        #   and X is not white (so that all siblings are found)
+        #   then do not simulate from that simulation child but only from X
+        #   as all new paths can only come from X
+        # if self.colour is Colour.G and len(self.parent.children) > 1 \
+        #         and len([child for child in self.parent.children.values() if
+        #                  child is not self and child.score() > -inf
+        #                  and child.colour is not Colour.W]) == 1:
+        #     return -inf
 
         if SCORE_FUN == 'random':
             score = random.uniform(0, 100)
@@ -810,19 +858,22 @@ class TreeNode:
         elif SCORE_FUN == 'contextual':
             # bound =
             # pdb.set_trace()
+
+            x = self.context().T.dot(np.linalg.inv(self.A)).dot(self.context()) \
+                + (
+                - 2 * self.shared_context().T.dot(np.linalg.inv(A0)).dot(self.B.T).dot(np.linalg.inv(self.A)).dot(self.context()) \
+                + self.shared_context().T.dot(np.linalg.inv(A0)).dot(self.shared_context()) \
+                + self.context().T.dot(np.linalg.inv(self.A)).dot(self.B).dot(np.linalg.inv(A0)).dot(self.B.T).dot(np.linalg.inv(self.A)).dot(self.context())
+                ) if HYBRID else 0
+
             return "{score:.2f}: {estimate:.2f} + {uncertainty:.2f} ({bound:.2f})".format(
                 score=self.score(),
                 # coeff=float(np.linalg.inv(self.A).dot(self.b)),
                 # context=self.context(),
                 estimate=self.estimated_score(),
                 uncertainty=self.uncertainty(),
-                alpha=self.alpha,
-                bound=float(np.sqrt(np.dot(np.dot(self.context(), np.linalg.inv(self.A)),
-                                           np.array([self.context()]).T)))) \
-                   + (str(np.linalg.inv(self.A).dot(self.b-self.B.dot(np.linalg.inv(A0).dot(b0)))) + " "
-                      + str(self.context()) + "; "
-                      + str(np.linalg.inv(A0).dot(b0)) + " " + str(self.shared_context())
-                      if HYBRID else str(np.linalg.inv(self.A).dot(self.b)) + " " + str(self.context()))
+                alpha=ALPHA,
+                bound=float(x))
 
         # return "{uct:.2f} = {simw}/{selt} " 1\
         #        "+ 2*{r:.2f}*sqrt(log({pselt})/{simt}) " \
@@ -1581,26 +1632,89 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
     """
     # Reward the simulation node selected for findings as well
     global A0, b0
-    updated_red = False  # When a trace has multiple red node, only update once.
+    updated_global = False  # When a trace has multiple red node, only update once.
     while node:
         for is_new in are_new:
-            if HYBRID and not updated_red:
-            # if HYBRID:
+
+            LOGGER.info("Propagating: {};\t Reward: {}".format(node, is_new))
+
+            if HYBRID and not updated_global:
+
+                LOGGER.info("Global.A0 = Global.A0 + node.B.T.dot(inv(node.A)).dot(node.B):\n"
+                            "{}\n"
+                            "=\n {}\n +\n {}\n .\n {}\n .\n {}\n"
+                            "=\n {}\n +\n {}\n".format(
+                    A0 + node.B.T.dot(np.linalg.inv(node.A)).dot(node.B),
+                    A0, node.B.T, np.linalg.inv(node.A), node.B,
+                    A0, node.B.T.dot(np.linalg.inv(node.A)).dot(node.B)
+                ))
+
+                LOGGER.info("Global.b0 = Global.b0 + node.B.T.dot(a_inv).dot(node.b):\n"
+                            "{}\n"
+                            "=\n {}\n +\n {}\n .\n {}\n .\n {}\n"
+                            "=\n {}\n +\n {}".format(
+                    b0 + node.B.T.dot(np.linalg.inv(node.A)).dot(node.b),
+                    b0, node.B.T, np.linalg.inv(node.A), node.b,
+                    b0, node.B.T.dot(np.linalg.inv(node.A)).dot(node.b)
+                ))
+
+                LOGGER.info("node.B = node.B + np.outer(node.context(), node.shared_context().T):\n"
+                            "{}\n"
+                            "=\n {}\n +\n {}\n *\n {}\n"
+                            "=\n {}\n +\n {}".format(
+                    node.B + np.outer(node.context(), node.shared_context().T),
+                    node.B, node.context(), node.shared_context().T,
+                    node.B, np.outer(node.context(), node.shared_context().T)
+                ))
+
                 a_inv = np.linalg.inv(node.A)
                 A0 += node.B.T.dot(a_inv).dot(node.B)
                 b0 += node.B.T.dot(a_inv).dot(node.b)
-                node.B += node.shared_context().dot(node.shared_context().T)
+                node.B += np.outer(node.context(), node.shared_context().T)
+
+            LOGGER.info("node.A = node.A + np.outer(node.context(), node.context()):\n"
+                        "{}\n"
+                        "=\n {}\n +\n {}\n *\n {}\n"
+                        "=\n {}\n +\n {}\n".format(
+                node.A + np.outer(node.context(), node.context()),
+                node.A, node.context(), node.context(),
+                node.A, np.outer(node.context(), node.context())
+            ))
+
+            LOGGER.info("node.b = node.b + np.array(is_new).dot(node.context()):\n"
+                        "{}\n"
+                        "=\n {}\n +\n {}\n .\n {}\n"
+                        "=\n {}\n +\n {}\n".format(
+                node.b + np.array(is_new).dot(node.context()),
+                node.b, np.array(is_new), node.context(),
+                node.b, np.array(is_new).dot(node.context())
+            ))
 
             node.A += np.outer(node.context(), node.context())
             node.b += np.array(is_new).dot(node.context())
 
-            if HYBRID and not updated_red:
-            # if HYBRID:
+            if HYBRID and not updated_global:
+
+                LOGGER.info("Global.A0 = Global.A0 + np.outer(node.shared_context(), node.shared_context().T) "
+                            "- node.B.T.dot(inv(node.A)).dot(node.B):\n {}\n =\n {}\n +\n {}\n -\n {}\n".format(
+                    A0 + np.outer(node.shared_context(), node.shared_context().T) - node.B.T.dot(a_inv).dot(node.B),
+                    A0, np.outer(node.shared_context(), node.shared_context().T), node.B.T.dot(a_inv).dot(node.B)
+                ))
+
+                LOGGER.info("Global.b0 = Global.b0 + np.array(is_new).dot(node.shared_context()) "
+                            "- node.B.T.dot(a_inv).dot(node.b):\n {}\n =\n {}\n +\n {}\n -\n {}\n".format(
+                    b0 + np.array(is_new).dot(node.shared_context()) - node.B.T.dot(a_inv).dot(node.b),
+                    b0, np.array(is_new).dot(node.shared_context()), node.B.T.dot(a_inv).dot(node.b)
+                ))
+
                 a_inv = np.linalg.inv(node.A)
-                A0 += node.shared_context().dot(node.shared_context().T) - node.B.T.dot(a_inv).dot(node.B)
+                A0 += np.outer(node.shared_context(), node.shared_context().T) - node.B.T.dot(a_inv).dot(node.B)
                 b0 += np.array(is_new).dot(node.shared_context()) - node.B.T.dot(a_inv).dot(node.b)
 
-        updated_red = node.colour == Colour.R
+            LOGGER.info("Propagated: {};\t Reward: {}".format(node, is_new))
+            # pdb.set_trace()
+
+        updated_global = True
         node = node.parent
 
 
@@ -1906,10 +2020,13 @@ if __name__ == '__main__':
     SHARED_CONTEXTS = args.shared_contexts
     NUM_CONTEXT = len(CONTEXTS)
     HYBRID = args.non_hybrid
+
+    ALPHA = 1 + sqrt(log(2/DELTA)/2)
+
     if HYBRID:
-        NUM_SHARED_CONTEXTS = len(SHARED_CONTEXTS) if HYBRID else []
+        NUM_SHARED_CONTEXTS = len(SHARED_CONTEXTS)
         A0 = np.identity(NUM_SHARED_CONTEXTS)
-        b0 = np.zeros(NUM_SHARED_CONTEXTS)
+        b0 = np.array([np.zeros(NUM_SHARED_CONTEXTS)]).T
 
     if RAN_SEED is not None:
         random.seed(RAN_SEED)

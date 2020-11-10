@@ -45,6 +45,7 @@ CONEX_TIMEOUT = None  # in secs
 MAX_BYTES = 1000  # Max bytes per input
 TREE_DEPTH_LIMIT = 100000000  # INT_MAX is 2147483647, a large value will cause a compilation error
 INFINITY = inf  # using inf will incur nan values, this is temporary workaround
+INITIAL_SCORE = None
 
 # Budget
 MAX_PATHS = float('inf')
@@ -496,7 +497,7 @@ class TreeNode:
             uct_score = self.avg_new_path() + self.explore_score()
             score = uct_score - time_penalisation()
         elif SCORE_FUN == 'contextual':
-            score = (self.estimated_score() + self.uncertainty()) if self.sel_try else INFINITY
+            score = (self.estimated_score() + self.uncertainty()) if (self.sel_try or not INITIAL_SCORE) else INITIAL_SCORE
         else:
             score = -INFINITY
             debug_assertion(False)
@@ -1077,6 +1078,7 @@ def mcts():
         print("APPF_NEW: {}".format(APPF_NEW))
 
     debug_assertion(len(traces) == len(are_new))
+    ROOT.pp(mark=node, found=sum(are_new))
     propagation(node=node, traces=traces, are_new=are_new)
     ROOT.pp(mark=node, found=sum(are_new))
     save_results_to_files(test_cases, test_inputs, are_new)
@@ -1978,6 +1980,11 @@ if __name__ == '__main__':
                         help='Exploration factor (default: sqrt(2))')
     parser.add_argument('--delta', type=float, default=DELTA,
                         help="The error allowed (i.e. 1 - confidence level")
+    parser.add_argument('--initial-score', default=INITIAL_SCORE,
+                        choices=[
+                            "inf",
+                        ],
+                        help="The initial value of each node")
     parser.add_argument("--non-hybrid", action="store_false",
                         help="Disable hybrid model with shared features")
     parser.add_argument("--contexts", nargs="+", type=str,
@@ -2073,6 +2080,7 @@ if __name__ == '__main__':
     SCORE_FUN = args.score
     RHO = args.rho
     DELTA = args.delta
+    INITIAL_SCORE = inf if args.initial_score else None
     COLLECT_STATISTICS = args.collect_statistics
     SAVE_TESTINPUTS = args.save_inputs if args.save_inputs else []
     SAVE_TESTCASES = args.save_tests if args.save_tests else []

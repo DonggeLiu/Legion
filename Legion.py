@@ -16,6 +16,7 @@ import struct
 import subprocess as sp
 import time
 
+from collections import Counter
 from contextlib import closing
 from math import sqrt, log, ceil, inf
 # from memory_profiler import profile
@@ -225,7 +226,41 @@ class TreeNode:
         :return: the path constraints of the node/state
         """
         return self.sim_state().solver.constraints \
-            if self.sim_state() else "No SimState"
+            if self.sim_state() else None
+
+    def equality_percentage(self) -> float:
+        """
+        :return: the percentage of equality constraints
+        """
+        constraints = self.estimate_constraints()
+        if not constraints:
+            return 0
+        return TreeNode.count_equality_constraint(constraints) / TreeNode.count_total_constraint(constraints)
+
+    def estimate_constraints(self) -> List:
+        """
+        :return: Estimate the list of constraints of a node
+        NOTE: if the constraints of a node has not been found, use the constraints of its nearest parent.
+        """
+        node = self
+        while not node.sim_state():
+            node = node.parent
+        return node.constraints()
+
+    @staticmethod
+    def count_equality_constraint(constraints:List) -> int:
+        return sum([constraint.op == '__eq__' for constraint in constraints])
+
+    @staticmethod
+    def count_total_constraint(constraints:List) -> int:
+        return len(constraints)
+
+    def max_num_repeated_address(self) -> int:
+        addr_counter = Counter(self.path_trace())
+        return max(addr_counter.values())
+
+    def num_cur_repeated_address(self) -> int:
+        return self.path_trace().count(self.addr)
 
     def path_trace(self) -> List[int]:
         """
@@ -265,12 +300,18 @@ class TreeNode:
         #   3. offset, which always equals to 1
         contexts = []
         for context in CONTEXTS:
-            if context == "CONST_ONE":
+            if context == "CONST_ZERO":
+                contexts.append(0)
+            elif context == "CONST_ONE":
                 contexts.append(1)
             elif context == "AVG_NEW_PATH":
                 contexts.append(self.avg_new_path())
             elif context == "EXPLORE_SCORE":
                 contexts.append(self.explore_score())
+            elif context == "MAX_ADDR_REPETITION":
+                contexts.append(self.max_num_repeated_address())
+            elif context == "CUR_ADDR_REPETITION":
+                contexts.append(self.num_cur_repeated_address())
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -282,7 +323,9 @@ class TreeNode:
 
         shared_contexts = []
         for context in SHARED_CONTEXTS:
-            if context == "CONST_ONE":
+            if context == "CONST_ZERO":
+                shared_contexts.append(0)
+            elif context == "CONST_ONE":
                 shared_contexts.append(1)
             elif context == "AVG_NEW_PATH":
                 shared_contexts.append(self.avg_new_path())
@@ -302,6 +345,12 @@ class TreeNode:
                 shared_contexts.append(self.depth())
             elif context == 'FISH_BONE':
                 shared_contexts.append(int(self.is_fish_bone()))
+            elif context == "EQ_PC":
+                shared_contexts.append(self.equality_percentage())
+            elif context == "MAX_ADDR_REPETITION":
+                shared_contexts.append(self.max_num_repeated_address())
+            elif context == "CUR_ADDR_REPETITION":
+                shared_contexts.append(self.num_cur_repeated_address())
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -1928,14 +1977,21 @@ if __name__ == '__main__':
                         help="Disable hybrid model with shared features")
     parser.add_argument("--contexts", nargs="+", type=str,
                         required=(('contextual' in sys.argv) and ('--shared-contexts' not in sys.argv)),
-                        choices=["CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
+                        choices=["CONST_ZERO", "CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
     parser.add_argument("--shared-contexts", nargs="+", type=str,
                         required=('contextual' in sys.argv) and ('--contexts' not in sys.argv),
-                        choices=['CONST_ONE',
-                                 "AVG_NEW_PATH", "EXPLORE_SCORE",
-                                 'COLOUR_RED', 'COLOUR_WHITE', 'COLOUR_GOLD', 'COLOUR_PURPLE', 'COLOUR_BLACK',
-                                 'FISH_BONE',
-                                 'DEPTH'])
+                        choices=[
+                            "CONST_ZERO",
+                            "CONST_ONE",
+                            "AVG_NEW_PATH",
+                            "EXPLORE_SCORE",
+                            "COLOUR_RED", "COLOUR_WHITE", "COLOUR_GOLD", "COLOUR_PURPLE", "COLOUR_BLACK",
+                            "FISH_BONE",
+                            "EQ_PC",
+                            "DEPTH",
+                            "MAX_ADDR_REPETITION",
+                            "CUR_ADDR_REPETITION",
+                        ])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,

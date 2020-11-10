@@ -745,7 +745,7 @@ class TreeNode:
                         APPF_TIME += (end-start)
                         print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
                         print("APPF_COUNT: {}".format(SOLV_COUNT))
- 
+
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
                 LOGGER.debug("Exhausted {}".format(self))
@@ -1670,6 +1670,11 @@ def propagation(node: TreeNode, traces: List[List[int]],
     # propagate_context_execution_traces(traces=traces, are_new=are_new)
     propagate_reward_selection_path(node=node, are_new=are_new)
     propagate_reward_execution_traces(traces=traces, are_new=are_new)
+    # NOTE: propagate the reward to feature values (i.e. like in the non-contextual setting)
+    #                        before feature coefficients
+    #  Otherwise if the feature value was 0, then this reward will not be recorded to coefficients
+
+    # propagate_context_selection_path(node=node, are_new=are_new)
 
 
 def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> None:

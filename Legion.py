@@ -1770,6 +1770,11 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
             LOGGER.info("Propagated: {};\t Reward: {}".format(node, is_new))
             # pdb.set_trace()
 
+        if HYBRID and COLLECT_STATISTICS:
+            beta_hat = np.linalg.inv(A0).dot(b0)
+            for index, coefficient in enumerate(beta_hat):
+                print("COEF of {}: {}".format(SHARED_CONTEXTS[index], coefficient[0]))
+
         updated_global = True
         node = node.parent
 

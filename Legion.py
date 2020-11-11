@@ -1774,52 +1774,52 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
         node = node.parent
 
 
-def propagate_context_execution_traces(
-        traces: List[List[int]], are_new: List[bool]) -> None:
-    """
-    Forward propagate the results to all execution traces correspondingly
-    :param traces: the binary execution traces
-    :param are_new: whether each of the execution traces is new
-    """
-
-    def propagate_execution_trace(trace: List[int], is_new: bool) -> None:
-        """
-        Forward propagate the change to matrix to all execution traces correspondingly
-        :param trace: the binary execution trace
-        :param is_new: whether the execution trace is new
-        """
-        LOGGER.debug("propagate_execution_trace")
-        debug_assertion(trace[0] == ROOT.addr)
-        node = ROOT
-        record_simulation(node=node, is_new=is_new)
-        for addr in trace[1:]:
-            node = node.children[addr]
-            record_simulation(node=node, is_new=is_new)
-
-        # NOTE: mark the last node as fully explored
-        #   as fuzzing it will not give any new path
-        #   this assumes no trace can be a prefix of another
-        #   (i.e. no [1,2,3] and [1,2,3,4]
-        # node.mark_fully_explored()
-
-    def record_simulation(node: TreeNode, is_new: bool) -> None:
-        """
-        Record a node has been traversed in simulation
-        NOTE: increment the statistics of its simulation child as well
-            otherwise it will always have sim_try = 0
-        :param node: the node to record
-        :param is_new: whether the node contributes to the discovery of a new path
-        """
-        node.A += node.context().T.dot(node.context())
-        node.b += np.array(is_new).dot(node.context())[0]
-        if 'Simulation' in node.children:
-            node = node.children['Simulation']
-            node.A += node.context().T.dot(node.context())
-            node.b += np.array(is_new).dot(node.context())[0]
-
-    debug_assertion(len(traces) == len(are_new))
-    for i in range(len(traces)):
-        propagate_execution_trace(trace=traces[i], is_new=are_new[i])
+# def propagate_context_execution_traces(
+#         traces: List[List[int]], are_new: List[bool]) -> None:
+#     """
+#     Forward propagate the results to all execution traces correspondingly
+#     :param traces: the binary execution traces
+#     :param are_new: whether each of the execution traces is new
+#     """
+#
+    # def propagate_execution_trace(trace: List[int], is_new: bool) -> None:
+    #     """
+    #     Forward propagate the change to matrix to all execution traces correspondingly
+    #     :param trace: the binary execution trace
+    #     :param is_new: whether the execution trace is new
+    #     """
+    #     LOGGER.debug("propagate_execution_trace")
+    #     debug_assertion(trace[0] == ROOT.addr)
+    #     node = ROOT
+    #     record_simulation(node=node, is_new=is_new)
+    #     for addr in trace[1:]:
+    #         node = node.children[addr]
+    #         record_simulation(node=node, is_new=is_new)
+    #
+    #     # NOTE: mark the last node as fully explored
+    #     #   as fuzzing it will not give any new path
+    #     #   this assumes no trace can be a prefix of another
+    #     #   (i.e. no [1,2,3] and [1,2,3,4]
+    #     # node.mark_fully_explored()
+    #
+    # def record_simulation(node: TreeNode, is_new: bool) -> None:
+    #     """
+    #     Record a node has been traversed in simulation
+    #     NOTE: increment the statistics of its simulation child as well
+    #         otherwise it will always have sim_try = 0
+    #     :param node: the node to record
+    #     :param is_new: whether the node contributes to the discovery of a new path
+    #     """
+    #     node.A += node.context().T.dot(node.context())
+    #     node.b += np.array(is_new).dot(node.context())[0]
+    #     if 'Simulation' in node.children:
+    #         node = node.children['Simulation']
+    #         node.A += node.context().T.dot(node.context())
+    #         node.b += np.array(is_new).dot(node.context())[0]
+    #
+    # debug_assertion(len(traces) == len(are_new))
+    # for i in range(len(traces)):
+    #     propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
 def propagate_reward_selection_path(node: TreeNode, are_new: List[bool]) -> None:

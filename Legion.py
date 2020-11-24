@@ -667,23 +667,21 @@ class TreeNode:
         method = "S"
         while len(results) < MAX_SAMPLES:
             try:
-                if COLLECT_STATISTICS:
-                    start = time.time()
+                start = time.time()
 
                 val = next(self.samples)
 
-                if COLLECT_STATISTICS:
-                    end = time.time()
-                    if method == "S":
-                        SOLV_COUNT += 1
-                        SOLV_TIME += (end - start)
-                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT))
-                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
-                    elif method == "F":
-                        APPF_COUNT += 1
-                        APPF_TIME += (end - start)
-                        print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
-                        print("APPF_COUNT: {}".format(APPF_COUNT))
+                end = time.time()
+                if method == "S":
+                    SOLV_COUNT += 1
+                    SOLV_TIME += (end - start)
+                    print_statistics("AVG_SOLV_TIME", SOLV_TIME/SOLV_COUNT)
+                    print_statistics("SOLV_COUNT", SOLV_COUNT)
+                elif method == "F":
+                    APPF_COUNT += 1
+                    APPF_TIME += (end - start)
+                    print_statistics("AVG_APPF_TIME", APPF_TIME/APPF_COUNT)
+                    print_statistics("APPF_COUNT", APPF_COUNT)
 
                 if val is None and len(results) >= MIN_SAMPLES:
                     # next val requires constraint solving and enough results
@@ -701,18 +699,18 @@ class TreeNode:
                 # TODO: May have a better way to solve this, e.g. redo sampling?
                 LOGGER.warning("Z3Exception in APPF: {}".format(e))
                 LOGGER.info("Redo APPF sampling")
-                if COLLECT_STATISTICS:
-                    end = time.time()
-                    if method == "S":
-                        SOLV_EXP += 1
-                        SOLV_TIME += (end-start)
-                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT)))
-                        print("SOLV_EXCEPTION: {}".format(SOLV_EXP))
-                    elif method == "F":
-                        APPF_EXP += 1
-                        APPF_TIME += (end-start)
-                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
-                        print("APPF_EXCEPTION: {}".format(APPF_EXP))
+
+                end = time.time()
+                if method == "S":
+                    SOLV_EXP += 1
+                    SOLV_TIME += (end-start)
+                    print_statistics("AVG_SOLV_TIME", SOLV_TIME/max(1, SOLV_COUNT))
+                    print_statistics("SOLV_EXCEPTION",SOLV_EXP)
+                elif method == "F":
+                    APPF_EXP += 1
+                    APPF_TIME += (end-start)
+                    print_statistics("AVG_APPF_TIME", APPF_TIME/max(1, APPF_COUNT))
+                    print_statistics("APPF_EXCEPTION", APPF_EXP)
 
                 # LOGGER.info("Exhausted {}".format(self))
                 # LOGGER.info("Fully explored {}".format(self))
@@ -734,18 +732,17 @@ class TreeNode:
                 #       even if not, the next constraint solving will take long
                 #       as it has to exclude all past solutions
                 #  Assume Case 1 for simplicity
-                if COLLECT_STATISTICS:
-                    end = time.time()
-                    if method == "S":
-                        SOLV_COUNT += 1
-                        SOLV_TIME += (end-start)
-                        print("AVG_SOLV_TIME: {}".format(SOLV_TIME/max(1, SOLV_COUNT)))
-                        print("SOLV_COUNT: {}".format(SOLV_COUNT))
-                    elif method == "F":
-                        APPF_COUNT += 1
-                        APPF_TIME += (end-start)
-                        print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
-                        print("APPF_COUNT: {}".format(SOLV_COUNT))
+                end = time.time()
+                if method == "S":
+                    SOLV_COUNT += 1
+                    SOLV_TIME += (end-start)
+                    print_statistics("AVG_SOLV_TIME", SOLV_TIME/max(1, SOLV_COUNT))
+                    print_statistics("SOLV_COUNT", SOLV_COUNT)
+                elif method == "F":
+                    APPF_COUNT += 1
+                    APPF_TIME += (end-start)
+                    print_statistics("AVG_APPF_TIME", APPF_TIME/max(1, APPF_COUNT))
+                    print_statistics("APPF_COUNT", SOLV_COUNT)
 
                 # Note: If the state of the simulation node is unsatisfiable
                 #   then this will occur in the first time the node is selected
@@ -783,17 +780,15 @@ class TreeNode:
             #     input_bytes += os.urandom(1)
             # return input_bytes
             # Or return end of file char?
-            if COLLECT_STATISTICS:
-                start = time.time()
+            start = time.time()
 
             random_input_bytes = os.urandom(MAX_BYTES)
 
-            if COLLECT_STATISTICS:
-                end = time.time()
-                RAND_COUNT += 1
-                RAND_TIME += (end - start)
-                print("AVG_RAND_TIME: {}".format(RAND_TIME / RAND_COUNT))
-                print("RAND_COUNT: {}".format(RAND_COUNT))
+            end = time.time()
+            RAND_COUNT += 1
+            RAND_TIME += (end - start)
+            print_statistics("AVG_RAND_TIME", RAND_TIME / RAND_COUNT)
+            print_statistics("RAND_COUNT", RAND_COUNT)
             return random_input_bytes
 
         return [(random_bytes(), "R") for _ in range(MIN_SAMPLES)]
@@ -1060,22 +1055,22 @@ def mcts():
         return
     traces, test_cases, test_inputs = simulation(node=node)
     are_new = expansion(traces=traces)
-    if COLLECT_STATISTICS:
-        # get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
-        # selection_path = get_trace(node)[:-1][::-1]
-        APPF_EQL += sum([node.preserved_path(trace) for trace in traces])
-        print("APPF_EQL: {}".format(APPF_EQL))
-        for i in range(len(are_new)):
-            if test_cases[i][-1][-1] == "R":
-                RAND_NEW += are_new[i]
-            if test_cases[i][-1][-1] == "S":
-                SOLV_NEW += are_new[i]
-            if test_cases[i][-1][-1] == "F":
-                APPF_NEW += are_new[i]
 
-        print("RAND_NEW: {}".format(RAND_NEW))
-        print("SOLV_NEW: {}".format(SOLV_NEW))
-        print("APPF_NEW: {}".format(APPF_NEW))
+    # get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
+    # selection_path = get_trace(node)[:-1][::-1]
+    APPF_EQL += sum([node.preserved_path(trace) for trace in traces])
+    print_statistics("APPF_EQL", APPF_EQL)
+    for i in range(len(are_new)):
+        if test_cases[i][-1][-1] == "R":
+            RAND_NEW += are_new[i]
+        if test_cases[i][-1][-1] == "S":
+            SOLV_NEW += are_new[i]
+        if test_cases[i][-1][-1] == "F":
+            APPF_NEW += are_new[i]
+
+    print_statistics("RAND_NEW", RAND_NEW)
+    print_statistics("SOLV_NEW", SOLV_NEW)
+    print_statistics("APPF_NEW", APPF_NEW)
 
     debug_assertion(len(traces) == len(are_new))
     ROOT.pp(mark=node, found=sum(are_new))
@@ -1174,8 +1169,7 @@ def selection() -> TreeNode:
                 node = node.parent
             node = last_red.children['Simulation']
             SYMEX_TIMEOUT_COUNT += 1
-            if COLLECT_STATISTICS:
-                print("SYMEX_TIMEOUT count: {}".format(SYMEX_TIMEOUT_COUNT))
+            print_statistics("SYMEX_TIMEOUT count", SYMEX_TIMEOUT_COUNT)
             break
 
         if node.is_leaf():
@@ -1225,10 +1219,11 @@ def selection() -> TreeNode:
     selection_end_time = time.time()
     SYMEX_TIME += (selection_end_time - selection_start_time)
     SYMEX_SUCCESS_COUNT += not reach_symex_timeout()
-    if COLLECT_STATISTICS:
-        print("SYMEX_TIME: {:.4f}".format(SYMEX_TIME))
-        print("SYMEX_SUCCESS count: {}".format(SYMEX_SUCCESS_COUNT))
-        print("SYMEX_TIME_AVG: {:.4f}".format(SYMEX_TIME / SYMEX_SUCCESS_COUNT))
+
+    print_statistics("SYMEX_TIME", SYMEX_TIME)
+    print("SYMEX_SUCCESS count", SYMEX_SUCCESS_COUNT)
+    print("SYMEX_TIME_AVG", SYMEX_TIME / SYMEX_SUCCESS_COUNT)
+
     return node
 
 
@@ -1508,8 +1503,7 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             # Note: Once instrumented binary execution times out,
             #  execute with uninstrumented binary to save inputs
             CONEX_TIMEOUT_COUNT += 1
-            if COLLECT_STATISTICS:
-                print("CONEX_TIMEOUT count: {}".format(CONEX_TIMEOUT_COUNT))
+            print_statistics("CONEX_TIMEOUT count", CONEX_TIMEOUT_COUNT);
             LOGGER.debug("Instrumented Binary execution time out")
             instr.kill()
             del instr
@@ -1541,10 +1535,9 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
             end_conex = time.time()
             CONEX_TIME += end_conex - start_conex
             CONEX_SUCCESS_COUNT += 1
-            if COLLECT_STATISTICS:
-                print("CONEX_TIME: {:.4f}".format(CONEX_TIME))
-                print("CONEX_SUCCESS count: {}".format(CONEX_SUCCESS_COUNT))
-                print("CONEX_TIME_AVG: {:.4f}".format(CONEX_TIME / CONEX_SUCCESS_COUNT))
+            print_statistics("CONEX_TIME", CONEX_TIME)
+            print_statistics("CONEX_SUCCESS count", CONEX_SUCCESS_COUNT)
+            print_statistics("CONEX_TIME_AVG", CONEX_TIME / CONEX_SUCCESS_COUNT)
         return msg, ret, timeout
 
     global SEED_IN_COUNT, SOL_GEN_COUNT, FUZ_GEN_COUNT, RND_GEN_COUNT, \
@@ -1561,35 +1554,31 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
 
     if input_bytes[1] == "D":
         SEED_IN_COUNT += 1
-        if COLLECT_STATISTICS:
-            print("Seed count: {}".format(SEED_IN_COUNT))
+        print_statistics("Seed count", SEED_IN_COUNT)
     elif input_bytes[1] == "S":
         SOL_GEN_COUNT += 1
-        if COLLECT_STATISTICS:
-            print("Solving count: {}".format(SOL_GEN_COUNT))
+        print_statistics("Solving count", SOL_GEN_COUNT)
     elif input_bytes[1] == "F":
         FUZ_GEN_COUNT += 1
-        if COLLECT_STATISTICS:
-            print("Fuzzing count: {}".format(FUZ_GEN_COUNT))
+        print_statistics("Fuzzing count", FUZ_GEN_COUNT)
     elif input_bytes[1] == "R":
         RND_GEN_COUNT += 1
-        if COLLECT_STATISTICS:
-            print("Random count: {}".format(RND_GEN_COUNT))
+        print_statistics("Random count", RND_GEN_COUNT)
 
     # Record the test case
     test_case = test_input = None
     curr_time = time.time() - TIME_START
-    if SAVE_TESTCASES and not time_out:
+    if not time_out:
         test_case = (curr_time, report_msg[0].decode('utf-8'),
                      ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
-    if SAVE_TESTINPUTS:
-        test_input = (curr_time, input_bytes[0],
-                      ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
+
+    test_input = (curr_time, input_bytes[0],
+                  ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
     if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
         save_test_to_file(curr_time, report_msg[0].decode('utf-8'),
                           ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
-    if completed and time_out and "TIMEOUT" in SAVE_TESTCASES:
+    if completed and time_out and "TIMEOUT" in SAVE_TESTINPUTS:
         save_input_to_file(curr_time, report_msg[0],
                            ("-T" if time_out else "-C") + ("-" + input_bytes[1]))
 
@@ -1602,14 +1591,11 @@ def binary_execute_parallel(input_bytes: Tuple[bytes, str]):
 
     if not time_out:
         MAX_TREE_DEPTH = max(len(trace) if trace else 0, MAX_TREE_DEPTH)
-        if COLLECT_STATISTICS:
-            print("Max tree depth:{}".format(MAX_TREE_DEPTH))
+        print_statistics("Max tree depth", MAX_TREE_DEPTH)
         MIN_TREE_DEPTH = min(len(trace) if trace else 0, MIN_TREE_DEPTH)
-        if COLLECT_STATISTICS:
-            print("Min tree depth:{}".format(MIN_TREE_DEPTH))
+        print_statistics("Min tree depth", MIN_TREE_DEPTH)
         SUM_TREE_DEPTH += len(trace) if trace else 0
-        if COLLECT_STATISTICS:
-            print("Avg tree depth:{}".format(SUM_TREE_DEPTH // CONEX_SUCCESS_COUNT))
+        print_statistics("Avg tree depth", SUM_TREE_DEPTH // CONEX_SUCCESS_COUNT)
 
     if LOGGER.level < logging.WARNING:
         trace_log = [hex(addr) if type(addr) is int else addr for addr in (
@@ -1773,7 +1759,7 @@ def propagate_context_selection_path(node: TreeNode, are_new: List[bool]) -> Non
         if HYBRID and COLLECT_STATISTICS:
             beta_hat = np.linalg.inv(A0).dot(b0)
             for index, coefficient in enumerate(beta_hat):
-                print("COEF of {}: {}".format(SHARED_CONTEXTS[index], coefficient[0]))
+                print_statistics("COEF of {}".format(SHARED_CONTEXTS[index]), coefficient[0])
 
         updated_global = True
         node = node.parent
@@ -1903,6 +1889,8 @@ def save_results_to_files(test_cases, test_inputs, are_new):
 
 def save_test_to_file(time_stamp, data, suffix):
     # if DIR_NAME not in os.listdir('tests'):
+    if not SAVE_TESTCASES:
+        return
     with open('tests/{}/{}_{}{}.xml'.format(
             DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wt+') as input_file:
         input_file.write(
@@ -1917,6 +1905,8 @@ def save_test_to_file(time_stamp, data, suffix):
 
 def save_input_to_file(time_stamp, input_bytes, suffix):
     # if DIR_NAME not in os.listdir('inputs'):
+    if not SAVE_TESTINPUTS:
+        return
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
 
     with open('inputs/{}/{}_{}{}'.format(
@@ -1929,6 +1919,14 @@ def debug_assertion(assertion: bool) -> None:
         # pdb.set_trace()
         return
     # assert assertion
+
+
+def print_statistics(name: str, value: float) -> None:
+    """
+    print out the statistic name and its value, if the collect-statistics flag is enabled
+    """
+    if COLLECT_STATISTICS:
+        print("{}: {}".format(name, value))
 
 
 def run_with_timeout() -> None:

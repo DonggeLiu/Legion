@@ -263,6 +263,40 @@ class TreeNode:
     def num_cur_repeated_address(self) -> int:
         return self.path_trace().count(self.addr)
 
+    def missing_descendants(self) -> float:
+        assert (0 <=len([child for child in self.children.values() if child.colour != Colour.G]) <=2)
+        if self.colour == Colour.G:
+            # NOTE: If the current node is a simulation node,
+            #   Its number of missing descendants is the average of its siblings
+            # NOTE: This will only be applied once, as all other simulation children will be skipped in the loop below
+            if len(self.parent.children) == 1:
+                return 0
+
+            return sum([sib.missing_descendants()
+                        for sib in self.parent.children.values()
+                        if sib.colour != Colour.G]) \
+                   / (len(self.parent.children) - 1)
+
+        if self.is_leaf():
+            # Leaves have no mising descendant
+            return 0
+
+        if self.phantom or self.colour == Colour.P:
+            # Phantoms have both children missing
+            return 2
+
+        # First assume both children are missing, then minus 1 for each non-simulation child
+        missing_descendants = 2
+        for child in self.children.values():
+            if child.colour == Colour.G:
+                continue
+            missing_descendants -= 1
+            missing_descendants += child.missing_descendants()
+
+        return missing_descendants
+
+
+
     def path_trace(self) -> List[int]:
         """
         Return the path trace of a node, which consists of two parts:
@@ -313,6 +347,8 @@ class TreeNode:
                 contexts.append(self.max_num_repeated_address())
             elif context == "CUR_ADDR_REPETITION":
                 contexts.append(self.num_cur_repeated_address())
+            elif context == "MISSING_DESCENDANTS":
+                contexts.append(self.missing_descendants())
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -352,6 +388,8 @@ class TreeNode:
                 shared_contexts.append(self.max_num_repeated_address())
             elif context == "CUR_ADDR_REPETITION":
                 shared_contexts.append(self.num_cur_repeated_address())
+            elif context == "MISSING_DESCENDANTS":
+                shared_contexts.append(self.missing_descendants())
             else:
                 LOGGER.error("Unidentified Contextual Feature")
                 exit(1)
@@ -1992,7 +2030,13 @@ if __name__ == '__main__':
                         help="Disable hybrid model with shared features")
     parser.add_argument("--contexts", nargs="+", type=str,
                         required=(('contextual' in sys.argv) and ('--shared-contexts' not in sys.argv)),
-                        choices=["CONST_ZERO", "CONST_ONE", "AVG_NEW_PATH", "EXPLORE_SCORE"])
+                        choices=[
+                            "CONST_ZERO",
+                            "CONST_ONE",
+                            "AVG_NEW_PATH",
+                            "EXPLORE_SCORE",
+                            "MISSING_DESCENDANTS",
+                        ])
     parser.add_argument("--shared-contexts", nargs="+", type=str,
                         required=('contextual' in sys.argv) and ('--contexts' not in sys.argv),
                         choices=[
@@ -2006,6 +2050,7 @@ if __name__ == '__main__':
                             "DEPTH",
                             "MAX_ADDR_REPETITION",
                             "CUR_ADDR_REPETITION",
+                            "MISSING_DESCENDANTS",
                         ])
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')

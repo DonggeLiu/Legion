@@ -20,7 +20,7 @@ from math import sqrt, log, ceil, inf
 from multiprocessing import Pool, cpu_count
 from typing import Dict, List, Tuple
 from types import GeneratorType
-
+import shutil
 from angr import Project
 from angr.errors import SimUnsatError
 from angr.sim_state import SimState as State
@@ -28,7 +28,7 @@ from angr.storage.file import SimFileStream
 from angr.sim_options import LAZY_SOLVES
 from z3.z3types import Z3Exception
 
-VERSION = "0.1-testcomp2020"
+VERSION = "aflegion-testcomp2020"
 
 if __name__ == '__main__':
     if len(sys.argv) == 2 and sys.argv[1] == '--version':
@@ -53,7 +53,7 @@ MAX_ROUNDS = float('inf')
 CORE = 1
 MAX_TIME = 0
 FOUND_BUG = False  # type: bool
-COVERAGE_ONLY = True
+COVERAGE_ONLY = False
 PERSISTENT = False
 
 # Statistics
@@ -75,15 +75,18 @@ SUM_TREE_DEPTH = 0
 SOLV_TIME = 0
 APPF_TIME = 0
 RAND_TIME = 0
+AFL_TIME = 0
 SOLV_COUNT = 0
 APPF_COUNT = 0
 RAND_COUNT = 0
+AFL_COUNT = 0
 SOLV_NEW = 0
 APPF_NEW = 0
 RAND_NEW = 0
+AFL_NEW = 0
 SOLV_EXP = 0
 APPF_EXP = 0
-APPF_EQL = 0
+AFL_EXP = 0
 PROFILE = False
 COLLECT_STATISTICS = False
 
@@ -99,6 +102,15 @@ DEFAULT_ADDR = -1
 INPUTS = []  # type: List
 MSGS = []  # type: List
 TIMES = []  # type: List
+
+# AFL related
+USE_AFL = False
+AFL_BIN = None
+COUNTER = 0
+AFL_PROCESS = None
+AFL_DIR = dict ()
+AFL_SYNC_DIR = "sync_dir"
+AFL_FUZZ_NAME = "fuzzer01"
 
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
@@ -161,6 +173,7 @@ class TreeNode:
         # the subtree beneath the node has been fully explored
         self.fully_explored = False
         self.exhausted = False
+
 
     def child(self, name) -> 'TreeNode' or None:
         """
@@ -407,7 +420,7 @@ class TreeNode:
             """
             return (target.size() + 7) // 8
 
-        global SOLV_EXP, SOLV_TIME, SOLV_COUNT, APPF_EXP, APPF_TIME, APPF_COUNT
+        global SOLV_EXP, SOLV_TIME, SOLV_COUNT, APPF_EXP, APPF_TIME, APPF_COUNT, AFL_TIME, AFL_COUNT, AFL_EXP
         # Note: Once we fuzz a simulation child,
         #   its parent is no longer a phantom
         #   This is important as we do not mark phantom fully explored
@@ -448,6 +461,11 @@ class TreeNode:
                         APPF_TIME += (end - start)
                         print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT))
                         print("APPF_COUNT: {}".format(APPF_COUNT))
+                    elif method == "A":
+                        AFL_COUNT += 1
+                        AFL_TIME += (end - start)
+                        print("AVG_AFL_TIME: {}".format(AFL_TIME/AFL_COUNT))
+                        print("AFL_COUNT: {}".format(AFL_COUNT))
 
                 if val is None and len(results) >= MIN_SAMPLES:
                     # next val requires constraint solving and enough results
@@ -476,6 +494,12 @@ class TreeNode:
                         APPF_TIME += (end-start)
                         print("AVG_APPF_TIME: {}".format(APPF_TIME/max(1, APPF_COUNT)))
                         print("APPF_EXCPTION: {}".format(APPF_EXP))
+                    elif method == "A":
+                        AFL_EXP += 1
+                        AFL_TIME += (end-start)
+                        print("AVG_AFL_TIME: {}".format(AFL_TIME/max(1, AFL_COUNT)))
+                        print("AFL_EXCPTION: {}".format(AFL_EXP))
+
 
                 # LOGGER.info("Exhausted {}".format(self))
                 # LOGGER.info("Fully explored {}".format(self))
@@ -630,7 +654,7 @@ class TreeNode:
     def repr_node_data(self) -> str:
         """
         UCT = sim_win / sel_try
-            + RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
+            + 2 * RHO * sqrt(2 * log(self.parent.sel_try) / self.self_try)
         :return:
         """
         return "{uct:.2f} = {explore:.2f}({simw}/{selt}) " \
@@ -672,14 +696,56 @@ def consider_tree_fully_explored() -> bool:
     return ROOT.is_fully_explored() and not PERSISTENT
 
 
+def files(path):
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path, file)):
+            yield file
+
 def run() -> None:
     """
     The main function
     """
+    delete_folder()
     initialisation()
     ROOT.pp()
+    afl()
+    time.sleep (3) # Wait for the AFL
     while has_budget():
-        mcts()
+       mcts()
+    AFL_PROCESS.kill()
+
+
+
+def delete_folder():
+    if os.path.exists(AFL_SYNC_DIR) and os.path.isdir(AFL_SYNC_DIR):
+        shutil.rmtree(AFL_SYNC_DIR)
+
+
+def afl():
+    def init():
+        LOGGER.info("Initialising AFL++")
+        os.environ['AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES'] = "1"
+        os.environ['AFL_DONT_OPTIMIZE'] = "1"
+        
+    def afl_instrument():
+        global AFL_BIN
+        AFL_BIN = args.file + "_afl_instr"
+        afl_clang_process = sp.run(["afl-gcc", "__VERIFIER.c", args.file, "-o", AFL_BIN])
+        output = afl_clang_process.stdout
+        print(output)
+    
+    def afl_start():
+        global AFL_PROCESS
+        AFL_PROCESS = sp.Popen(["afl-fuzz", "-i", "inputs/" + DIR_NAME + "/", "-o", AFL_SYNC_DIR, "-M", AFL_FUZZ_NAME, "./" + AFL_BIN], stdout=sp.PIPE, stderr=sp.PIPE)
+        # while watchdog("./afl_output_dir/queue"):
+        #     print("===Listening====")
+        # print("Stop listening")
+        # afl_fuzz_process.kill()
+
+    
+    init()
+    afl_instrument()
+    afl_start()
 
 
 def initialisation():
@@ -741,7 +807,8 @@ def initialisation():
         LOGGER.info("ROOT created")
         return root
 
-    global ROOT
+    global ROOT, AFL_DIR
+    
     LOGGER.info("Simulating on the seeded inputs")
     traces, test_cases, test_inputs = simulation(node=None)
     LOGGER.info("Initialising the ROOT")
@@ -751,7 +818,7 @@ def initialisation():
     LOGGER.info("Propagating the first results")
     propagation(node=ROOT.children['Simulation'], traces=traces,
                 are_new=are_new)
-    save_results_to_files(test_cases, test_inputs, are_new)
+    save_results_to_files(test_cases, test_inputs, are_new, "seed")
 
 
 def has_budget() -> bool:
@@ -769,34 +836,63 @@ def mcts():
     """
     The four steps of MCTS
     """
-    global SOLV_NEW, APPF_NEW, RAND_NEW, APPF_EQL
-    node = selection()
-    if node is ROOT:
-        return
-    traces, test_cases, test_inputs = simulation(node=node)
-    are_new = expansion(traces=traces)
-    if COLLECT_STATISTICS:
-        get_trace = lambda cur_node: [cur_node.addr] + get_trace(cur_node.parent) if cur_node else []
-        selection_path = get_trace(node)[:-1][::-1]
-        if traces[:len(selection_path)] == selection_path:
-            APPF_EQL += 1
-            print("APPF_EQL: {}".format(APPF_EQL))
-        for i in range(len(are_new)):
-            if test_cases[i][-1][-1] == "R":
-                RAND_NEW += are_new[i]
-            if test_cases[i][-1][-1] == "S":
-                SOLV_NEW += are_new[i]
-            if test_cases[i][-1][-1] == "F":
-                APPF_NEW += are_new[i]
 
-        print("RAND_NEW: {}".format(RAND_NEW))
-        print("SOLV_NEW: {}".format(SOLV_NEW))
-        print("APPF_NEW: {}".format(APPF_NEW))
+    """
+    Here we check if AFL find new path or not
+    """
+    global SOLV_NEW, APPF_NEW, RAND_NEW, AFL_DIR, AFL_NEW
+    after = dict ([(f, None) for f in os.listdir ("{}/{}/queue".format(AFL_SYNC_DIR, AFL_FUZZ_NAME))])
+    added = [f for f in after if not f in AFL_DIR]
+    if (added):
+        LOGGER.info("AFL found new paths")
+        AFL_DIR = after
+        LOGGER.info("Simulating on the AFL inputs")
+        traces, test_cases, test_inputs = afl_simulation(new_paths=added)
+        are_new = expansion(traces=traces)
+        if COLLECT_STATISTICS:
+            for i in range(len(are_new)):
+                if test_cases[i][-1][-1] == "R":
+                    RAND_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "S":
+                    SOLV_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "F":
+                    APPF_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "A":
+                    AFL_NEW += are_new[i]
 
-    debug_assertion(len(traces) == len(are_new))
-    propagation(node=node, traces=traces, are_new=are_new)
-    ROOT.pp(mark=node, found=sum(are_new))
-    save_results_to_files(test_cases, test_inputs, are_new)
+            print("RAND_NEW: {}".format(RAND_NEW))
+            print("SOLV_NEW: {}".format(SOLV_NEW))
+            print("APPF_NEW: {}".format(APPF_NEW))
+            print("AFL_NEW: {}".format(AFL_NEW))
+        propagation(node=ROOT.children['Simulation'], traces=traces, are_new=are_new)
+        save_results_to_files(test_cases, test_inputs, are_new, "afl_legion")
+
+    else:
+        LOGGER.info("Normal app_fuzzing")
+        node = selection()
+        if node is ROOT:
+            return
+        traces, test_cases, test_inputs = simulation(node=node)
+        are_new = expansion(traces=traces)
+        if COLLECT_STATISTICS:
+            for i in range(len(are_new)):
+                if test_cases[i][-1][-1] == "R":
+                    RAND_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "S":
+                    SOLV_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "F":
+                    APPF_NEW += are_new[i]
+                if test_cases[i][-1][-1] == "A":
+                    AFL_NEW += are_new[i]
+
+            print("RAND_NEW: {}".format(RAND_NEW))
+            print("SOLV_NEW: {}".format(SOLV_NEW))
+            print("APPF_NEW: {}".format(APPF_NEW))
+            print("AFL_NEW: {}".format(AFL_NEW))
+        debug_assertion(len(traces) == len(are_new))
+        propagation(node=node, traces=traces, are_new=are_new)
+        ROOT.pp(mark=node, found=sum(are_new))
+        save_results_to_files(test_cases, test_inputs, are_new, "native_legion")
 
 
 def selection() -> TreeNode:
@@ -1163,12 +1259,70 @@ def simulation(node: TreeNode = None) \
          for mutant in SEEDS] if SEEDS else ([(b'\x00' * MAX_BYTES, "D")])
 
     # Set the inital input to be a EoF char?
-
     if CORE == 1:
         results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
     else:
         with closing(Pool(processes=CORE)) as conex_pool:
             results = conex_pool.map(binary_execute_parallel, mutants)
+
+    traces, testcases, testinputs = [], [], []
+    for result in results:
+        trace, curr_found_bug, testcase, testinput = result
+        traces.append(trace)
+        testcases.append(testcase)
+        testinputs.append(testinput)
+        FOUND_BUG = FOUND_BUG or curr_found_bug
+    return traces, testcases, testinputs
+
+
+def intersection(lst1, lst2): 
+    return list(set(lst1) & set(lst2))
+
+
+def afl_simulation(new_paths) \
+        -> Tuple[List[List[int]], List[Tuple[float, str, str]], List[Tuple[float, bytes, str]]]:
+    """
+    Generate mutants (i.e. inputs that tend to preserve the path to the node)
+    Execute the instrumented binary with mutants to collect the execution traces
+    :param node: the node to fuzz
+    :return: the execution traces
+    """
+    # node is None if this is initialisation, during which should:
+    #   use SEEDS if SEEDS is available or use random fuzzing if not
+    # otherwise, mutate() the node
+    
+    def afl_fuzzing() -> List[Tuple[bytes, str]]:
+        global SOLV_EXP, SOLV_TIME, SOLV_COUNT, APPF_EXP, APPF_TIME, APPF_COUNT, AFL_TIME, AFL_COUNT, AFL_EXP
+        start = time.time()
+        method = "A"
+        results = []
+        for path in intersection(files("./{}/{}/queue".format(AFL_SYNC_DIR, AFL_FUZZ_NAME)), new_paths):
+            with open("./{}/{}/queue/".format(AFL_SYNC_DIR, AFL_FUZZ_NAME) + path, "rb") as f:
+                byte = f.read()
+                result = (byte, method)
+            results.append(result)   
+        if COLLECT_STATISTICS:
+            end = time.time()
+            if method == "S":
+                SOLV_COUNT += 1
+                SOLV_TIME += (end - start)
+                print("AVG_SOLV_TIME: {}".format(SOLV_TIME/SOLV_COUNT + 0.0001))
+                print("SOLV_COUNT: {}".format(SOLV_COUNT))
+            elif method == "F":
+                APPF_COUNT += 1
+                APPF_TIME += (end - start)
+                print("AVG_APPF_TIME: {}".format(APPF_TIME/APPF_COUNT + 0.0001))
+                print("APPF_COUNT: {}".format(APPF_COUNT))
+            elif method == "A":
+                AFL_COUNT += len(results)
+                AFL_TIME += (end - start)
+                print("AVG_AFL_TIME: {}".format(AFL_TIME / AFL_COUNT + 0.0001))
+                print("AFL_COUNT: {}".format(AFL_COUNT))
+        return results
+    
+    global FOUND_BUG, MSGS, INPUTS, TIMES
+    mutants = afl_fuzzing()
+    results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
 
     traces, testcases, testinputs = [], [], []
     for result in results:
@@ -1366,8 +1520,8 @@ def propagation(node: TreeNode, traces: List[List[int]],
     :param are_new: whether each of the execution traces is new
     """
     LOGGER.info("Propagation Stage")
-    propagate_selection_path(node=node, are_new=are_new)
-    propagate_execution_traces(traces=traces, are_new=are_new)
+    propagate_selection_path(node=node, are_new = are_new)
+    propagate_execution_traces(traces=traces, are_new = are_new)
 
 
 def propagate_selection_path(node: TreeNode, are_new: List[bool]) -> None:
@@ -1433,15 +1587,17 @@ def propagate_execution_traces(traces: List[List[int]],
         propagate_execution_trace(trace=traces[i], is_new=are_new[i])
 
 
-def save_results_to_files(test_cases, test_inputs, are_new):
+def save_results_to_files(test_cases, test_inputs, are_new, src):
     debug_assertion(len(test_cases) == len(test_inputs) == len(are_new))
     if not any(test_cases) and not any(test_inputs):
         return
     for i in range(len(are_new)):
         if SAVE_TESTCASES and (are_new[i] or "FULL" in SAVE_TESTCASES):
             save_test_to_file(*test_cases[i])
+            save_new_input_to_file(*test_inputs[i], src)
         if SAVE_TESTINPUTS and (are_new[i] or "FULL" in SAVE_TESTINPUTS):
             save_input_to_file(*test_inputs[i])
+            save_new_input_to_file(*test_inputs[i], src)
 
 
 def save_test_to_file(time_stamp, data, suffix):
@@ -1460,10 +1616,17 @@ def save_test_to_file(time_stamp, data, suffix):
 def save_input_to_file(time_stamp, input_bytes, suffix):
     # if DIR_NAME not in os.listdir('inputs'):
     os.system("mkdir -p inputs/{}".format(DIR_NAME))
-
     with open('inputs/{}/{}_{}{}'.format(
             DIR_NAME, time_stamp, SOL_GEN_COUNT, suffix), 'wb+') as input_file:
         input_file.write(input_bytes)
+
+
+def save_new_input_to_file(time_stamp, input_bytes, suffix, src):
+    global COUNTER
+    os.system("mkdir -p {}/legion/queue".format(AFL_SYNC_DIR))
+    with open("%s/legion/queue/id:%06d,src:%s" % (AFL_SYNC_DIR, COUNTER, src), 'wb+') as input_file:
+        input_file.write(input_bytes)
+        COUNTER = COUNTER + 1
 
 
 def debug_assertion(assertion: bool) -> None:
@@ -1521,7 +1684,7 @@ if __name__ == '__main__':
     parser.add_argument('--time-penalty', type=float, default=TIME_COEFF,
                         help='Penalty factor for constraints that take longer to solve')
     parser.add_argument('--rho', type=float, default=RHO,
-                        help='Exploration factor (default: sqrt(2))')
+                        help='Exploration factor (default: 1/sqrt(2))')
     parser.add_argument("--core", type=int, default=cpu_count() - 1,
                         help='Number of cores available')
     parser.add_argument("--random-seed", type=int, default=RAN_SEED,
@@ -1581,9 +1744,11 @@ if __name__ == '__main__':
                         help='Optional input seeds')
     parser.add_argument("--profile", action="store_true",
                         help="Whether to print the profiling of functions")
+    parser.add_argument("--afl", action="store_true",
+                        help="Whether to use AFL")
 
     args = parser.parse_args()
-
+    USE_AFL = args.afl
     MIN_SAMPLES = args.min_samples
     MAX_SAMPLES = args.max_samples
     CORE = args.core

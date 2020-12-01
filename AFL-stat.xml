@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE benchmark PUBLIC "+//IDN sosy-lab.org//DTD BenchExec benchmark 1.18//EN" "https://www.sosy-lab.org/benchexec/benchmark-1.18.dtd">
-<benchmark tool="legion" displayName="Legion" timelimit="1 min" memlimit="15 GB" cpuCores="8">
+<benchmark tool="legion" displayName="Legion" timelimit="15 min" memlimit="15 GB" cpuCores="8">
 
-  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="4" />
+  <require cpuModel="Intel Xeon E3-1230 v5 @ 3.40 GHz" cpuCores="8" />
 
   <option name="--rho">0.0025</option>
   <option name="--score">uct</option>
@@ -14,11 +14,12 @@
   <option name="--save-inputs">REDUCED</option>
   <option name="--save-tests">REDUCED</option>
   <option name="--persistent"/>
+  <option name="--collect-statistics"/>
   <option name="--time-penalty">0</option>
   <option name="--random-seed">0</option>
   <option name="-o">./binary.instr</option>
   <option name="--compile">svcomp</option>
- 
+
   <resultfiles>**/**.xml</resultfiles>
 
   <rundefinition name="test-comp20_prop-coverage-error-call">
@@ -86,6 +87,23 @@
     <includesfile>../sv-benchmarks/c/Termination-MainHeap.set</includesfile>
     <option name="-64"/>
   </tasks>
-
+  
+  <columns>
+    <column title="AVG_SOLV_TIME">AVG_SOLV_TIME:</column>
+    <column title="AVG_APPF_TIME">AVG_APPF_TIME:</column>
+    <column title="SOLV_COUNT">SOLV_COUNT:</column>
+    <column title="APPF_COUNT">APPF_COUNT:</column>
+    <column title="SOLV_EXCPTION">SOLV_EXCPTION:</column>
+    <column title="APPF_EXCPTION">APPF_EXCPTION:</column>
+    <column title="AVG_RAND_TIME">AVG_RAND_TIME:</column>
+    <column title="RAND_COUNT">RAND_COUNT:</column>
+    <column title="APPF_NEW">APPF_NEW:</column>
+    <column title="SOLV_NEW">SOLV_NEW:</column>
+    <column title="RAND_NEW">RAND_NEW:</column>
+    <column title="APPF_EQL">APPF_EQL:</column>
+    <column title="APPF_INPUT">APPF_INPUT:</column>
+    <column title="AFL_COUNT">AFL_COUNT:</column>
+    <column title="AFL_NEW">AFL_NEW:</column>
+  </columns>
 </benchmark>
 

@@ -1,4 +1,5 @@
 #!/bin/bash
-
-export PYTHONPATH=lib
+export AFL_PATH=/home/zongdongl/AFLplusplus
+export PYTHONPATH=mylib
+export PATH=mylib:$PATH
 python3 ./Legion.py $@

@@ -82,12 +82,12 @@ uninstall:
 	rm $(PREFIX)/bin/trace/as
 	rmdir $(PREFIX)/bin/trace
 
-LOGS = $(wildcard test/results/legion.*.files/*)
+LOGS = $(wildcard results/*.files/*/*)
 ZIPS = $(addsuffix /test-suite.zip,$(LOGS))
 
 .PHONY: zips
 
-%/test-suite.zip: %/Legion
+%/test-suite.zip: %/tests
 	zip $@ $^ -r
 
 zips: $(ZIPS)

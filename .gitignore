@@ -214,3 +214,12 @@ binary.instr.instr.s
 past-scoes.ods
 statistics/
 test/results
+
+# Ignore input files
+**/inputs/
+
+# Ignore lib
+**/mylib/
+
+# Ignore sync
+**/sync_dir/

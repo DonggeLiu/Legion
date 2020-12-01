@@ -1,0 +1,14 @@
+#!/bin/bash
+
+git clone https://github.com/AFLplusplus/AFLplusplus.git --branch 2.68c
+cd AFLplusplus
+
+make distrib
+
+make install
+
+cp ./afl-gcc ../mylib/afl-gcc
+cp ./afl-fuzz ../mylib/afl-fuzz
+
+chmod +x ../mylib/afl-gcc
+chmod +x ../mylib/afl-fuzz

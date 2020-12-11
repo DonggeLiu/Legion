@@ -8,6 +8,7 @@ import enum
 import gc
 import logging
 import os
+import threading
 # import pdb
 import random
 import signal
@@ -111,6 +112,7 @@ AFL_PROCESS = None
 AFL_DIR = dict ()
 AFL_SYNC_DIR = "sync_dir"
 AFL_FUZZ_NAME = "fuzzer01"
+AFL_INSTRUMENTED = False
 
 # cache Node
 # ROOT = TreeNode()  # type: TreeNode or None
@@ -709,7 +711,7 @@ def run() -> None:
     initialisation()
     ROOT.pp()
     afl()
-    time.sleep (3) # Wait for the AFL
+    # time.sleep (3) # Wait for the AFL
     while has_budget():
        mcts()
     AFL_PROCESS.kill()
@@ -730,22 +732,21 @@ def afl():
     def afl_instrument():
         global AFL_BIN
         AFL_BIN = args.file + "_afl_instr"
-        afl_clang_process = sp.run(["afl-gcc", "__VERIFIER.c", args.file, "-o", AFL_BIN])
+        afl_clang_process = sp.run(["afl-gcc", "__VERIFIER.c", "__VERIFIER_assume.c", args.file, "-o", AFL_BIN])
         output = afl_clang_process.stdout
         print(output)
+        print("==================== Instrumented finished ====================")
+        afl_start()
     
     def afl_start():
+        print("==================== Start afl_fuzz ====================")
         global AFL_PROCESS
         AFL_PROCESS = sp.Popen(["afl-fuzz", "-i", "inputs/" + DIR_NAME + "/", "-o", AFL_SYNC_DIR, "-M", AFL_FUZZ_NAME, "./" + AFL_BIN], stdout=sp.PIPE, stderr=sp.PIPE)
-        # while watchdog("./afl_output_dir/queue"):
-        #     print("===Listening====")
-        # print("Stop listening")
-        # afl_fuzz_process.kill()
 
     
     init()
-    afl_instrument()
-    afl_start()
+    t = threading.Thread(target=afl_instrument)
+    t.start()
 
 
 def initialisation():
@@ -841,58 +842,70 @@ def mcts():
     Here we check if AFL find new path or not
     """
     global SOLV_NEW, APPF_NEW, RAND_NEW, AFL_DIR, AFL_NEW
-    after = dict ([(f, None) for f in os.listdir ("{}/{}/queue".format(AFL_SYNC_DIR, AFL_FUZZ_NAME))])
-    added = [f for f in after if not f in AFL_DIR]
+    
+    added = False
+    try:
+        after = dict ([(f, None) for f in os.listdir ("{}/{}/queue".format(AFL_SYNC_DIR, AFL_FUZZ_NAME))])
+        added = [f for f in after if not f in AFL_DIR]
+    except:
+        added = False
     if (added):
-        LOGGER.info("AFL found new paths")
+        # print("AFL found new paths, Simulating")
         AFL_DIR = after
-        LOGGER.info("Simulating on the AFL inputs")
-        traces, test_cases, test_inputs = afl_simulation(new_paths=added)
-        are_new = expansion(traces=traces)
-        if COLLECT_STATISTICS:
-            for i in range(len(are_new)):
-                if test_cases[i][-1][-1] == "R":
-                    RAND_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "S":
-                    SOLV_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "F":
-                    APPF_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "A":
-                    AFL_NEW += are_new[i]
+        try:
+            traces, test_cases, test_inputs = afl_simulation(new_paths=added)
+            are_new = expansion(traces=traces)
+            if COLLECT_STATISTICS:
+                for i in range(len(are_new)):
+                    if test_cases[i][-1][-1] == "R":
+                        RAND_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "S":
+                        SOLV_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "F":
+                        APPF_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "A":
+                        AFL_NEW += are_new[i]
 
-            print("RAND_NEW: {}".format(RAND_NEW))
-            print("SOLV_NEW: {}".format(SOLV_NEW))
-            print("APPF_NEW: {}".format(APPF_NEW))
-            print("AFL_NEW: {}".format(AFL_NEW))
-        propagation(node=ROOT.children['Simulation'], traces=traces, are_new=are_new)
-        save_results_to_files(test_cases, test_inputs, are_new, "afl_legion")
+                print("RAND_NEW: {}".format(RAND_NEW))
+                print("SOLV_NEW: {}".format(SOLV_NEW))
+                print("APPF_NEW: {}".format(APPF_NEW))
+                print("AFL_NEW: {}".format(AFL_NEW))
+            propagation(node=ROOT.children['Simulation'], traces=traces, are_new=are_new)
+            save_results_to_files(test_cases, test_inputs, are_new, "afl_legion")
+        except:
+            print("Resource temporarily unavailable")
+        
 
     else:
-        LOGGER.info("Normal app_fuzzing")
-        node = selection()
-        if node is ROOT:
-            return
-        traces, test_cases, test_inputs = simulation(node=node)
-        are_new = expansion(traces=traces)
-        if COLLECT_STATISTICS:
-            for i in range(len(are_new)):
-                if test_cases[i][-1][-1] == "R":
-                    RAND_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "S":
-                    SOLV_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "F":
-                    APPF_NEW += are_new[i]
-                if test_cases[i][-1][-1] == "A":
-                    AFL_NEW += are_new[i]
+        try:
+            node = selection()
+            if node is ROOT:
+                return
+            traces, test_cases, test_inputs = simulation(node=node)
+            are_new = expansion(traces=traces)
+            if COLLECT_STATISTICS:
+                for i in range(len(are_new)):
+                    if test_cases[i][-1][-1] == "R":
+                        RAND_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "S":
+                        SOLV_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "F":
+                        APPF_NEW += are_new[i]
+                    if test_cases[i][-1][-1] == "A":
+                        AFL_NEW += are_new[i]
 
-            print("RAND_NEW: {}".format(RAND_NEW))
-            print("SOLV_NEW: {}".format(SOLV_NEW))
-            print("APPF_NEW: {}".format(APPF_NEW))
-            print("AFL_NEW: {}".format(AFL_NEW))
-        debug_assertion(len(traces) == len(are_new))
-        propagation(node=node, traces=traces, are_new=are_new)
-        ROOT.pp(mark=node, found=sum(are_new))
-        save_results_to_files(test_cases, test_inputs, are_new, "native_legion")
+                print("RAND_NEW: {}".format(RAND_NEW))
+                print("SOLV_NEW: {}".format(SOLV_NEW))
+                print("APPF_NEW: {}".format(APPF_NEW))
+                print("AFL_NEW: {}".format(AFL_NEW))
+            debug_assertion(len(traces) == len(are_new))
+            propagation(node=node, traces=traces, are_new=are_new)
+            ROOT.pp(mark=node, found=sum(are_new))
+            save_results_to_files(test_cases, test_inputs, are_new, "native_legion")
+        except:
+            print("Resource temporarily unavailable")
+        # print("Normal app_fuzzing")
+
 
 
 def selection() -> TreeNode:
@@ -1322,7 +1335,14 @@ def afl_simulation(new_paths) \
     
     global FOUND_BUG, MSGS, INPUTS, TIMES
     mutants = afl_fuzzing()
-    results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
+
+    if CORE == 1:
+        results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
+    else:
+        with closing(Pool(processes=CORE)) as conex_pool:
+            results = conex_pool.map(binary_execute_parallel, mutants)
+
+    # results = [binary_execute_parallel(mutant) for mutant in mutants if not FOUND_BUG]
 
     traces, testcases, testinputs = [], [], []
     for result in results:
